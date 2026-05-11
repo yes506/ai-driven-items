@@ -74,7 +74,7 @@ Parse the JSON. The `state` field classifies into exactly one of:
 | `greenfield` | no `.git` with commits, or repo with zero commits | offer `git init -b main` (if needed), initial empty commit, then `git branch dev` (after asking) |
 | `existing-with-dev` | `dev` exists locally or on origin | set `BASE_BRANCH=dev`, proceed to Phase 1 |
 | `existing-without-dev` | repo has commits but no `dev` | dialog (below) → `BASE_BRANCH` is set from user's pick |
-| `not-a-repo` | cwd is not inside any git repo | dialog: offer `git init` here, OR ask the user to `cd` to the target repo and re-invoke |
+| `not-a-repo` | cwd is not inside any git repo | dialog: offer `git init` here, OR ask the user to `cd` to the target repo and re-invoke. **If `git init` is chosen**: run the greenfield bootstrap commands, then **re-run `inspect_repo_state.sh`** to refresh `MAIN_CHECKOUT` and `default_branch` (they were `null` while `not-a-repo`). Treat the refreshed state as `greenfield` from there on. |
 | `inside-scaffold-worktree` | cwd matches `*/.worktrees/scaffold-*` AND is a linked worktree | if `.scaffold-state.json` present → resume from `phase_completed`; else refuse |
 | `inside-other-worktree` | inside a linked worktree NOT matching scaffold pattern | refuse, instruct user to run from `MAIN_CHECKOUT` |
 
@@ -151,6 +151,14 @@ Anything ambiguous → re-ask.
 
 Order matters — only after Phase 3 confirmation:
 
+0. **Locally** ignore `.worktrees/` in the main checkout so the in-flight
+   scaffold doesn't dirty `git status` on `${BASE_BRANCH}` (this file is
+   never committed, so it covers the pre-merge interval that step 3 below
+   does not):
+   ```bash
+   grep -qxF '.worktrees/' "${MAIN_CHECKOUT}/.git/info/exclude" \
+     || echo '.worktrees/' >> "${MAIN_CHECKOUT}/.git/info/exclude"
+   ```
 1. Compute `SCAFFOLD_ID` **once**, then interpolate consistently into both
    the path and the branch name:
    ```bash
@@ -161,10 +169,12 @@ Order matters — only after Phase 3 confirmation:
      -b "scaffold/${STACK_SLUG}-${SCAFFOLD_ID}" "${BASE_BRANCH}"
    ```
 2. `cd` into the new worktree for all subsequent file operations.
-3. Append `.worktrees/` and `.scaffold-state.json` to the parent repo's
-   `.gitignore` if either is missing — committed as part of the scaffold
-   baseline so the worktree directory and resume marker never leak into
-   future merges.
+3. Append `.worktrees/` and `.scaffold-state.json` to the **worktree's**
+   `.gitignore` if either is missing. This file is committed on the scaffold
+   branch and lands on `${BASE_BRANCH}` via Phase 7's merge, so future
+   contributors never see those paths as untracked. (The local exclude in
+   step 0 covers the pre-merge interval; this committed entry covers
+   post-merge forever.)
 
 Worktree path encodes the stack so `git worktree list` / `git branch` are
 self-describing.
@@ -208,10 +218,12 @@ sub-step, so a mid-scaffold failure stays resumable:
 }
 ```
 
-Initial commit on the scaffold branch:
+Initial commit on the scaffold branch (use the explicit `-m` form — a bare
+`git commit` would drop into `$EDITOR` and hang in non-interactive runs):
 
-```
-chore(scaffold): initialize <stack> baseline (no domain logic)
+```bash
+git add -A
+git commit -m "chore(scaffold): initialize ${STACK_SLUG} baseline (no domain logic)"
 ```
 
 The state file is gitignored (Phase 4 step 3) so it does not appear in the
@@ -275,7 +287,7 @@ deviate, but default to refusal):
 
 - `git push`, `git push --force`
 - `git merge` without the `--no-ff` flag for the scaffold branch
-- `git merge` without the `-m` flag (would hang on `$EDITOR`)
+- `git merge` or `git commit` without the `-m` flag (would hang on `$EDITOR`)
 - `git reset --hard`, `git clean -f`, `git worktree remove --force`
 - `--no-verify` on commits (pre-commit hooks must run)
 - Generating domain entities, business routes, or product-named screens
@@ -293,6 +305,15 @@ deviate, but default to refusal):
 If the user re-invokes the skill from inside an existing scaffold worktree
 (state `inside-scaffold-worktree`), read `.scaffold-state.json` and resume
 from the next phase after `phase_completed`. Do not restart the wizard.
+
+Resume mapping:
+
+| `phase_completed` value | Resume at |
+|---|---|
+| `worktree_created` | Phase 5 (scaffold files) |
+| `initialized` | Phase 5 (scaffold files), after the `initialized` sub-step |
+| `scaffold_files_written` | Phase 6 (validate) |
+| `validated` | Phase 7 (merge gate) |
 
 If `inside-scaffold-worktree` but no state file → refuse and ask the user to
 either delete the worktree or supply a state file.
