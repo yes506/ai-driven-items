@@ -15,6 +15,9 @@ GEMINI.md
 .worktrees/
 .scaffold-state.json
 
+# Skill packaging output from skill-creator's package_skill.py
+*.skill
+
 # Environment files — never commit secrets
 .env
 .env.*
