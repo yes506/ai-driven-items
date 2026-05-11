@@ -1,6 +1,14 @@
 # Claude Code per-machine settings (contains absolute paths, never share)
 .claude/settings.local.json
 
+# AI-tool instruction files (master + thin redirects) — per-clone, never
+# shipped publicly. Each maintainer/contributor authors their own based on
+# README.md, with CLAUDE.md as the single source of truth on their machine.
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.github/copilot-instructions.md
+
 # Skill runtime artifacts (the project-scaffolder skill creates these in
 # scaffolded projects; including them here is belt-and-suspenders so they
 # never accidentally land in this repo)
