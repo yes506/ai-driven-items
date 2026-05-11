@@ -1,0 +1,50 @@
+# Claude Code per-machine settings (contains absolute paths, never share)
+.claude/settings.local.json
+
+# AI-tool instruction files (master + thin redirects) — per-clone, never
+# shipped publicly. Each maintainer/contributor authors their own based on
+# README.md, with CLAUDE.md as the single source of truth on their machine.
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.github/copilot-instructions.md
+
+# Skill runtime artifacts (the project-scaffolder skill creates these in
+# scaffolded projects; including them here is belt-and-suspenders so they
+# never accidentally land in this repo)
+.worktrees/
+.scaffold-state.json
+
+# Skill packaging output from skill-creator's package_skill.py
+*.skill
+
+# Environment files — never commit secrets
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# Logs / dumps that commonly leak when debugging
+*.log
+*.dump
+core
+core.*
