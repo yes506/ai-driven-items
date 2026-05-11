@@ -149,7 +149,7 @@ These check the YAML frontmatter, the 500-line `SKILL.md` soft cap, the director
 
 ### License
 
-To be added.
+Released into the public domain via [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/). To the extent possible under law, the author(s) have waived all copyright and related or neighboring rights to this work. You may copy, modify, distribute, and use the work, even for commercial purposes, all without asking permission. See [`LICENSE`](LICENSE) for the full text.
 
 ---
 
@@ -299,4 +299,4 @@ python3 ~/.claude/skills/skill-creator/scripts/package_skill.py skills/<name> /t
 
 ### 라이선스
 
-추후 추가 예정.
+[CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/)에 따라 퍼블릭 도메인에 헌정합니다. 법이 허용하는 범위 내에서 저작자는 이 저작물에 대한 모든 저작권 및 인접 권리를 포기합니다. 별도의 허가 없이 상업적 목적을 포함한 모든 용도로 복제, 수정, 배포, 사용할 수 있습니다. 전체 원문은 [`LICENSE`](LICENSE) 파일을 참조하세요.
