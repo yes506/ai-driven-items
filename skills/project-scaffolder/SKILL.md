@@ -98,8 +98,11 @@ translated.
 
 5. **Mid-flow switches**: if the user explicitly asks to change language at
    any later phase (e.g. "switch to English" / "영어로 바꿔줘"), update
-   `LANGUAGE` in `.scaffold-state.json` and continue in the new language.
-   Do not reset other phase progress.
+   `LANGUAGE` **in memory immediately**, and continue in the new language.
+   If `.scaffold-state.json` already exists (Phase 5 onward), update its
+   top-level `language` field too. If the state file does not exist yet
+   (Phases 1–4), just hold `LANGUAGE` in memory — it will be written when
+   Phase 5 first creates the state file. Do not reset other phase progress.
 
 ### Gate
 
@@ -261,7 +264,11 @@ sub-step, so a mid-scaffold failure stays resumable:
 ```json
 {
   "language": "Korean | English",
-  "stack": { "language": "...", "framework": "...", "version_lookup": "..." },
+  "stack": {
+    "language": "...",
+    "framework": "...",
+    "version_lookup": "..."
+  },
   "base_branch": "<BASE_BRANCH>",
   "main_checkout": "<MAIN_CHECKOUT>",
   "scaffold_id": "<SCAFFOLD_ID>",
@@ -270,6 +277,11 @@ sub-step, so a mid-scaffold failure stays resumable:
   "scaffolded_at": "<ISO-8601>"
 }
 ```
+
+`stack.version_lookup`: the URL/source the agent consulted at scaffold time to
+pin the current stable version (e.g. `https://nextjs.org/docs` or
+`https://start.spring.io/`). Captured so a re-run can reproduce the same
+version pin or surface drift.
 
 Note: the top-level `language` field is the dialog `LANGUAGE` from Phase L
 (distinct from `stack.language`, which is the chosen programming language).
@@ -365,6 +377,11 @@ from the next phase after `phase_completed`. Do not restart the wizard.
 On resume, **also restore `LANGUAGE`** from the state file's top-level
 `language` field — skip Phase L entirely. If the user wants to switch
 language mid-resume, follow Phase L's "Mid-flow switches" rule.
+
+If the state file predates Phase L and has no `language` field (e.g. a
+worktree scaffolded before this version of the skill), default `LANGUAGE` to
+Korean (matching Phase L's default) and continue without prompting. The
+next state-file write will add the field.
 
 Resume mapping:
 
