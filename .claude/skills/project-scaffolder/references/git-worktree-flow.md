@@ -3,6 +3,19 @@
 This file documents ordering, naming, and edge-case handling for the worktree
 lifecycle. Read it whenever Phase 0 or Phase 4 in `SKILL.md` is active.
 
+## State variables
+
+These are captured in Phase 0 from the inspector JSON and threaded through
+Phase 4 / Phase 7:
+
+| Variable | Source | Used by |
+|---|---|---|
+| `MAIN_CHECKOUT` | inspector `main_checkout` field | Phase 4 worktree-add, Phase 7 merge |
+| `BASE_BRANCH` | `dev` for `existing-with-dev`; user choice for `existing-without-dev`; `dev` newly created for `greenfield` | Phase 4 worktree base, Phase 7 merge target |
+| `SCAFFOLD_ID` | `$(date +%s | tail -c 6)` computed once in Phase 4 | Worktree path AND branch name (must match) |
+| `STACK_SLUG` | from Phase 3 confirmation | Worktree path AND branch name |
+| `default_branch` | inspector `default_branch` field | Greenfield bootstrap, dialog wording |
+
 ## Ordering invariant
 
 **No file mutations happen before Phase 3 confirmation.** Specifically, the
@@ -14,80 +27,105 @@ discussion.
 
 Worktree path:
 ```
-.worktrees/scaffold-<stack-slug>-<short-id>
+.worktrees/scaffold-${STACK_SLUG}-${SCAFFOLD_ID}
 ```
 
 Branch:
 ```
-scaffold/<stack-slug>-<short-id>
+scaffold/${STACK_SLUG}-${SCAFFOLD_ID}
 ```
 
-`<stack-slug>` examples: `nextjs-app-router`, `spring-boot`, `fastapi`,
-`go-gin`, `node-express`. `<short-id>` is the last 5 chars of `date +%s` to
-avoid collision when scaffolding multiple stacks in one session.
+`STACK_SLUG` examples: `nextjs-app-router`, `spring-boot`, `fastapi`,
+`go-gin`, `node-express`. `SCAFFOLD_ID` is the last 5 chars of `date +%s`,
+**computed once** and reused — never recompute, or path and branch will drift.
 
 The encoded stack lets `git worktree list` and `git branch` self-describe what
 is in flight.
 
-## Phase 0 — `dev` branch detection
+## Phase 0 — `BASE_BRANCH` resolution
 
 ```bash
-git rev-parse --verify dev 2>/dev/null && echo "dev exists locally"
-git ls-remote --heads origin dev | grep -q dev && echo "dev exists on origin"
+git -C "${MAIN_CHECKOUT}" rev-parse --verify --quiet dev >/dev/null 2>&1 \
+  && echo "dev exists locally"
+git -C "${MAIN_CHECKOUT}" ls-remote --heads origin dev 2>/dev/null \
+  | grep -q "refs/heads/dev" && echo "dev exists on origin"
 ```
 
-If `dev` exists locally → use it.
-If only on origin → ask: *"Track origin/dev as local dev? (y/n)"* On y:
-`git fetch origin dev:dev`.
-If neither → present the dialog:
-
-```
-`dev` branch not found. Options:
-  1) Create dev from main (recommended for new projects)
-  2) Use a different base branch (specify name)
-  3) Abort — let me set up dev myself first
-Type 1, 2 <branch-name>, or abort.
-```
+- `dev` exists locally → `BASE_BRANCH=dev`.
+- `dev` only on origin → ask: *"Track origin/dev as local dev? (y/n)"*
+  On y: `git -C "${MAIN_CHECKOUT}" fetch origin dev:dev`.
+- Neither → present the dialog (see Phase 0 of SKILL.md).
 
 ## Phase 4 — worktree edge cases
 
 | Case | Detection | Response |
 |---|---|---|
-| Path collision | `test -e .worktrees/scaffold-<slug>-<id>` | Suffix path with extra timestamp segment, then ask user before proceeding |
-| Dirty `dev` | `git -C <main-checkout> diff --quiet dev -- .` fails | Stop, list dirty files, ask user to commit/stash first |
-| `dev` not local but on origin | see Phase 0 detection | Offer `git fetch origin dev:dev` |
+| Path collision | `test -e .worktrees/scaffold-${STACK_SLUG}-${SCAFFOLD_ID}` | Recompute `SCAFFOLD_ID` once, ask user before retry |
+| Dirty `BASE_BRANCH` | see "Dirty base-branch detection" below | Stop, list dirty files, ask user to commit/stash first |
+| `dev` not local but on origin | see Phase 0 detection | Offer `git -C "${MAIN_CHECKOUT}" fetch origin dev:dev` |
 | User aborts mid-scaffold | user typed `abort` or `^C` | Leave worktree intact, write current `phase_completed` to `.scaffold-state.json` |
 | Merge conflict at gate | `git merge --no-ff` exits non-zero | Stop, list conflicting files, hand back to user. **Never** auto-resolve. |
-| Nested invocation | `pwd` matches `*/.worktrees/scaffold-*` | Refuse with: *"This skill cannot be run from inside an existing scaffold worktree. Run it from the main checkout."* |
+| Nested invocation (other worktree) | inspector returns `inside-other-worktree` | Refuse with: *"This skill cannot be run from a non-scaffold worktree. Run it from the main checkout (`${MAIN_CHECKOUT}` from inspector output)."* |
+| Re-entry into scaffold worktree | inspector returns `inside-scaffold-worktree` + state file present | Resume per SKILL.md Resumability section |
 | Untracked files on re-run | `git status --porcelain` shows `??` lines | Preserve them. **Never** `git clean`. |
+| Default branch is `master` not `main` | inspector `default_branch == "master"` | Use `master` everywhere `main` would appear in greenfield bootstrap |
+
+### Dirty base-branch detection
+
+The agent must verify `BASE_BRANCH` is clean *as a workspace*, not "different
+from current checkout". Wrong check (compares branches, not dirtiness):
+
+```bash
+# WRONG — fails whenever current branch differs from dev
+git diff --quiet dev -- .
+```
+
+Correct check:
+
+```bash
+# Right — checks the actual working tree of MAIN_CHECKOUT for tracked + untracked changes
+[[ -z "$(git -C "${MAIN_CHECKOUT}" status --porcelain)" ]] || echo "MAIN_CHECKOUT is dirty"
+```
+
+Note: this checks the **main checkout's** working tree. If the main checkout
+sits on a different branch than `BASE_BRANCH`, that is fine — `git worktree
+add ... ${BASE_BRANCH}` operates on the named branch directly without
+touching the main checkout's index. The dirtiness check just protects the
+user's in-flight edits in the main checkout.
 
 ## Greenfield bootstrap
 
 If Phase 0 returned `greenfield`:
 
 ```bash
-git init
+# Use git ≥2.28's -b flag to set the initial branch directly
+git init -b "${default_branch:-main}"
 git commit --allow-empty -m "chore: initial empty commit"
-git branch -M main
 git branch dev
 ```
 
-Then proceed to Phase 4 with `dev` as the base. Confirm with the user before
-each of these commands (greenfield init is a "are you sure" moment).
+If `default_branch` came back as `master` (older convention), substitute that
+in. Confirm with the user before each command — greenfield init is a
+"are you sure" moment.
+
+After bootstrap, set `BASE_BRANCH=dev`.
 
 ## Merge gate (Phase 7)
 
-From the **main checkout** (not the worktree):
+Use the `git -C` form so the merge is cwd-independent:
 
 ```bash
-git checkout dev
-git merge --no-ff scaffold/<stack-slug>-<short-id> \
-  -m "feat(scaffold): merge <stack-slug> baseline"
+git -C "${MAIN_CHECKOUT}" checkout "${BASE_BRANCH}"
+git -C "${MAIN_CHECKOUT}" merge --no-ff "scaffold/${STACK_SLUG}-${SCAFFOLD_ID}" \
+  -m "feat(scaffold): merge ${STACK_SLUG} baseline"
 ```
 
 `--no-ff` is mandatory — it preserves the scaffold-as-a-unit history so the
 merge commit anchors the entire baseline. The agent must reject any user
 request to fast-forward or squash here without explicit override.
+
+The explicit `-m` is mandatory — without it `git merge` drops into `$EDITOR`,
+which hangs in non-interactive agent runs.
 
 ## What this flow never does
 
@@ -97,3 +135,4 @@ request to fast-forward or squash here without explicit override.
 - `git worktree remove --force` (forbidden — only `git worktree remove` after asking)
 - `git clean -f` (forbidden — would destroy untracked work)
 - `--no-verify` on any commit (pre-commit hooks must run)
+- Recompute `SCAFFOLD_ID` between path-creation and branch-creation (would drift)

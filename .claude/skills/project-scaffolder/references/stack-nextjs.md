@@ -48,5 +48,7 @@ config reader throws on missing required vars.
 
 ## Versions
 
-Pin via `create-next-app@latest`. Do not write a Next.js major version into
-any scaffolded file. Reference: <https://nextjs.org/docs>.
+Pin via `create-next-app@latest` and use `node:lts-alpine` in any Dockerfile
+(not a pinned major like `node:20-alpine` — `lts` tracks current Node LTS).
+Do not write a Next.js major version into any scaffolded file.
+Reference: <https://nextjs.org/docs>.

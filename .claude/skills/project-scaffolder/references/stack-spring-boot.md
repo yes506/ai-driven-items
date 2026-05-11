@@ -5,12 +5,15 @@
 Use Spring Initializr CLI or the web UI:
 
 ```bash
-# CLI (preferred — current stable picked automatically)
+# CLI (preferred — current stable picked automatically).
+# javaVersion intentionally omitted: Spring Initializr defaults to the
+# current Spring-Boot-supported LTS at request time. If a specific JDK
+# major is required, capture the user's choice in Phase 1 and pass it
+# explicitly here (e.g. `-d javaVersion=21`).
 curl https://start.spring.io/starter.zip \
   -d type=gradle-project-kotlin \
   -d language=kotlin \
   -d packaging=jar \
-  -d javaVersion=21 \
   -d dependencies=web,actuator,configuration-processor \
   -o starter.zip
 unzip starter.zip -d <project-name> && rm starter.zip

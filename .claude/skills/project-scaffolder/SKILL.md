@@ -21,8 +21,8 @@ disable-model-invocation: true
 
 Walk the user from *intent → tech-stack selection → scaffolded baseline* without
 ever generating domain logic. All file mutations happen inside a dedicated git
-worktree branched from `dev`, and the worktree only merges back after explicit
-user confirmation.
+worktree branched from `dev` (or a user-chosen base), and the worktree only
+merges back after explicit user confirmation.
 
 `disable-model-invocation: true` means this skill only fires on explicit
 `/project-scaffolder` invocation — never auto-trigger it.
@@ -30,22 +30,29 @@ user confirmation.
 ## Workflow Decision Tree
 
 ```
-Phase 0: Detect repo state ──┬─ greenfield ──┐
-                             ├─ existing+dev ┤
-                             ├─ existing-dev ┤── dialog
-                             └─ in-worktree ─── refuse, exit
-                                                │
-Phase 1: Capture intent (no mutations) ─────────┤
-Phase 2: Recommend 2-4 stacks (no mutations) ───┤
-Phase 3: User confirms stack ───── silence = stop, not yes
-Phase 4: Create worktree from dev (first mutation)
-Phase 5: Scaffold per scaffold-contract.md
-Phase 6: Validate (stack-appropriate command) + write state file
+Phase 0: Detect repo state ──┬─ greenfield ─────────┐
+                             ├─ existing-with-dev ──┤
+                             ├─ existing-without-dev ┤── dialog → BASE_BRANCH
+                             ├─ not-a-repo ─────────┤── dialog → init or relocate
+                             ├─ inside-scaffold-wt ─┤── resume from .scaffold-state.json
+                             └─ inside-other-wt ────── refuse, exit
+                                                    │
+Phase 1: Capture intent (no mutations) ─────────────┤
+Phase 2: Recommend 2-4 stacks (no mutations) ───────┤
+Phase 3: User confirms stack ─── silence = stop, not yes
+Phase 4: Create worktree from BASE_BRANCH (first mutation, SCAFFOLD_ID computed once)
+Phase 5: Scaffold per scaffold-contract.md + write .scaffold-state.json (incrementally)
+Phase 6: Validate (stack-appropriate command)
 Phase 7: Show summary, await `confirm merge` (anything else = abort)
-         on confirm: git merge --no-ff into dev, leave worktree intact
+         on confirm: git -C MAIN_CHECKOUT merge --no-ff -m "..." into BASE_BRANCH
 ```
 
-Each phase below states **inputs**, **what the agent does**, and **gates**.
+State variables captured during Phase 0 and threaded through later phases:
+
+- `MAIN_CHECKOUT` — absolute path to the parent main worktree
+- `BASE_BRANCH` — branch the scaffold branches from (default `dev`)
+- `SCAFFOLD_ID` — short suffix used in both worktree path and branch name
+- `SCAFFOLD_STATE` — `.scaffold-state.json` contents on resume
 
 ---
 
@@ -53,26 +60,45 @@ Each phase below states **inputs**, **what the agent does**, and **gates**.
 
 **Inputs**: current working directory.
 
-Run the read-only inspector and parse the JSON it prints:
+Run the read-only inspector via the skill-directory variable (the bundled
+script is **not** at the user's project root):
 
 ```bash
-bash scripts/inspect_repo_state.sh
+bash "${CLAUDE_SKILL_DIR}/scripts/inspect_repo_state.sh"
 ```
 
-Classify into exactly one of:
+Parse the JSON. The `state` field classifies into exactly one of:
 
 | State | Meaning | Action |
 |---|---|---|
-| `greenfield` | no `.git`, or `.git` with zero commits | offer to `git init` + initial commit + create `dev` from `main` (after asking) |
-| `existing-with-dev` | repo has commits, `dev` exists locally or on origin | proceed to Phase 1 |
-| `existing-without-dev` | repo has commits but no `dev` | dialog: create `dev` from `main`? target a different branch? abort? |
-| `inside-worktree` | invoked from inside a `.worktrees/...` path | refuse, instruct user to run from main checkout |
+| `greenfield` | no `.git` with commits, or repo with zero commits | offer `git init -b main` (if needed), initial empty commit, then `git branch dev` (after asking) |
+| `existing-with-dev` | `dev` exists locally or on origin | set `BASE_BRANCH=dev`, proceed to Phase 1 |
+| `existing-without-dev` | repo has commits but no `dev` | dialog (below) → `BASE_BRANCH` is set from user's pick |
+| `not-a-repo` | cwd is not inside any git repo | dialog: offer `git init` here, OR ask the user to `cd` to the target repo and re-invoke |
+| `inside-scaffold-worktree` | cwd matches `*/.worktrees/scaffold-*` AND is a linked worktree | if `.scaffold-state.json` present → resume from `phase_completed`; else refuse |
+| `inside-other-worktree` | inside a linked worktree NOT matching scaffold pattern | refuse, instruct user to run from `MAIN_CHECKOUT` |
 
-**Gate**: do not advance if state is `inside-worktree` or if user has not chosen
-a fallback in `existing-without-dev`.
+Also capture from the JSON:
 
-See [git-worktree-flow.md](references/git-worktree-flow.md) for branch-fallback
-dialog wording and edge-case handling.
+- `MAIN_CHECKOUT = json.main_checkout` (absolute path)
+- `default_branch` (used for greenfield-bootstrap and main/master detection)
+
+### `existing-without-dev` dialog
+
+```
+`dev` branch not found. Options:
+  1) Create dev from <default_branch> (recommended)
+  2) Use a different base branch (specify name, must already exist)
+  3) Abort — let me set up dev myself first
+Type 1, 2 <branch-name>, or abort.
+```
+
+Whatever branch results becomes `BASE_BRANCH`. Persist it for Phase 4 and Phase 7.
+
+**Gate**: do not advance unless `BASE_BRANCH` is decided.
+
+See [git-worktree-flow.md](references/git-worktree-flow.md) for fallback dialog
+wording, greenfield bootstrap commands, and edge-case handling.
 
 ---
 
@@ -104,9 +130,11 @@ specifics from the matching `references/stack-*.md`. For anything else, follow
 [tier2-fallback.md](references/tier2-fallback.md) — ask the user to describe
 the stack rather than improvising.
 
-**Versions**: never hardcode "Next.js 14" or "Spring Boot 3.2". When a
-version-sensitive choice matters, look up the current stable version from
-official docs at scaffold time, or emit a TODO with the canonical lookup URL.
+**Versions**: never hardcode specific major versions. When a version-sensitive
+choice matters, look up the current stable version from official docs at
+scaffold time, or emit a TODO with the canonical lookup URL. The references
+follow this rule too — if any reference shows a pinned version, treat the pin
+as a placeholder and re-resolve.
 
 ---
 
@@ -123,21 +151,29 @@ Anything ambiguous → re-ask.
 
 Order matters — only after Phase 3 confirmation:
 
-1. Pick a slug from the chosen stack (e.g. `nextjs-app-router`).
-2. Create the worktree:
+1. Compute `SCAFFOLD_ID` **once**, then interpolate consistently into both
+   the path and the branch name:
    ```bash
-   git worktree add ".worktrees/scaffold-<stack-slug>-$(date +%s | tail -c 6)" \
-     -b "scaffold/<stack-slug>-<short-id>" dev
+   SCAFFOLD_ID="$(date +%s | tail -c 6)"
+   STACK_SLUG="<chosen-slug>"   # e.g. nextjs-app-router, spring-boot, fastapi
+   git -C "${MAIN_CHECKOUT}" worktree add \
+     ".worktrees/scaffold-${STACK_SLUG}-${SCAFFOLD_ID}" \
+     -b "scaffold/${STACK_SLUG}-${SCAFFOLD_ID}" "${BASE_BRANCH}"
    ```
-3. `cd` into the new worktree for all subsequent file operations.
+2. `cd` into the new worktree for all subsequent file operations.
+3. Append `.worktrees/` and `.scaffold-state.json` to the parent repo's
+   `.gitignore` if either is missing — committed as part of the scaffold
+   baseline so the worktree directory and resume marker never leak into
+   future merges.
 
-Worktree path encodes the stack so `git worktree list` / `git branch` is
+Worktree path encodes the stack so `git worktree list` / `git branch` are
 self-describing.
 
-Edge cases (path collision, dirty `dev`, missing `dev` locally but on origin,
-nested invocation, untracked files on re-run, merge conflicts at the gate) are
-documented in [git-worktree-flow.md](references/git-worktree-flow.md). Stop and
-ask the user — never auto-resolve.
+Edge cases (path collision, dirty `BASE_BRANCH`, missing `dev` locally but on
+origin, nested invocation, untracked files on re-run, merge conflicts at the
+gate, default-branch is `master` not `main`) are documented in
+[git-worktree-flow.md](references/git-worktree-flow.md). Stop and ask the
+user — never auto-resolve.
 
 ---
 
@@ -157,15 +193,18 @@ selected stack:
 - [stack-go.md](references/stack-go.md)
 - [stack-node-express.md](references/stack-node-express.md)
 
-After file generation, write a resumable state file at the worktree root:
+Write `.scaffold-state.json` **incrementally** at the worktree root after each
+sub-step, so a mid-scaffold failure stays resumable:
 
 ```json
-// .scaffold-state.json
 {
   "stack": { "language": "...", "framework": "...", "version_lookup": "..." },
-  "phase_completed": "scaffolded",
+  "base_branch": "<BASE_BRANCH>",
+  "main_checkout": "<MAIN_CHECKOUT>",
+  "scaffold_id": "<SCAFFOLD_ID>",
+  "phase_completed": "worktree_created | initialized | scaffold_files_written | validated",
   "decisions": { "linter": "...", "test_runner": "...", "ci": "..." },
-  "scaffolded_at": "2026-05-11T11:00:00+09:00"
+  "scaffolded_at": "<ISO-8601>"
 }
 ```
 
@@ -174,6 +213,9 @@ Initial commit on the scaffold branch:
 ```
 chore(scaffold): initialize <stack> baseline (no domain logic)
 ```
+
+The state file is gitignored (Phase 4 step 3) so it does not appear in the
+commit.
 
 ---
 
@@ -195,23 +237,33 @@ Update `.scaffold-state.json` `phase_completed` to `validated` on success.
 
 ## Phase 7 — Merge gate
 
+The agent's cwd may be inside the worktree. Use `git -C "${MAIN_CHECKOUT}"`
+so the merge command is cwd-independent.
+
 Print:
 
-1. `git diff --stat dev..HEAD` (what changed).
+1. `git -C "${MAIN_CHECKOUT}" diff --stat ${BASE_BRANCH}..scaffold/${STACK_SLUG}-${SCAFFOLD_ID}` (what changed).
 2. The decisions block from `.scaffold-state.json`.
 3. The exact prompt:
 
 ```
-Type `confirm merge` to merge scaffold/<slug> into dev,
+Type `confirm merge` to merge scaffold/<slug>-<id> into <BASE_BRANCH>,
 or `abort` to leave the worktree intact for further iteration.
 ```
 
-- `confirm merge` → from main checkout: `git merge --no-ff scaffold/<slug>`
-  into `dev`. **Do not** `git push` — that is the user's call.
+- `confirm merge` → run from anywhere:
+  ```bash
+  git -C "${MAIN_CHECKOUT}" checkout "${BASE_BRANCH}"
+  git -C "${MAIN_CHECKOUT}" merge --no-ff "scaffold/${STACK_SLUG}-${SCAFFOLD_ID}" \
+    -m "feat(scaffold): merge ${STACK_SLUG} baseline"
+  ```
+  The explicit `-m` is mandatory — without it git drops into `$EDITOR` and
+  hangs in non-interactive use. **Do not** `git push` — that is the user's call.
 - Anything else → leave worktree intact, exit.
 
 After a successful merge, ask: "Remove the worktree at `.worktrees/...`?"
-On yes: `git worktree remove <path>` (no `--force`). On no: leave it.
+On yes: `git -C "${MAIN_CHECKOUT}" worktree remove <path>` (no `--force`).
+On no: leave it.
 
 ---
 
@@ -223,10 +275,12 @@ deviate, but default to refusal):
 
 - `git push`, `git push --force`
 - `git merge` without the `--no-ff` flag for the scaffold branch
+- `git merge` without the `-m` flag (would hang on `$EDITOR`)
 - `git reset --hard`, `git clean -f`, `git worktree remove --force`
 - `--no-verify` on commits (pre-commit hooks must run)
 - Generating domain entities, business routes, or product-named screens
-- Hardcoded framework versions in any scaffolded file
+- Hardcoded framework versions in any scaffolded file (re-resolve at scaffold
+  time even if the references show pinned versions)
 - Treating user silence as confirmation at any gate
 - Creating `README.md`, `INSTALLATION_GUIDE.md`, or similar docs *inside this
   skill folder* (a top-level project README in the *scaffolded project* is
@@ -236,6 +290,9 @@ deviate, but default to refusal):
 
 ## Resumability
 
-If the user re-invokes the skill from inside an existing scaffold worktree,
-read `.scaffold-state.json` and resume from the next phase after
-`phase_completed`. Do not restart the wizard.
+If the user re-invokes the skill from inside an existing scaffold worktree
+(state `inside-scaffold-worktree`), read `.scaffold-state.json` and resume
+from the next phase after `phase_completed`. Do not restart the wizard.
+
+If `inside-scaffold-worktree` but no state file → refuse and ask the user to
+either delete the worktree or supply a state file.

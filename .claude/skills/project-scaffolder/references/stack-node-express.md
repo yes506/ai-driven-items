@@ -40,7 +40,9 @@ Layout:
 - `src/logger.ts`: pino instance or console wrapper
 - `src/errors.ts`: `class AppError extends Error` + middleware error handler
 - `src/__tests__/health.test.ts`: supertest hits `/health`, asserts 200
-- `Dockerfile`: multi-stage `node:20-alpine` → `node:20-alpine` runtime
+- `Dockerfile`: multi-stage `node:lts-alpine` → `node:lts-alpine` runtime
+  (use `node:lts-alpine` rather than a pinned major like `node:20-alpine` —
+  Docker's `lts` tag tracks current Node LTS and avoids stale pins)
 - `.github/workflows/ci.yml`: `npm run lint && npm test -- --run` (opt-in)
 
 ## Denied
