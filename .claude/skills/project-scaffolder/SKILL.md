@@ -74,7 +74,7 @@ Parse the JSON. The `state` field classifies into exactly one of:
 | `greenfield` | no `.git` with commits, or repo with zero commits | offer `git init -b main` (if needed), initial empty commit, then `git branch dev` (after asking) |
 | `existing-with-dev` | `dev` exists locally or on origin | set `BASE_BRANCH=dev`, proceed to Phase 1 |
 | `existing-without-dev` | repo has commits but no `dev` | dialog (below) → `BASE_BRANCH` is set from user's pick |
-| `not-a-repo` | cwd is not inside any git repo | dialog: offer `git init` here, OR ask the user to `cd` to the target repo and re-invoke. **If `git init` is chosen**: run the greenfield bootstrap commands, then **re-run `inspect_repo_state.sh`** to refresh `MAIN_CHECKOUT` and `default_branch` (they were `null` while `not-a-repo`). Treat the refreshed state as `greenfield` from there on. |
+| `not-a-repo` | cwd is not inside any git repo | dialog: offer `git init` here, OR ask the user to `cd` to the target repo and re-invoke. **If `git init` is chosen**: run **only** `git init -b "${default_branch:-main}"` first, then **re-run `inspect_repo_state.sh`** to refresh `MAIN_CHECKOUT` and `default_branch` (they were `null` while `not-a-repo`). The refreshed state will be `greenfield` — follow that row's action (initial empty commit, then `git branch dev`, asking the user before each command). |
 | `inside-scaffold-worktree` | cwd matches `*/.worktrees/scaffold-*` AND is a linked worktree | if `.scaffold-state.json` present → resume from `phase_completed`; else refuse |
 | `inside-other-worktree` | inside a linked worktree NOT matching scaffold pattern | refuse, instruct user to run from `MAIN_CHECKOUT` |
 

@@ -56,6 +56,23 @@ git -C "${MAIN_CHECKOUT}" ls-remote --heads origin dev 2>/dev/null \
   On y: `git -C "${MAIN_CHECKOUT}" fetch origin dev:dev`.
 - Neither → present the dialog (see Phase 0 of SKILL.md).
 
+## Phase 4 — pre-creation: local exclude
+
+Before `git worktree add` runs, append `.worktrees/` to the **main checkout's**
+`.git/info/exclude`. This is local-only and never committed; it covers the
+pre-merge interval where the worktree directory would otherwise show as
+`?? .worktrees/` in `git status` on the main checkout.
+
+```bash
+grep -qxF '.worktrees/' "${MAIN_CHECKOUT}/.git/info/exclude" \
+  || echo '.worktrees/' >> "${MAIN_CHECKOUT}/.git/info/exclude"
+```
+
+The committed `.gitignore` entry on the scaffold branch (Phase 4 step 3 in
+`SKILL.md`) handles the post-merge interval. Both are needed: the local
+exclude disappears with the repo, the committed entry persists for future
+contributors.
+
 ## Phase 4 — worktree edge cases
 
 | Case | Detection | Response |
@@ -98,7 +115,9 @@ user's in-flight edits in the main checkout.
 If Phase 0 returned `greenfield`:
 
 ```bash
-# Use git ≥2.28's -b flag to set the initial branch directly
+# Use git ≥2.28's -b flag to set the initial branch directly.
+# (Older git rejects -b; if you suspect git <2.28, run `git --version` first
+# and fall back to `git init && git checkout -b "${default_branch:-main}"`.)
 git init -b "${default_branch:-main}"
 git commit --allow-empty -m "chore: initial empty commit"
 git branch dev
@@ -109,6 +128,21 @@ in. Confirm with the user before each command — greenfield init is a
 "are you sure" moment.
 
 After bootstrap, set `BASE_BRANCH=dev`.
+
+## `not-a-repo` → greenfield handoff
+
+If Phase 0 returned `not-a-repo` and the user chose to `git init` here:
+
+1. Run **only** `git init -b "${default_branch:-main}"` first (this is the
+   minimum to make the inspector usable — the empty commit and `dev` branch
+   come later, gated by the greenfield bootstrap dialog above).
+2. **Re-run** `inspect_repo_state.sh`. `MAIN_CHECKOUT` and `default_branch`
+   will refresh from `null` to real values; `state` will become `greenfield`.
+3. Follow the greenfield bootstrap section above (with per-command user
+   confirmation), then set `BASE_BRANCH=dev`.
+
+This sequencing preserves the per-command confirmation gate that bundling all
+three commands into the `not-a-repo` decision would bypass.
 
 ## Merge gate (Phase 7)
 
