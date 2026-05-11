@@ -5,11 +5,12 @@ lifecycle. Read it whenever Phase 0 or Phase 4 in `SKILL.md` is active.
 
 ## State variables
 
-These are captured in Phase 0 from the inspector JSON and threaded through
-Phase 4 / Phase 7:
+These are captured in Phase L / Phase 0 from the inspector JSON and threaded
+through Phase 4 / Phase 7:
 
 | Variable | Source | Used by |
 |---|---|---|
+| `LANGUAGE` | Phase L detection from invocation utterance (default `Korean`) | Every user-facing prompt across Phases 0–7 |
 | `MAIN_CHECKOUT` | inspector `main_checkout` field | Phase 4 worktree-add, Phase 7 merge |
 | `BASE_BRANCH` | `dev` for `existing-with-dev`; user choice for `existing-without-dev`; `dev` newly created for `greenfield` | Phase 4 worktree base, Phase 7 merge target |
 | `SCAFFOLD_ID` | `$(date +%s | tail -c 6)` computed once in Phase 4 | Worktree path AND branch name (must match) |
