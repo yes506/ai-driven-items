@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Architecture report — {{PROJECT_SLUG}}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 960px; margin: 2em auto; padding: 0 1em; color: #1a1a1a; }
+    h1 { border-bottom: 2px solid #1a1a1a; padding-bottom: .25em; }
+    h2 { margin-top: 2em; border-bottom: 1px solid #ccc; padding-bottom: .15em; }
+    h4 { margin-bottom: .25em; color: #444; }
+    code { background: #f4f4f4; padding: .15em .4em; border-radius: 3px; }
+    pre { background: #f9f9f9; padding: 1em; border-radius: 6px; overflow-x: auto; }
+    pre.doc { background: #fafaf2; border-left: 3px solid #ccc; padding: .6em .9em;
+              font-size: .85em; white-space: pre-wrap; }
+    summary { cursor: pointer; padding: .5em 0; }
+    details { margin: .5em 0; padding-left: 1em; border-left: 2px solid #eee; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #ddd; padding: .4em .6em; text-align: left; }
+    th { background: #f9f9f9; }
+    .meta { color: #666; font-size: .9em; }
+    .checklist { line-height: 1.8; }
+    .checklist li { list-style: none; }
+    .checklist li::before { content: "☐ "; color: #888; margin-right: .25em; }
+  </style>
+</head>
+<body>
+  <h1>{{PROJECT_SLUG}}</h1>
+  <p class="meta">Language: <strong>{{LANGUAGE}}</strong> · Last completed phase: <strong>{{PHASE}}</strong></p>
+
+  <h2>Project plan</h2>
+  {{PLAN}}
+
+  <h2>Package layout</h2>
+  {{PACKAGES}}
+
+  <h2>Interfaces &amp; method docstrings</h2>
+  <p class="meta">All interfaces are expanded by default so the reviewer can spot-check the 9-field docstrings without scrolling through a chat log.</p>
+  {{INTERFACES}}
+
+  <h2>Dependency DAG (Mermaid source)</h2>
+  <p class="meta">Inline Mermaid source — this report is fully self-contained and does not load any external scripts. To render the diagram, paste the block below into a Mermaid renderer (e.g. <code>mermaid-cli</code> or <code>mermaid.live</code>) or open the sibling <code>architecture.mmd</code> file.</p>
+  <pre>
+{{MERMAID}}
+  </pre>
+
+  <h2>Self-verification rubric</h2>
+  {{RUBRIC}}
+
+  <h2>Reviewer checklist</h2>
+  {{CHECKLIST}}
+</body>
+</html>
