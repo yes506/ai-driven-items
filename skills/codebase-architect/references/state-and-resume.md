@@ -106,6 +106,18 @@ language-native writer (Python: `json.dump`).
 
 ## Read by downstream automation
 
+> **Note on the unborn-branch edge case in inspector output**: when a
+> repo has been initialized with `git init -b dev` (or `git init -b main`)
+> but no commits yet, the inspector emits
+> `{"state": "unrelated", "reason": "repo_has_no_commits",
+>   "current_branch": "dev", "dev_exists": false, ...}`. The
+> `current_branch` and `dev_exists` fields look contradictory at a
+> glance but are both correct: `git symbolic-ref HEAD` returns the
+> unborn branch name (so it's the conceptual current branch), but
+> `refs/heads/dev` doesn't materialize until the first commit (so the
+> ref-existence check returns false). Treat the `state` field as
+> authoritative; `current_branch` and `dev_exists` are diagnostic.
+
 Downstream automation does NOT read `.architect-state.json` (it's
 gitignored — wouldn't survive merge to dev). The canonical
 implementation-gate check looks at the **tracked** architecture

@@ -55,7 +55,6 @@ CURRENT_BRANCH="$(printf '%s' "${CURRENT_BRANCH}" | tr -d '\r\n\t')"
 # DETACHED bucket below also doesn't catch this case — must be checked here.
 # 4-reviewer round-3 convergence (D1).
 if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
-  MAIN_CHECKOUT_FOR_EMIT="${MAIN_CHECKOUT}"
   DEFAULT_BRANCH=""
   DEV_EXISTS=false
   SCAFFOLD_MARKER_PRESENT=false

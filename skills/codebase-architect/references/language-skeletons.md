@@ -8,7 +8,12 @@ validation command.
 `detect_language_stack.sh` returns:
 - `language` — the *primary* recommendation (first match in priority order below)
 - `validation_command` — Phase 6 command for that primary language
-- `detected_build_files` — every build file found at the project root (handles monorepos)
+- `detected_build_files` — normalized list of stack markers found at
+  the project root (handles monorepos). Normalization rule: when both
+  `tsconfig.json` and `package.json` are present, only `tsconfig.json`
+  is listed (the `package.json` is part of the canonical TypeScript
+  pairing, not a separate stack signal — without this rule every
+  normal TS project would falsely trigger Phase 0's monorepo dialog).
 
 Priority order (first match becomes primary; multiple matches are listed in `detected_build_files`):
 

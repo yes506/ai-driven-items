@@ -95,8 +95,12 @@ bash "${CLAUDE_SKILL_DIR}/scripts/detect_language_stack.sh"
 
 Output gives `language` (primary recommendation: `java | python |
 typescript | javascript | go | rust | unknown`), `validation_command`
-for Phase 6, AND `detected_build_files` listing every build file found
-at the project root.
+for Phase 6, AND `detected_build_files` — a normalized list of stack
+markers found at the project root. (Normalization: when both
+`tsconfig.json` and `package.json` are present at the root, only
+`tsconfig.json` is listed since the `package.json` is part of the
+canonical TypeScript pairing, not a separate stack signal. Any other
+combination of build files is reported verbatim.)
 
 **Handle multi-build-file projects (monorepos)**: when
 `detected_build_files` lists more than one entry (e.g. `pom.xml` AND
