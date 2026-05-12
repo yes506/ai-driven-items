@@ -21,6 +21,31 @@ criterion.
 If a field is genuinely empty for a given method (e.g., no side effects),
 write `None.` explicitly — do NOT omit the field.
 
+### Async / context-carrying methods
+
+For `async`, `Future`/`Promise`-returning, or `ctx`/`Context`-carrying
+methods (Python `async def`, TypeScript `Promise<T>`, Go's
+`context.Context`, Rust `async fn`), the 9 fields cover everything but
+require specific discipline:
+
+- **Inputs** — document the context/cancellation parameter explicitly
+  (even though it's idiomatic), e.g. `ctx: context.Context — carries
+  deadline and cancellation; pass context.Background() only in tests`.
+- **Side-effects** — note any work that continues after cancellation
+  (e.g. "best-effort flush; partial writes may persist if cancelled
+  mid-flight").
+- **Failure-modes** — list `Cancelled` / `DeadlineExceeded` /
+  cancellation-equivalent errors explicitly. Do not bundle them into
+  generic "errors".
+
+Idempotency and thread-safety are NOT separate fields — call them out
+in **Postconditions** (e.g. "idempotent: repeated calls with the same
+input produce the same effect") or **Side-effects** (e.g. "callers
+must serialize calls; not safe for concurrent invocation on the same
+instance") as appropriate. The 9-field schema deliberately stops at 9
+to keep the writing burden manageable; concerns that aren't a separate
+node category go inside an existing field.
+
 ## Per-language format
 
 ### Java (Javadoc)
@@ -47,6 +72,11 @@ public interface OrderRepository {
 
 ### Python (PEP 257 with structured sections)
 
+PEP 257 reserves the first line as a one-sentence summary. Treat that
+summary line AS the `Responsibility` field (don't repeat it on a
+second line labelled "Responsibility:"). Below the summary, lay out
+the remaining 8 fields:
+
 ```python
 from typing import Protocol
 
@@ -54,7 +84,6 @@ class OrderRepository(Protocol):
     def save(self, order: Order) -> Order:
         """Persist a validated Order to the canonical store.
 
-        Responsibility: Persist a validated Order to the canonical store.
         Pipeline-position: PaymentCharger.capture -> THIS -> OrderEventPublisher.publish
         Inputs:
             order: Order — must be validated AND payment-captured (status >= CAPTURED)
@@ -102,6 +131,7 @@ type OrderRepository interface {
     // Responsibility: Persist a validated Order to the canonical store.
     // Pipeline-position: PaymentCharger.Capture -> THIS -> OrderEventPublisher.Publish
     // Inputs:
+    //   - ctx: context.Context — carries deadline and cancellation; on cancellation, partial writes may persist (see Side-effects)
     //   - order: *Order — must be validated AND payment-captured (Status >= Captured)
     // Outputs: *Order — same pointer with non-empty ID and Status == Persisted
     // Side-effects: writes one row to orders table; increments persisted_total

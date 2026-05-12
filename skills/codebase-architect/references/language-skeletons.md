@@ -5,18 +5,30 @@ validation command.
 
 ## Selection
 
-`detect_language_stack.sh` returns `language` based on root build files:
+`detect_language_stack.sh` returns:
+- `language` — the *primary* recommendation (first match in priority order below)
+- `validation_command` — Phase 6 command for that primary language
+- `detected_build_files` — every build file found at the project root (handles monorepos)
+
+Priority order (first match becomes primary; multiple matches are listed in `detected_build_files`):
 
 | Build file present | Language |
 |---|---|
 | `pom.xml` | java (Maven) |
 | `build.gradle` or `build.gradle.kts` | java (Gradle) |
 | `pyproject.toml`, `requirements.txt`, `Pipfile` | python |
-| `package.json` + `tsconfig.json` | typescript |
+| `tsconfig.json` (with or without `package.json`) | typescript |
 | `package.json` (no `tsconfig.json`) | javascript |
 | `go.mod` | go |
 | `Cargo.toml` | rust |
 | (none) | unknown |
+
+**Multi-build-file projects (monorepos)**: `detected_build_files`
+will list more than one entry. Do NOT silently honor only the primary
+— ask the user explicitly which stack codebase-architect should
+design for. This skill is single-stack per invocation; for repos with
+both a Java backend and a TypeScript frontend, run it twice in
+separate worktrees.
 
 **If `unknown`**: ask the user
 "What language? (java/python/typescript/go/rust/other)" and capture as
@@ -45,12 +57,18 @@ construct.
 ### Python
 
 - **Abstraction kind**: `typing.Protocol` (preferred for structural
-  typing) or `abc.ABC` (when runtime `isinstance` checks are needed)
+  typing) or `abc.ABC` (when runtime `isinstance` checks are needed).
+  Record the choice in `.architect-state.json`'s
+  `interfaces[].python_kind` field (`protocol` | `abc`) so downstream
+  implementers know which to subclass.
 - **File layout**: one `.py` per interface, OR a single `interfaces.py`
   per package when the package has many small interfaces
 - **Empty method**: signature ending in `...` (Ellipsis literal) inside
   a `Protocol`; or `@abstractmethod` decorator + `pass` body in `ABC`
-- **Validation**: `mypy --strict <package>` or `pyright`
+- **Validation**: `mypy --strict <package>` or `pyright`. The
+  `<package>` placeholder must be substituted with the actual package
+  path from Phase 2 (e.g. `src/myproj`) — never run `mypy --strict .`
+  over the worktree root.
 - **Docstring format**: PEP 257 with structured sections — see
   [docstring-schema.md](docstring-schema.md)
 
@@ -66,6 +84,11 @@ construct.
 - **Validation**: `tsc --noEmit`
 - **Docstring format**: TSDoc — see
   [docstring-schema.md](docstring-schema.md)
+- **TypeScript-specific NO-implementation rules** (in addition to the
+  cross-language rule below): no concrete (non-`abstract`) methods on
+  `abstract class`; no `declare module` augmentations adding implemented
+  members; no `static` method bodies; no default values on optional
+  method parameters that smuggle in behavior
 
 ### Go
 

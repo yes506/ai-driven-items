@@ -1,19 +1,25 @@
 # `.architect-state.json` — schema and resume
 
-The state file lives at the worktree root and is gitignored on the
-architect branch. It is updated **incrementally** after each Phase
-sub-step so any mid-run failure stays resumable.
+The state file lives at the worktree root and is **gitignored** on the
+architect branch (per Phase 4 step 3). It is local-only working state,
+updated **incrementally** after each Phase sub-step so any mid-run
+failure stays resumable. It is NEVER committed; Phase 8's
+human-confirmation marker lives in the architecture artifacts
+(`architecture.html`, `architecture.mmd`) and the merge commit
+message, not in this file. See SKILL.md "Implementation gate
+(downstream contract)" for the canonical gate check.
 
 ## Schema
 
 ```json
 {
-  "project_slug": "string (kebab-case, used in worktree path + branch name)",
-  "main_checkout": "absolute path to the main worktree",
-  "base_branch": "string (default: dev)",
-  "architect_id": "string (numeric suffix from date +%s | tail -c 6)",
+  "project_slug": "string (kebab-case ascii, used in worktree path + branch name)",
+  "main_checkout": "absolute path to the main worktree (physical, symlinks resolved)",
+  "base_branch": "string (default: dev; configurable when dev doesn't exist)",
+  "architect_id": "string (e.g. '12345-67890' — `date +%s | tail -c 6`-`$$`)",
   "language_stack": "java | python | typescript | go | rust",
-  "validation_command": "string (the actual command to run in Phase 6)",
+  "validation_command": "string (the actual command to run in Phase 6, with <package> already substituted)",
+  "detected_build_files": ["array (from detect_language_stack.sh output; non-empty when project is a monorepo)"],
   "phase_completed": "worktree_created | plan_normalized | packages_planned | decomposition_done | skeleton_written | validated | artifacts_emitted | human_confirmed",
   "plan": {
     "goal": "string",
@@ -100,15 +106,16 @@ language-native writer (Python: `json.dump`).
 
 ## Read by downstream automation
 
-Skills, subagents, and Claude sessions intending to write
-**implementation** code read this file from the project root. The check
-they perform is exactly:
+Downstream automation does NOT read `.architect-state.json` (it's
+gitignored — wouldn't survive merge to dev). The canonical
+implementation-gate check looks at the **tracked** architecture
+artifacts and the architect-merge commit on the current branch:
 
 ```bash
-test -f .architect-state.json \
-  && jq -e '.phase_completed == "human_confirmed"' .architect-state.json \
-  >/dev/null
+test -f architecture.html && test -f architecture.mmd \
+  && git log --grep='(interfaces only, human-confirmed)' \
+       --format=%H | grep -q .
 ```
 
-If the check fails, refuse implementation work and ask the user to
-complete `/codebase-architect` first.
+See SKILL.md "Implementation gate (downstream contract)" for the full
+contract, including its honest forgeability limitations.

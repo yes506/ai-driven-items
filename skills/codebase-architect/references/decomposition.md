@@ -49,12 +49,12 @@ interface OrderService {
 
 | Interface | Methods | Cohesion source |
 |---|---|---|
-| `OrderIntake` | `receive`, `validate` | shared state (raw → validated form) |
-| `InventoryReservation` | `reserve`, `release` | shared lifecycle on a Reservation |
-| `PaymentCharger` | `authorize`, `capture`, `refund` | shared payment-state machine |
-| `OrderRepository` | `save`, `findById`, `markStatus` | shared persistence boundary |
-| `CustomerNotifier` | `notify` | single responsibility, may grow |
-| `OrderEventPublisher` | `publish` | separate failure domain (event bus) |
+| `OrderIntake` | `receive`, `validate` | `lifecycle` — both methods operate on a single Order as it advances through the intake stage (raw → validated); `validate` is meaningful only on the output of `receive` |
+| `InventoryReservation` | `reserve`, `release` | `lifecycle` — paired methods on a Reservation aggregate |
+| `PaymentCharger` | `authorize`, `capture`, `refund` | `state` — all three read/write the same payment-state machine |
+| `OrderRepository` | `save`, `findById`, `markStatus` | `collaboration` — invoked by the same upstream pipeline stage to mediate persistence |
+| `CustomerNotifier` | `notify` | single responsibility; may grow if more notification channels appear |
+| `OrderEventPublisher` | `publish` | `failure_domain` — event-bus failures must not block the synchronous Order path |
 
 Each method is one node. Each interface is a cohesive group.
 

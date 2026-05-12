@@ -6,6 +6,13 @@ Edges come from each interface's methods' `collaborators` field if present in
 the state; otherwise just nodes are emitted.
 
 Read-only: writes only to stdout. Caller redirects with `> architecture.mmd`.
+
+Safety:
+- Node IDs are deterministic and collision-free even when interface names share
+  the same _safe()-stripped form (a counter suffix is appended for collisions).
+- Node labels are escaped against Mermaid syntax injection — quotes, angle
+  brackets, and click-directive separators in interface names cannot break
+  out of the label or inject directives.
 """
 
 import json
@@ -14,7 +21,40 @@ from pathlib import Path
 
 
 def _safe(name: str) -> str:
-    return "".join(c if c.isalnum() else "_" for c in name) or "node"
+    """Conservative ASCII identifier from arbitrary text."""
+    cleaned = "".join(c if c.isalnum() else "_" for c in name)
+    return cleaned or "node"
+
+
+def _label_escape(name: str) -> str:
+    """Escape a string for safe use as a Mermaid quoted label.
+
+    Mermaid renders `id["LABEL"]` blocks; the label is HTML-decoded by the
+    renderer, so we use #-prefixed entity codes (Mermaid's preferred form)
+    plus standard HTML entities to neutralize quotes, brackets, click
+    directives, and newlines.
+    """
+    return (
+        str(name)
+        .replace("&", "&amp;")
+        .replace('"', "#quot;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\n", " ")
+        .replace("\r", " ")
+        .replace("|", "&#124;")
+        .replace("[", "&#91;")
+        .replace("]", "&#93;")
+    )
+
+
+def _unique_id(base: str, taken: dict) -> str:
+    """Return a unique node id; if `base` is already taken, append a counter."""
+    if base not in taken:
+        taken[base] = 1
+        return base
+    taken[base] += 1
+    return f"{base}_{taken[base]}"
 
 
 def main() -> int:
@@ -35,20 +75,33 @@ def main() -> int:
         print('  empty["(no interfaces emitted yet)"]')
         return 0
 
-    seen_edges: set = set()
+    # First pass: assign unique node ids per interface.
+    name_to_id = {}
+    taken = {}
     for iface in interfaces:
-        name = iface.get("name", "?")
-        node_id = _safe(name)
-        print(f'  {node_id}["{name}"]')
+        original = str(iface.get("name", "?"))
+        node_id = _unique_id(_safe(original), taken)
+        name_to_id[original] = node_id
+        print(f'  {node_id}["{_label_escape(original)}"]')
+
+    # Second pass: emit edges from collaborators.
+    seen_edges = set()
+    for iface in interfaces:
+        src_name = str(iface.get("name", "?"))
+        src_id = name_to_id.get(src_name)
+        if src_id is None:
+            continue
         for method in iface.get("methods") or []:
             for collab in method.get("collaborators") or []:
-                target = collab.split(".", 1)[0]
-                target_id = _safe(target)
-                edge = (node_id, target_id)
-                if edge in seen_edges or target_id == node_id:
+                target_name = str(collab).split(".", 1)[0]
+                target_id = name_to_id.get(target_name)
+                if target_id is None or target_id == src_id:
+                    continue
+                edge = (src_id, target_id)
+                if edge in seen_edges:
                     continue
                 seen_edges.add(edge)
-                print(f"  {node_id} --> {target_id}")
+                print(f"  {src_id} --> {target_id}")
     return 0
 
 

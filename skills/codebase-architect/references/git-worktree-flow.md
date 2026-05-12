@@ -10,10 +10,13 @@ for maintainers familiar with that skill.
 architect/<project-slug>-<id>               ← branch name
 ```
 
-`<id>` is `date +%s | tail -c 6` — short numeric suffix to disambiguate
-re-runs. `<project-slug>` is a short identifier for the project being
-architected (e.g., `order-service`, `analytics-pipeline`); ask the user
-in Phase 4 if not already obvious.
+`<id>` is `date +%s | tail -c 6`-`$$` — short numeric suffix with the
+shell PID appended, so two `/codebase-architect` invocations started
+within the same wall-clock second still get different IDs.
+`<project-slug>` is a short ASCII identifier for the project being
+architected (e.g., `order-service`, `analytics-pipeline`) — lowercase,
+hyphens only, no spaces or path separators. Ask the user in Phase 4 if
+not already obvious, and sanitize defensively before interpolating.
 
 ## Base branch resolution
 
@@ -88,7 +91,8 @@ grep -qxF '.worktrees/' "${MAIN_CHECKOUT}/.git/info/exclude" \
   || echo '.worktrees/' >> "${MAIN_CHECKOUT}/.git/info/exclude"
 
 # Step 1 — compute ARCHITECT_ID once, interpolate into both path + branch
-ARCHITECT_ID="$(date +%s | tail -c 6)"
+# (PID suffix guarantees uniqueness for same-second concurrent runs)
+ARCHITECT_ID="$(date +%s | tail -c 6)-$$"
 PROJECT_SLUG="<short-project-slug>"
 git -C "${MAIN_CHECKOUT}" worktree add \
   ".worktrees/architect-${PROJECT_SLUG}-${ARCHITECT_ID}" \
@@ -114,6 +118,6 @@ Inherits the global rules from CLAUDE.md:
 - No `git merge` without `--no-ff` for the architect branch
 - No `git merge` or `git commit` without `-m` (would hang on `$EDITOR`)
 - No `--no-verify` on commits
-- Never use `git commit --amend` once a commit lands on the architect
-  branch — create a new commit instead, even if the previous was
-  trivially wrong
+- No `git commit --amend` once a commit lands on the architect branch
+  — create a new commit instead, even if the previous was trivially
+  wrong. Amend rewrites history that `--no-ff` was meant to preserve.

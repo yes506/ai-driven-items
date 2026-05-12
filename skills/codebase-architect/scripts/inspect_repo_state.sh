@@ -4,64 +4,112 @@
 
 set -euo pipefail
 
-emit() {
-  printf '%s\n' "$1"
-  exit 0
+# Escape a string for safe JSON-string interpolation: backslash, quote, control chars.
+jesc() {
+  printf '%s' "${1:-}" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read())[1:-1])'
+}
+
+emit() { printf '%s\n' "$1"; exit 0; }
+
+build_json() {
+  local state="$1" reason="${2:-}"
+  local reason_field=""
+  [ -n "${reason}" ] && reason_field=",\"reason\":\"$(jesc "${reason}")\""
+  printf '{"state":"%s"%s,"main_checkout":"%s","default_branch":"%s","current_branch":"%s","dev_exists":%s,"scaffold_marker_present":%s}\n' \
+    "${state}" "${reason_field}" \
+    "$(jesc "${MAIN_CHECKOUT:-}")" \
+    "$(jesc "${DEFAULT_BRANCH:-}")" \
+    "$(jesc "${CURRENT_BRANCH:-}")" \
+    "${DEV_EXISTS:-false}" "${SCAFFOLD_MARKER_PRESENT:-false}"
 }
 
 # 1. Inside any git repo?
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  emit '{"state":"unrelated","reason":"not_in_git_repo","main_checkout":null,"default_branch":null,"current_branch":null,"scaffold_marker_present":false}'
+  MAIN_CHECKOUT="" DEFAULT_BRANCH="" CURRENT_BRANCH="" DEV_EXISTS=false SCAFFOLD_MARKER_PRESENT=false
+  emit '{"state":"unrelated","reason":"not_in_git_repo","main_checkout":null,"default_branch":null,"current_branch":null,"dev_exists":false,"scaffold_marker_present":false}'
 fi
 
-# 2. Worktree info — derive MAIN_CHECKOUT from git-common-dir's parent.
+# 2. Worktree info — derive MAIN_CHECKOUT from the *physical* parent of git-common-dir.
+#    `pwd -P` resolves symlinks (e.g. macOS /tmp -> /private/tmp) so the result
+#    matches `git rev-parse --show-toplevel`, which always emits physical paths.
 GIT_COMMON_DIR="$(git rev-parse --git-common-dir 2>/dev/null)"
-MAIN_CHECKOUT="$(cd "$(dirname "${GIT_COMMON_DIR}")" && pwd)"
+GIT_COMMON_DIR_ABS="$(cd "$(dirname "${GIT_COMMON_DIR}")" && pwd -P)/$(basename "${GIT_COMMON_DIR}")"
+MAIN_CHECKOUT="$(dirname "${GIT_COMMON_DIR_ABS}")"
 
-CWD="$(pwd)"
-CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'HEAD')"
+# 3. Current branch — symbolic-ref handles detached HEAD and empty-repo states cleanly,
+#    and (unlike rev-parse) returns a single line or fails silently.
+if CURRENT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null)"; then
+  : # real branch name captured
+else
+  # Detached HEAD or zero-commits repo — distinguishable but treat as a single bucket.
+  CURRENT_BRANCH="DETACHED"
+fi
+# Defensive: collapse any stray whitespace/newlines that would corrupt JSON.
+CURRENT_BRANCH="$(printf '%s' "${CURRENT_BRANCH}" | tr -d '\r\n\t')"
 
-# 3. Default branch (main / master)
+# 4. Default branch (main / master) — read from MAIN_CHECKOUT, not cwd.
 DEFAULT_BRANCH=""
 for candidate in main master; do
-  if git -C "${MAIN_CHECKOUT}" show-ref --verify --quiet "refs/heads/${candidate}"; then
+  if git -C "${MAIN_CHECKOUT}" show-ref --verify --quiet "refs/heads/${candidate}" 2>/dev/null; then
     DEFAULT_BRANCH="${candidate}"
     break
   fi
 done
 
-# 4. Linked-worktree detection (a linked worktree has .git as a file, not dir)
-IS_LINKED_WORKTREE="false"
-if [ "${CWD}" != "${MAIN_CHECKOUT}" ] && [ -f "${CWD}/.git" ]; then
-  IS_LINKED_WORKTREE="true"
+# 5. Does dev exist locally?
+DEV_EXISTS=false
+if git -C "${MAIN_CHECKOUT}" show-ref --verify --quiet "refs/heads/dev" 2>/dev/null; then
+  DEV_EXISTS=true
 fi
 
-# 5. Has the project ever been scaffolded? Search commit messages.
-SCAFFOLD_MARKER_PRESENT="false"
-if git -C "${MAIN_CHECKOUT}" log --oneline --all 2>/dev/null \
-    | grep -q 'chore(scaffold): initialize'; then
-  SCAFFOLD_MARKER_PRESENT="true"
+# 6. Worktree-root for path classification — works even when cwd is a subdirectory.
+WORKTREE_TOP="$(git rev-parse --show-toplevel 2>/dev/null || echo '')"
+IS_LINKED_WORKTREE=false
+if [ -n "${WORKTREE_TOP}" ] && [ "${WORKTREE_TOP}" != "${MAIN_CHECKOUT}" ]; then
+  IS_LINKED_WORKTREE=true
 fi
 
-# 6. Classify
+# 7. Scaffold marker — search commit messages on any ref.
+#    Use git's native --grep + output capture (not `| grep -q`); under `pipefail`,
+#    `grep -q` short-circuits and gives `git log` SIGPIPE, which propagates as a
+#    pipeline failure and silently miscategorizes existing scaffold commits.
+SCAFFOLD_MARKER_PRESENT=false
+if [ -n "$(git -C "${MAIN_CHECKOUT}" log --all --grep='chore(scaffold): initialize' --format=%H 2>/dev/null)" ]; then
+  SCAFFOLD_MARKER_PRESENT=true
+fi
+
+# 8. Classify
 if [ "${IS_LINKED_WORKTREE}" = "true" ]; then
-  case "${CWD}" in
-    */.worktrees/architect-*)
-      emit "{\"state\":\"inside-architect-worktree\",\"main_checkout\":\"${MAIN_CHECKOUT}\",\"default_branch\":\"${DEFAULT_BRANCH}\",\"current_branch\":\"${CURRENT_BRANCH}\",\"scaffold_marker_present\":${SCAFFOLD_MARKER_PRESENT}}"
-      ;;
-    *)
-      emit "{\"state\":\"inside-other-worktree\",\"main_checkout\":\"${MAIN_CHECKOUT}\",\"default_branch\":\"${DEFAULT_BRANCH}\",\"current_branch\":\"${CURRENT_BRANCH}\",\"scaffold_marker_present\":${SCAFFOLD_MARKER_PRESENT}}"
-      ;;
+  case "${WORKTREE_TOP}" in
+    */.worktrees/architect-*)  emit "$(build_json inside-architect-worktree)" ;;
+    *)                          emit "$(build_json inside-other-worktree)" ;;
   esac
 fi
 
-# In main checkout: classify by branch + scaffold marker.
+# Main checkout — classify by current branch + dev presence + scaffold marker.
 if [ "${CURRENT_BRANCH}" = "dev" ]; then
   if [ "${SCAFFOLD_MARKER_PRESENT}" = "true" ]; then
-    emit "{\"state\":\"on-dev-with-scaffold\",\"main_checkout\":\"${MAIN_CHECKOUT}\",\"default_branch\":\"${DEFAULT_BRANCH}\",\"current_branch\":\"${CURRENT_BRANCH}\",\"scaffold_marker_present\":true}"
+    emit "$(build_json on-dev-with-scaffold)"
   else
-    emit "{\"state\":\"on-dev-no-scaffold\",\"main_checkout\":\"${MAIN_CHECKOUT}\",\"default_branch\":\"${DEFAULT_BRANCH}\",\"current_branch\":\"${CURRENT_BRANCH}\",\"scaffold_marker_present\":false}"
+    emit "$(build_json on-dev-no-scaffold)"
   fi
 fi
 
-emit "{\"state\":\"unrelated\",\"reason\":\"not_on_dev_in_main_checkout\",\"main_checkout\":\"${MAIN_CHECKOUT}\",\"default_branch\":\"${DEFAULT_BRANCH}\",\"current_branch\":\"${CURRENT_BRANCH}\",\"scaffold_marker_present\":${SCAFFOLD_MARKER_PRESENT}}"
+if [ "${CURRENT_BRANCH}" = "DETACHED" ]; then
+  emit "$(build_json unrelated detached_head)"
+fi
+
+# Zero-commits repo: HEAD points at a branch name but no commit exists yet.
+# symbolic-ref above succeeded with the unborn branch name (e.g. "main"), so
+# this branch isn't covered by the DETACHED check; surface it explicitly.
+if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+  emit "$(build_json unrelated repo_has_no_commits)"
+fi
+
+# On the default branch but `dev` doesn't exist — surface so Phase 0 can run the
+# "create dev from <default_branch>?" dialog from references/git-worktree-flow.md.
+if [ -n "${DEFAULT_BRANCH}" ] && [ "${CURRENT_BRANCH}" = "${DEFAULT_BRANCH}" ] && [ "${DEV_EXISTS}" = "false" ]; then
+  emit "$(build_json on-default-needs-dev)"
+fi
+
+emit "$(build_json unrelated not_on_dev_in_main_checkout)"

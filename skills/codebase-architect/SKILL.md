@@ -1,18 +1,15 @@
 ---
 name: codebase-architect
 description: |
-  Plan a project's package/directory layout and generate one
-  language-appropriate abstract component (Java interface / Python
-  Protocol / TypeScript interface / Go interface / Rust trait) per
-  cohesive responsibility — with a structured 9-field docstring on every
-  method — BEFORE any implementation begins. Sequences after
-  `project-scaffolder`. Runs entirely inside an isolated git worktree and
-  emits a human-confirmation gate (rubric self-review + checklist + Mermaid
-  DAG + self-contained HTML report) that downstream skills/agents must
-  observe before generating implementation code. Language-agnostic.
-  Triggers on phrases like "design the architecture", "plan the codebase",
-  "create interfaces for", "design interfaces", "plan packages",
-  "코드베이스 설계".
+  Plan a project's package/directory layout and emit interface-only
+  language-appropriate skeletons (Java interface / Python Protocol /
+  TypeScript interface / Go interface / Rust trait) with a structured
+  9-field docstring on every method, BEFORE any implementation begins.
+  Sequences after `project-scaffolder`. Runs entirely inside an isolated
+  git worktree and emits a human-confirmation gate (rubric self-review +
+  checklist + Mermaid DAG + HTML report) that downstream skills/agents
+  must observe before generating implementation code. Language-agnostic.
+  Manual invocation only — `/codebase-architect`.
 disable-model-invocation: true
 ---
 
@@ -76,9 +73,10 @@ Parse the JSON. The `state` field classifies into:
 |---|---|---|
 | `on-dev-with-scaffold` | on `dev`, project-scaffolder marker commit present | proceed to Phase 1 |
 | `on-dev-no-scaffold` | on `dev` but no `chore(scaffold): initialize` commit in history | warn user, ask explicit confirmation to proceed without a scaffold baseline |
-| `inside-architect-worktree` | cwd matches `*/.worktrees/architect-*` | resume from `.architect-state.json` if present, else refuse |
+| `on-default-needs-dev` | on `main`/`master`, but `dev` does not exist locally | run the "create dev from `<default_branch>`?" dialog from [git-worktree-flow.md](references/git-worktree-flow.md) |
+| `inside-architect-worktree` | cwd is inside an `*/.worktrees/architect-*` worktree (root or subdirectory) | resume from `.architect-state.json` if present, else refuse |
 | `inside-other-worktree` | inside a non-architect linked worktree | refuse, instruct user to run from `MAIN_CHECKOUT` |
-| `unrelated` | not in a git repo / not on a sensible base | refuse, surface what's off |
+| `unrelated` | not in a git repo, detached HEAD, repo with no commits, or some other branch | refuse, surface the `reason` field from the JSON to the user |
 
 Capture from JSON: `MAIN_CHECKOUT`, `default_branch`. Set `BASE_BRANCH`
 to `dev` by default (configurable via dialog if the user objects).
@@ -89,9 +87,20 @@ Detect language stack:
 bash "${CLAUDE_SKILL_DIR}/scripts/detect_language_stack.sh"
 ```
 
-Output gives `language` (`java | python | typescript | javascript | go |
-rust | unknown`) and the corresponding `validation_command` for Phase 6.
-If `unknown`, follow the dialog in
+Output gives `language` (primary recommendation: `java | python |
+typescript | javascript | go | rust | unknown`), `validation_command`
+for Phase 6, AND `detected_build_files` listing every build file found
+at the project root.
+
+**Handle multi-build-file projects (monorepos)**: when
+`detected_build_files` lists more than one entry (e.g. `pom.xml` AND
+`package.json`), the primary recommendation alone will silently hide
+the secondary stack. Ask the user explicitly which stack codebase-architect
+should design for; if the user wants to cover both, surface that this skill
+is single-stack per invocation and recommend running it twice in separate
+worktrees (one per stack).
+
+If `language` is `unknown`, follow the dialog in
 [language-skeletons.md](references/language-skeletons.md) to capture from
 the user. If `javascript` and no `tsconfig.json`, ask whether to treat as
 TypeScript (recommended) or refuse (no first-class skeleton language for
@@ -159,10 +168,12 @@ Order matters — only after Phase 3 confirmation:
      || echo '.worktrees/' >> "${MAIN_CHECKOUT}/.git/info/exclude"
    ```
 1. Compute `ARCHITECT_ID` **once**, then interpolate consistently into
-   both the path and the branch name:
+   both the path and the branch name. The `$$` (shell PID) suffix
+   guarantees uniqueness even if two `/codebase-architect` invocations
+   start within the same second:
    ```bash
-   ARCHITECT_ID="$(date +%s | tail -c 6)"
-   PROJECT_SLUG="<short-project-slug>"
+   ARCHITECT_ID="$(date +%s | tail -c 6)-$$"
+   PROJECT_SLUG="<short-project-slug>"   # ascii lowercase/hyphens only
    git -C "${MAIN_CHECKOUT}" worktree add \
      ".worktrees/architect-${PROJECT_SLUG}-${ARCHITECT_ID}" \
      -b "architect/${PROJECT_SLUG}-${ARCHITECT_ID}" "${BASE_BRANCH}"
@@ -225,6 +236,14 @@ Run the language-appropriate compile/type-check on the empty skeleton
 | Go | `go build ./...` |
 | Rust | `cargo check` |
 
+**Python substitution**: `detect_language_stack.sh` emits
+`mypy --strict <package>` as a template (with the `<package>`
+placeholder). Before running, substitute `<package>` with the actual
+package directory from Phase 2 (e.g. `mypy --strict src/myproj`).
+**Never run `mypy --strict .` over the worktree root** — it picks up
+generated artifacts, virtualenvs, and other noise that inflate false
+failures.
+
 If validation fails: stop, report failure, **never auto-prune the
 worktree**. Update `.architect-state.json` `phase_completed: validated`
 on success.
@@ -242,12 +261,16 @@ Produce all three handoff outputs per
 2. **Human-confirmation checklist** — single-point rubric (proficiency
    threshold + space for above/below comments).
 3. **Visual outputs:**
-   - Mermaid dependency DAG:
+   - Mermaid dependency DAG (interface names are HTML-entity-escaped at
+     emit time so malicious names in the state file cannot inject
+     `click ... href` directives if the file is later rendered):
      ```bash
      python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" \
        .architect-state.json > architecture.mmd
      ```
-   - Self-contained HTML report:
+   - HTML report (fully self-contained — no CDN, no external scripts;
+     the Mermaid block is inlined as plain text for the reviewer to
+     paste into a renderer of their choice):
      ```bash
      python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py" \
        .architect-state.json > architecture.html
@@ -282,13 +305,20 @@ Type `confirm architecture` to mark this architecture human-confirmed
 ```
 
 - `confirm architecture` →
-  - Update `.architect-state.json`: set `phase_completed: human_confirmed`,
-    record reviewer + ISO-8601 timestamp.
-  - Commit:
-    ```bash
-    git add .architect-state.json
-    git commit -m "chore(architect): human-confirmed architecture (unlocks implementation)"
-    ```
+  - Update `.architect-state.json` **locally** (file is gitignored —
+    used for resume tracking only): set
+    `phase_completed: human_confirmed`, record reviewer + ISO-8601
+    timestamp.
+  - The canonical confirmation record on the architect branch is the
+    Phase 7 commit of `architecture.mmd` + `architecture.html` (already
+    in place) plus the Phase 8 merge commit message
+    `feat(architect): merge ... (interfaces only, human-confirmed)` that
+    follows next. There is intentionally NO separate
+    `.architect-state.json` commit — the file is gitignored on the
+    worktree's `.gitignore`, so `git add` of it is a silent no-op and
+    `git commit` would fail with "nothing to commit". Downstream
+    automation looks at the architecture artifacts and the merge commit
+    instead (see "Implementation gate" below).
   - Then prompt:
     ```
     Type `confirm merge` to merge architect/<slug>-<id> into <BASE_BRANCH>,
@@ -316,13 +346,32 @@ On no: leave it.
 
 Skills, subagents, and Claude sessions that intend to write
 **implementation** code (method bodies for the interfaces this skill
-emitted) MUST first read `.architect-state.json` from the project root.
-If `phase_completed` is not exactly `human_confirmed`, REFUSE to write
-implementation and ask the user to complete `/codebase-architect` first.
+emitted) MUST first verify the architect phase has been merged. The
+canonical check on the current branch:
 
-This is the single source of truth for the gate. The skill itself
-enforces it via documented refusal in this section; downstream
-automation honors it by checking the file.
+```bash
+test -f architecture.html && test -f architecture.mmd \
+  && git log -1 --format=%s | grep -q '(interfaces only, human-confirmed)'
+```
+
+If any part fails, REFUSE to write implementation and ask the user to
+complete `/codebase-architect` first. The check is two-pronged:
+
+- `architecture.html` + `architecture.mmd` exist on the current branch
+  (they were committed at Phase 7 of a completed architect run)
+- The most recent commit message contains the `(interfaces only,
+  human-confirmed)` marker that Phase 8's merge commit carries (or that
+  marker appears in `git log --grep=...` on the branch's recent history,
+  if other commits have landed on top)
+
+**Honest limitations**: this gate is a documented social contract, not
+a cryptographic one. A determined user can hand-craft the marker files
+and a fake merge commit message to bypass the check; the goal is to
+catch accidental misuse and make any deliberate bypass visible in git
+history. Stronger physical enforcement (signed commits / git notes
+verified against a maintainer key / external service) is out of scope
+for this skill. If your downstream automation needs that, layer it on
+top of this contract — do not replace it.
 
 ---
 
@@ -335,6 +384,9 @@ confirmation to deviate, but default to refusal):
 - `git push`, `git push --force`
 - `git merge` without the `--no-ff` flag for the architect branch
 - `git merge` or `git commit` without the `-m` flag (would hang on `$EDITOR`)
+- `git commit --amend` once a commit has landed on the architect branch
+  (create a new commit instead — amend rewrites history that the merge
+  commit's `--no-ff` was meant to preserve)
 - `git reset --hard`, `git clean -f`, `git worktree remove --force`
 - `--no-verify` on commits (pre-commit hooks must run)
 - Generating method bodies (implementation) — defer to a separate task

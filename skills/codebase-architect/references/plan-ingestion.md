@@ -32,9 +32,11 @@ guessing what's behind the wall.
 
 ### Inline pasted text
 
-User pastes plan content directly in chat. Treat as authoritative if
-two or more sources conflict on a field — it's the most recent,
-highest-attention input from the user.
+User pastes plan content directly in chat. Track each paste with a
+timestamp in `plan.sources[]`. Inline content is NOT automatically
+authoritative over file/URL sources — conflicts are surfaced as Open
+Questions per the conflict policy below, not silently resolved by
+recency.
 
 ## Normalization rubric
 
