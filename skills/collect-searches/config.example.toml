@@ -1,0 +1,23 @@
+# Copy this file to config.toml (next to it) and fill in your values.
+# Both fields accept `~` (expanded via `Path.expanduser()`). Use absolute
+# paths if you'd rather not rely on `~`.
+
+[vault]
+# Absolute path to your Obsidian vault. Notes land at <path>/Search/<Category>/.
+path = "~/Documents/Obsidian Vault"
+
+[chrome]
+# Path to Chrome's History SQLite file. macOS default-profile layout shown;
+# other OSes use a different prefix:
+#   macOS:   ~/Library/Application Support/Google/Chrome/<profile>/History
+#   Linux:   ~/.config/google-chrome/<profile>/History
+#   Windows: %LOCALAPPDATA%\Google\Chrome\User Data\<profile>\History
+history_path = "~/Library/Application Support/Google/Chrome/Default/History"
+# Multi-profile users: replace "Default" with "Profile 1", "Profile 2", etc.
+# Other Chromium browsers (Brave, Arc, Edge) use the same SQLite schema at
+# their equivalent paths.
+
+[loop]
+# Informational only. Actual cadence is set when you run /loop in Claude Code.
+# No upper bound; pick whatever feels right (e.g. 1h, 6h, 24h).
+cadence = "6h"
