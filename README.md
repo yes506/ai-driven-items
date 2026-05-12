@@ -18,6 +18,7 @@ This README is the **item index** for the repo. Items are grouped by type below;
 |---|---|
 | [`project-scaffolder`](skills/project-scaffolder/) | Language-agnostic project bootstrapping. Walks intent → 2-4 tech-stack options → scaffolded baseline (lint, test, logging, config, CI stub, health endpoint). Runs entirely inside an isolated git worktree and merges back to `dev` only after explicit user confirmation. Tier-1 stacks: Next.js, Spring Boot, FastAPI, Go, Node/Express. |
 | [`codebase-architect`](skills/codebase-architect/) | Sequences after `project-scaffolder`. Plans packages and emits one language-appropriate abstract component (Java interface / Python Protocol / TypeScript interface / Go interface / Rust trait) per cohesive responsibility, with a structured 9-field docstring on every method. Runs inside an isolated git worktree; emits a human-confirmation gate (rubric self-review + checklist + Mermaid DAG + self-contained HTML report) that downstream skills/agents must clear before any implementation begins. |
+| [`collect-searches`](skills/collect-searches/) | Two-stage Chrome-search-history → Obsidian pipeline. Stage 1 is a deterministic Python collector that reads Chrome's local SQLite history, dedupes by cursor + content hash, and stages new Google searches as JSON to a vault inbox. Stage 2 is a prompt-orchestrated workflow that classifies each query into a category folder, enriches with WebSearch (1–3 reliable sources), writes one Markdown note per query, and clears the inbox. Designed to be run periodically (`/loop 6h /collect-searches`). Captures searches across all Chrome-Sync'd devices; doesn't capture Safari or in-app iOS searches. |
 
 #### Agents
 
@@ -37,7 +38,8 @@ _(planned — none shipped yet)_
 ai-driven-items/
 ├── skills/             Claude Code skills (procedural workflows + bundled resources)
 │   ├── project-scaffolder/
-│   └── codebase-architect/
+│   ├── codebase-architect/
+│   └── collect-searches/
 ├── agents/             (planned) Custom Claude Code subagents
 ├── mcp-servers/        (planned) Model Context Protocol servers
 ├── playbooks/          (planned) Reusable, AI-consumable implementation guides
@@ -190,6 +192,7 @@ Released into the public domain via [CC0 1.0 Universal](https://creativecommons.
 |---|---|
 | [`project-scaffolder`](skills/project-scaffolder/) | 언어 무관 프로젝트 부트스트래퍼. 의도 파악 → 2-4개 스택 옵션 추천 → 베이스라인 스캐폴딩 (린트, 테스트, 로깅, 설정, CI 스텁, 헬스 엔드포인트) 흐름으로 진행합니다. 모든 작업은 격리된 git worktree 안에서만 일어나며, 사용자가 명시적으로 확인해야만 `dev` 브랜치로 머지됩니다. Tier-1 스택: Next.js, Spring Boot, FastAPI, Go, Node/Express. |
 | [`codebase-architect`](skills/codebase-architect/) | `project-scaffolder` 다음 단계로 실행됩니다. 패키지 구조를 설계하고, 응집도 있는 책임 단위마다 언어에 적합한 추상 구성요소(Java interface / Python Protocol / TypeScript interface / Go interface / Rust trait) 하나씩을 생성합니다. 각 메서드에는 구조화된 9-필드 docstring이 붙습니다. 격리된 git worktree 안에서 동작하며, 인간 확인 게이트(루브릭 자가 검증 + 체크리스트 + Mermaid DAG + 단일 파일 HTML 리포트)를 통과해야만 다운스트림 스킬/에이전트가 실제 구현 코드를 작성할 수 있습니다. |
+| [`collect-searches`](skills/collect-searches/) | 2단계 Chrome 검색 기록 → Obsidian 파이프라인. Stage 1은 결정론적 Python 수집기로, Chrome의 로컬 SQLite 기록을 읽고 커서 + 콘텐츠 해시로 중복을 제거한 뒤 새 Google 검색을 JSON 형태로 vault inbox에 적재합니다. Stage 2는 프롬프트 기반 워크플로로, 각 쿼리를 카테고리 폴더로 분류하고 WebSearch로 보강(신뢰할 만한 소스 1–3개)한 다음 쿼리당 Markdown 노트 하나를 작성하고 inbox를 비웁니다. 주기적으로(`/loop 6h /collect-searches`) 실행하도록 설계되었습니다. Chrome Sync 로 연결된 모든 디바이스의 검색을 포착하지만, Safari나 iOS 인앱 검색은 포착하지 않습니다. |
 
 #### 에이전트
 
@@ -209,7 +212,8 @@ _(예정 — 아직 제공되는 항목 없음)_
 ai-driven-items/
 ├── skills/             Claude Code 스킬 (절차적 워크플로 + 번들 리소스)
 │   ├── project-scaffolder/
-│   └── codebase-architect/
+│   ├── codebase-architect/
+│   └── collect-searches/
 ├── agents/             (예정) Claude Code 커스텀 서브에이전트
 ├── mcp-servers/        (예정) Model Context Protocol 서버
 ├── playbooks/          (예정) 재사용 가능한 AI 친화적 구현 가이드
