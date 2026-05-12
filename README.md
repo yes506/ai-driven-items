@@ -6,27 +6,49 @@
 
 ## English
 
-A collection of AI-driven developer utilities for the [Claude Code](https://docs.claude.com/en/docs/claude-code) ecosystem — skills, agents, MCP servers, and related building blocks. Each utility is self-contained, validated against the official Claude Skills standard, and **portable to other AI coding tools** (Codex CLI, Gemini CLI, GitHub Copilot, Cursor) with light adaptation.
+A collection of AI-driven developer utilities for the [Claude Code](https://docs.claude.com/en/docs/claude-code) ecosystem — skills, agents, MCP servers, and playbooks. Each utility is self-contained, validated against the official Claude Skills standard, and **portable to other AI coding tools** (Codex CLI, Gemini CLI, GitHub Copilot, Cursor) with light adaptation.
+
+This README is the **item index** for the repo. Items are grouped by type below; per-tool install instructions follow.
+
+### Item index
+
+#### Skills
+
+| Skill | What it does |
+|---|---|
+| [`project-scaffolder`](skills/project-scaffolder/) | Language-agnostic project bootstrapping. Walks intent → 2-4 tech-stack options → scaffolded baseline (lint, test, logging, config, CI stub, health endpoint). Runs entirely inside an isolated git worktree and merges back to `dev` only after explicit user confirmation. Tier-1 stacks: Next.js, Spring Boot, FastAPI, Go, Node/Express. |
+| [`codebase-architect`](skills/codebase-architect/) | Sequences after `project-scaffolder`. Plans packages and emits one language-appropriate abstract component (Java interface / Python Protocol / TypeScript interface / Go interface / Rust trait) per cohesive responsibility, with a structured 9-field docstring on every method. Runs inside an isolated git worktree; emits a human-confirmation gate (rubric self-review + checklist + Mermaid DAG + self-contained HTML report) that downstream skills/agents must clear before any implementation begins. |
+
+#### Agents
+
+_(planned — none shipped yet)_
+
+#### MCP servers
+
+_(planned — none shipped yet)_
+
+#### Playbooks
+
+_(planned — none shipped yet)_
 
 ### Repository layout
 
 ```
 ai-driven-items/
 ├── skills/             Claude Code skills (procedural workflows + bundled resources)
-│   └── project-scaffolder/
+│   ├── project-scaffolder/
+│   └── codebase-architect/
 ├── agents/             (planned) Custom Claude Code subagents
 ├── mcp-servers/        (planned) Model Context Protocol servers
 ├── playbooks/          (planned) Reusable, AI-consumable implementation guides
 └── README.md
 ```
 
-### Available utilities
+### Installing
 
-| Skill | What it does |
-|---|---|
-| [`project-scaffolder`](skills/project-scaffolder/) | Language-agnostic project bootstrapping. Walks intent → 2-4 tech-stack options → scaffolded baseline (lint, test, logging, config, CI stub, health endpoint). Runs entirely inside an isolated git worktree and merges back to `dev` only after explicit user confirmation. Tier-1 stacks: Next.js, Spring Boot, FastAPI, Go, Node/Express. Dialog defaults to Korean; reply "English" or invoke with an English request to switch. |
+The install instructions below use `project-scaffolder` as the running example. **Substitute `<name>`** with the directory name of any other utility from the index above (e.g. `codebase-architect`).
 
-### Installing for Claude Code (native)
+#### Claude Code (native)
 
 Run from the repo root:
 
@@ -42,11 +64,11 @@ ln -s "$(pwd)/skills/project-scaffolder" /path/to/your-project/.claude/skills/pr
 
 Windows note: `ln -s` requires Developer Mode or admin. Use `mklink /J` (cmd) or `New-Item -ItemType SymbolicLink` (PowerShell) instead, or use WSL.
 
-Invoke with `/project-scaffolder`. `disable-model-invocation: true` is set, so it only fires on explicit invocation.
+Invoke with `/project-scaffolder` (or `/<name>` for any other utility). Skills that ship with `disable-model-invocation: true` only fire on explicit invocation.
 
 ### Using with other AI coding tools
 
-The SKILL.md body is plain Markdown describing a workflow — any AI tool that can accept custom instructions can use it. What differs per tool is **where the file goes** and **how the tool loads it**. The bundled `scripts/inspect_repo_state.sh` is a portable bash script and works unchanged.
+The SKILL.md body is plain Markdown describing a workflow — any AI tool that can accept custom instructions can use it. What differs per tool is **where the file goes** and **how the tool loads it**. Bundled scripts under `skills/<name>/scripts/` are portable and work unchanged.
 
 When porting, two Claude-specific bits to adapt:
 
@@ -102,7 +124,7 @@ typing `confirm merge`). References live under references/ next to it.
 EOF
 ```
 
-Note about the `gh copilot` CLI: it's scoped to single-command suggestions (`gh copilot suggest`) and command-explanation (`gh copilot explain`), not multi-step interactive workflows. Piping a procedural workflow into `gh copilot suggest` returns one shell-command suggestion, not the documented Phase-gated execution. For workflow-style use, stay with the `.github/copilot-instructions.md` route above and drive the scaffold via Copilot Chat in your IDE.
+Note about the `gh copilot` CLI: it's scoped to single-command suggestions (`gh copilot suggest`) and command-explanation (`gh copilot explain`), not multi-step interactive workflows. Piping a procedural workflow into `gh copilot suggest` returns one shell-command suggestion, not the documented Phase-gated execution. For workflow-style use, stay with the `.github/copilot-instructions.md` route above and drive the workflow via Copilot Chat in your IDE.
 
 #### Cursor AI
 
@@ -125,7 +147,7 @@ awk 'fm < 2 { if (/^---$/) fm++; next } { print }' \
   skills/project-scaffolder/SKILL.md >> .cursor/rules/project-scaffolder.mdc
 ```
 
-In Cursor, attach the rule explicitly when starting a scaffold task (or set `alwaysApply: true` if you want it on every chat).
+In Cursor, attach the rule explicitly when starting a task (or set `alwaysApply: true` if you want it on every chat).
 
 ### Validating a skill
 
@@ -144,6 +166,7 @@ These check the YAML frontmatter, the 500-line `SKILL.md` soft cap, the director
 2. Run the validator for the category before opening a PR.
 3. Keep machine-local state out of git — `.claude/settings.local.json` is already gitignored; add new patterns to `.gitignore` if you find leakage.
 4. If the utility is portable to non-Claude AI tools, add a note to the per-tool table in this README.
+5. Add a row for the new utility in the **Item index** above so it's discoverable.
 
 **AI-tool instruction files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`) are intentionally gitignored.** This is a deliberate convention break from the typical "commit `CLAUDE.md` so the whole team shares context" pattern. Each contributor authors their own version locally based on this README, because tool stacks and instruction styles differ per maintainer. If your AI tool runs `claude /init` (or equivalent) and writes a `CLAUDE.md`, you'll see it silently ignored — that's expected. This README is the canonical contributor doc; the rest is yours to tailor.
 
@@ -155,27 +178,49 @@ Released into the public domain via [CC0 1.0 Universal](https://creativecommons.
 
 ## 한국어
 
-[Claude Code](https://docs.claude.com/en/docs/claude-code) 생태계용 AI 기반 개발 유틸리티 모음 — 스킬, 에이전트, MCP 서버 등 빌딩 블록을 제공합니다. 각 유틸리티는 독립적이고, 공식 Claude Skills 표준을 통과하며, **약간의 수정만으로 다른 AI 코딩 도구**(Codex CLI, Gemini CLI, GitHub Copilot, Cursor)에서도 사용할 수 있습니다.
+[Claude Code](https://docs.claude.com/en/docs/claude-code) 생태계용 AI 기반 개발 유틸리티 모음 — 스킬, 에이전트, MCP 서버, 플레이북 등 빌딩 블록을 제공합니다. 각 유틸리티는 독립적이고, 공식 Claude Skills 표준을 통과하며, **약간의 수정만으로 다른 AI 코딩 도구**(Codex CLI, Gemini CLI, GitHub Copilot, Cursor)에서도 사용할 수 있습니다.
+
+이 README는 저장소의 **아이템 인덱스** 역할을 합니다. 아이템은 아래에 유형별로 그룹화되어 있으며, 도구별 설치 방법은 그 뒤에 이어집니다.
+
+### 아이템 인덱스
+
+#### 스킬
+
+| 스킬 | 설명 |
+|---|---|
+| [`project-scaffolder`](skills/project-scaffolder/) | 언어 무관 프로젝트 부트스트래퍼. 의도 파악 → 2-4개 스택 옵션 추천 → 베이스라인 스캐폴딩 (린트, 테스트, 로깅, 설정, CI 스텁, 헬스 엔드포인트) 흐름으로 진행합니다. 모든 작업은 격리된 git worktree 안에서만 일어나며, 사용자가 명시적으로 확인해야만 `dev` 브랜치로 머지됩니다. Tier-1 스택: Next.js, Spring Boot, FastAPI, Go, Node/Express. |
+| [`codebase-architect`](skills/codebase-architect/) | `project-scaffolder` 다음 단계로 실행됩니다. 패키지 구조를 설계하고, 응집도 있는 책임 단위마다 언어에 적합한 추상 구성요소(Java interface / Python Protocol / TypeScript interface / Go interface / Rust trait) 하나씩을 생성합니다. 각 메서드에는 구조화된 9-필드 docstring이 붙습니다. 격리된 git worktree 안에서 동작하며, 인간 확인 게이트(루브릭 자가 검증 + 체크리스트 + Mermaid DAG + 단일 파일 HTML 리포트)를 통과해야만 다운스트림 스킬/에이전트가 실제 구현 코드를 작성할 수 있습니다. |
+
+#### 에이전트
+
+_(예정 — 아직 제공되는 항목 없음)_
+
+#### MCP 서버
+
+_(예정 — 아직 제공되는 항목 없음)_
+
+#### 플레이북
+
+_(예정 — 아직 제공되는 항목 없음)_
 
 ### 저장소 구조
 
 ```
 ai-driven-items/
 ├── skills/             Claude Code 스킬 (절차적 워크플로 + 번들 리소스)
-│   └── project-scaffolder/
+│   ├── project-scaffolder/
+│   └── codebase-architect/
 ├── agents/             (예정) Claude Code 커스텀 서브에이전트
 ├── mcp-servers/        (예정) Model Context Protocol 서버
 ├── playbooks/          (예정) 재사용 가능한 AI 친화적 구현 가이드
 └── README.md
 ```
 
-### 제공 유틸리티
+### 설치
 
-| 스킬 | 설명 |
-|---|---|
-| [`project-scaffolder`](skills/project-scaffolder/) | 언어 무관 프로젝트 부트스트래퍼. 의도 파악 → 2-4개 스택 옵션 추천 → 베이스라인 스캐폴딩 (린트, 테스트, 로깅, 설정, CI 스텁, 헬스 엔드포인트) 흐름으로 진행합니다. 모든 작업은 격리된 git worktree 안에서만 일어나며, 사용자가 명시적으로 확인해야만 `dev` 브랜치로 머지됩니다. Tier-1 스택: Next.js, Spring Boot, FastAPI, Go, Node/Express. 대화는 기본적으로 한국어로 진행되며, "English"라고 답하거나 영어로 요청을 시작하면 영어로 전환됩니다. |
+아래 설치 방법은 `project-scaffolder` 를 예시로 사용합니다. 위 인덱스의 다른 유틸리티를 설치하려면 **`<name>` 부분을 해당 디렉터리 이름으로 치환**하세요(예: `codebase-architect`).
 
-### Claude Code에서 설치 (네이티브)
+#### Claude Code (네이티브)
 
 저장소 루트에서 실행하세요:
 
@@ -191,11 +236,11 @@ ln -s "$(pwd)/skills/project-scaffolder" /path/to/your-project/.claude/skills/pr
 
 Windows 참고: `ln -s` 는 Developer Mode 또는 관리자 권한이 필요합니다. 대신 `mklink /J` (cmd) 또는 `New-Item -ItemType SymbolicLink` (PowerShell) 를 사용하거나 WSL을 사용하세요.
 
-`/project-scaffolder` 로 실행합니다. `disable-model-invocation: true` 가 설정되어 있어, 명시적으로 호출할 때만 동작합니다.
+`/project-scaffolder` 로 실행합니다(다른 유틸리티는 `/<name>`). `disable-model-invocation: true` 가 설정된 스킬은 명시적으로 호출할 때만 동작합니다.
 
 ### 다른 AI 코딩 도구에서 사용
 
-SKILL.md 본문은 워크플로를 기술한 일반 Markdown 문서입니다. 커스텀 지침을 받을 수 있는 AI 도구라면 어디서든 사용할 수 있습니다. 도구마다 다른 것은 **파일을 어디에 두느냐**와 **도구가 어떻게 로드하느냐** 뿐입니다. 번들 스크립트 `scripts/inspect_repo_state.sh` 는 휴대성 있는 bash 스크립트라 그대로 동작합니다.
+SKILL.md 본문은 워크플로를 기술한 일반 Markdown 문서입니다. 커스텀 지침을 받을 수 있는 AI 도구라면 어디서든 사용할 수 있습니다. 도구마다 다른 것은 **파일을 어디에 두느냐**와 **도구가 어떻게 로드하느냐** 뿐입니다. `skills/<name>/scripts/` 의 번들 스크립트는 휴대성 있는 코드라 그대로 동작합니다.
 
 이식 시 두 가지 Claude 전용 요소를 조정해야 합니다:
 
@@ -252,7 +297,7 @@ cat > .github/copilot-instructions.md <<'EOF'
 EOF
 ```
 
-`gh copilot` CLI 관련 참고: 이 CLI는 단일 셸 명령 제안(`gh copilot suggest`)과 명령 설명(`gh copilot explain`) 용도이지, 다단계 인터랙티브 워크플로용이 아닙니다. 절차적 워크플로를 `gh copilot suggest` 에 파이프로 넘기면 한 줄짜리 명령 제안만 돌려주며, 문서화된 Phase-게이트 흐름은 실행되지 않습니다. 워크플로 스타일로 쓰려면 위의 `.github/copilot-instructions.md` 경로를 사용하고, 실제 스캐폴딩은 IDE 안의 Copilot Chat에서 진행하세요.
+`gh copilot` CLI 관련 참고: 이 CLI는 단일 셸 명령 제안(`gh copilot suggest`)과 명령 설명(`gh copilot explain`) 용도이지, 다단계 인터랙티브 워크플로용이 아닙니다. 절차적 워크플로를 `gh copilot suggest` 에 파이프로 넘기면 한 줄짜리 명령 제안만 돌려주며, 문서화된 Phase-게이트 흐름은 실행되지 않습니다. 워크플로 스타일로 쓰려면 위의 `.github/copilot-instructions.md` 경로를 사용하고, 실제 작업은 IDE 안의 Copilot Chat에서 진행하세요.
 
 #### Cursor AI
 
@@ -275,7 +320,7 @@ awk 'fm < 2 { if (/^---$/) fm++; next } { print }' \
   skills/project-scaffolder/SKILL.md >> .cursor/rules/project-scaffolder.mdc
 ```
 
-Cursor 안에서 스캐폴딩 작업을 시작할 때 명시적으로 룰을 첨부하세요(모든 대화에서 자동 적용을 원하면 `alwaysApply: true` 로 설정).
+Cursor 안에서 작업을 시작할 때 명시적으로 룰을 첨부하세요(모든 대화에서 자동 적용을 원하면 `alwaysApply: true` 로 설정).
 
 ### 스킬 검증
 
@@ -294,6 +339,7 @@ python3 ~/.claude/skills/skill-creator/scripts/package_skill.py skills/<name> /t
 2. PR을 열기 전에 해당 카테고리의 검증 도구를 실행하세요.
 3. 머신별 로컬 상태는 git에 올리지 마세요 — `.claude/settings.local.json` 은 이미 gitignore에 포함되어 있습니다. 새로운 누출 패턴을 발견하면 `.gitignore` 에 추가하세요.
 4. 유틸리티가 비-Claude AI 도구에도 이식 가능하다면 README의 도구별 표에 노트를 추가해 주세요.
+5. 새 유틸리티를 추가했다면 위의 **아이템 인덱스**에 행을 추가해 발견 가능하도록 하세요.
 
 **AI 도구 지침 파일 (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`) 은 의도적으로 gitignore에 포함됩니다.** 이는 일반적인 "팀 전체가 컨텍스트를 공유하도록 `CLAUDE.md` 를 커밋한다" 패턴을 의도적으로 거스르는 결정입니다. 메인테이너마다 도구 스택과 지침 스타일이 달라, 각 기여자가 이 README를 바탕으로 자신만의 로컬 버전을 작성합니다. AI 도구가 `claude /init` (또는 동등한 명령) 으로 `CLAUDE.md` 를 생성해도 조용히 무시되는 것은 정상입니다. 이 README가 정식 기여자 문서이고, 나머지는 각자 맞춤 설정하시면 됩니다.
 
