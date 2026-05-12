@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Architecture report — {{PROJECT_SLUG}}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+           max-width: 960px; margin: 2em auto; padding: 0 1em; color: #1a1a1a; }
+    h1 { border-bottom: 2px solid #1a1a1a; padding-bottom: .25em; }
+    h2 { margin-top: 2em; border-bottom: 1px solid #ccc; padding-bottom: .15em; }
+    h4 { margin-bottom: .25em; color: #444; }
+    code { background: #f4f4f4; padding: .15em .4em; border-radius: 3px; }
+    summary { cursor: pointer; padding: .5em 0; }
+    details { margin: .5em 0; padding-left: 1em; border-left: 2px solid #eee; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #ddd; padding: .4em .6em; text-align: left; }
+    th { background: #f9f9f9; }
+    .meta { color: #666; font-size: .9em; }
+    .mermaid { background: #fafafa; padding: 1em; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>{{PROJECT_SLUG}}</h1>
+  <p class="meta">Language: <strong>{{LANGUAGE}}</strong> · Phase: <strong>{{PHASE}}</strong></p>
+
+  <h2>Project plan</h2>
+  {{PLAN}}
+
+  <h2>Package layout</h2>
+  {{PACKAGES}}
+
+  <h2>Interfaces</h2>
+  <p class="meta">Click an interface to expand its methods and docstring-field coverage.</p>
+  {{INTERFACES}}
+
+  <h2>Dependency DAG</h2>
+  <pre class="mermaid">
+{{MERMAID}}
+  </pre>
+
+  <h2>Self-verification rubric</h2>
+  {{RUBRIC}}
+
+  <h2>Reviewer checklist</h2>
+  <p>See the human-confirmation checklist printed by Phase 7 in the chat session.</p>
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@latest/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: true });
+  </script>
+</body>
+</html>
