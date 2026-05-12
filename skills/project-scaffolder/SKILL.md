@@ -9,9 +9,11 @@ description: |
   Runs all scaffolding inside a dedicated git worktree branched from `dev` and
   asks for explicit user confirmation before merging back. Language-agnostic —
   tier-1 stacks: Next.js, Spring Boot, FastAPI, Go (Gin or stdlib), Node/Express;
-  tier-2 stacks fall back to a "describe-your-stack" dialog. Triggers on phrases
-  like "start a new project", "scaffold a backend", "bootstrap a Next.js app",
-  "set up project skeleton", "프로젝트 스캐폴딩".
+  tier-2 stacks fall back to a "describe-your-stack" dialog. User-facing
+  dialog renders in Korean by default, or English when the invocation
+  utterance is predominantly English (other languages fall back to English).
+  Triggers on phrases like "start a new project", "scaffold a backend",
+  "bootstrap a Next.js app", "set up project skeleton", "프로젝트 스캐폴딩".
 disable-model-invocation: true
 ---
 
@@ -30,6 +32,7 @@ merges back after explicit user confirmation.
 ## Workflow Decision Tree
 
 ```
+Phase L: Language selection (detect from invocation utterance, default Korean)
 Phase 0: Detect repo state ──┬─ greenfield ─────────┐
                              ├─ existing-with-dev ──┤
                              ├─ existing-without-dev ┤── dialog → BASE_BRANCH
@@ -47,12 +50,64 @@ Phase 7: Show summary, await `confirm merge` (anything else = abort)
          on confirm: git -C MAIN_CHECKOUT merge --no-ff -m "..." into BASE_BRANCH
 ```
 
-State variables captured during Phase 0 and threaded through later phases:
+State variables captured during Phase L / Phase 0 and threaded through later phases:
 
+- `LANGUAGE` — `Korean` (default) or `English`; renders all user-facing dialog in this language
 - `MAIN_CHECKOUT` — absolute path to the parent main worktree
 - `BASE_BRANCH` — branch the scaffold branches from (default `dev`)
 - `SCAFFOLD_ID` — short suffix used in both worktree path and branch name
 - `SCAFFOLD_STATE` — `.scaffold-state.json` contents on resume
+
+---
+
+## Phase L — Language selection (preamble)
+
+Determine the language for **all subsequent user-facing dialog** in this skill —
+intent-capture questions, stack-recommendation presentations, confirmation
+prompts, status updates, error messages. The choice persists in
+`.scaffold-state.json` for resumability.
+
+**This applies to dialog only.** Scaffolded code, configuration files,
+`.env.example`, the generated project's `README.md`, and code comments stay in
+their natural form (typically English) regardless of `LANGUAGE`. This skill's
+own `SKILL.md`, `references/*.md`, and `scripts/` are agent-facing and never
+translated.
+
+### Detection rule
+
+1. **Inspect the invocation utterance** (the user's `/project-scaffolder ...`
+   message plus any follow-up text in the same turn).
+2. Classify:
+
+   | Signal | `LANGUAGE` |
+   |---|---|
+   | Predominantly Hangul characters in the utterance | `Korean` |
+   | Predominantly English text in the utterance | `English` |
+   | Empty, ambiguous, or non-text invocation | `Korean` (default) |
+
+3. **Echo the choice and wait for confirmation** in the chosen language:
+   - Korean: `진행 언어를 한국어로 설정했습니다. 다른 언어를 원하시면 알려주세요 (지원: 한국어, 영어). 그대로 진행하려면 "확인"이라고 답해 주세요.`
+   - English: `Communication language set to English. Reply with another language name to switch (supported: Korean, English). Type "confirm" to proceed.`
+
+4. **On user override**:
+   - If the user picks Korean → `LANGUAGE=Korean`.
+   - If the user picks English → `LANGUAGE=English`.
+   - If the user picks any other language → fall back to English with a polite
+     note: *"Other languages aren't first-class supported yet — I'll continue
+     in English. You can use Korean or English freely at any point."*
+
+5. **Mid-flow switches**: if the user explicitly asks to change language at
+   any later phase (e.g. "switch to English" / "영어로 바꿔줘"), update
+   `LANGUAGE` **in memory immediately**, and continue in the new language.
+   If `.scaffold-state.json` already exists (Phase 5 onward), update its
+   top-level `language` field too. If the state file does not exist yet
+   (Phases 1–4), just hold `LANGUAGE` in memory — it will be written when
+   Phase 5 first creates the state file. Do not reset other phase progress.
+
+### Gate
+
+Do not advance to Phase 0 until `LANGUAGE` is set (either auto-detected and
+confirmed, or explicitly chosen).
 
 ---
 
@@ -208,7 +263,12 @@ sub-step, so a mid-scaffold failure stays resumable:
 
 ```json
 {
-  "stack": { "language": "...", "framework": "...", "version_lookup": "..." },
+  "language": "Korean | English",
+  "stack": {
+    "language": "...",
+    "framework": "...",
+    "version_lookup": "..."
+  },
   "base_branch": "<BASE_BRANCH>",
   "main_checkout": "<MAIN_CHECKOUT>",
   "scaffold_id": "<SCAFFOLD_ID>",
@@ -217,6 +277,14 @@ sub-step, so a mid-scaffold failure stays resumable:
   "scaffolded_at": "<ISO-8601>"
 }
 ```
+
+`stack.version_lookup`: the URL/source the agent consulted at scaffold time to
+pin the current stable version (e.g. `https://nextjs.org/docs` or
+`https://start.spring.io/`). Captured so a re-run can reproduce the same
+version pin or surface drift.
+
+Note: the top-level `language` field is the dialog `LANGUAGE` from Phase L
+(distinct from `stack.language`, which is the chosen programming language).
 
 Initial commit on the scaffold branch (use the explicit `-m` form — a bare
 `git commit` would drop into `$EDITOR` and hang in non-interactive runs):
@@ -305,6 +373,15 @@ deviate, but default to refusal):
 If the user re-invokes the skill from inside an existing scaffold worktree
 (state `inside-scaffold-worktree`), read `.scaffold-state.json` and resume
 from the next phase after `phase_completed`. Do not restart the wizard.
+
+On resume, **also restore `LANGUAGE`** from the state file's top-level
+`language` field — skip Phase L entirely. If the user wants to switch
+language mid-resume, follow Phase L's "Mid-flow switches" rule.
+
+If the state file predates Phase L and has no `language` field (e.g. a
+worktree scaffolded before this version of the skill), default `LANGUAGE` to
+Korean (matching Phase L's default) and continue without prompting. The
+next state-file write will add the field.
 
 Resume mapping:
 
