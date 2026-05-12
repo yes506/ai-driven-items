@@ -16,10 +16,11 @@ category folder under `<Vault>/Search/` it should live in.
 
 ## Input
 
-A JSON object emitted by Stage 1 with these fields: `title` (the search query
-prefixed by "Searched for "), `titleUrl` (the visit URL), `time` (ISO
-timestamp), `query` (the bare query text), `page_title`, `source` (one of
-`keyword_search_terms` or `urls_google_search`), and `products` (`["Search"]`).
+A JSON object emitted by Stage 1 with exactly these fields: `title` (the
+search query prefixed by "Searched for "), `titleUrl` (the visit URL), `time`
+(ISO timestamp), `query` (the bare query text), `page_title`, `source` (one
+of `keyword_search_terms` or `urls_google_search`), and `products`
+(`["Search"]`). No other fields are present.
 
 ## Examples
 

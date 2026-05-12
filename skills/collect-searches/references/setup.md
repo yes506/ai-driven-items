@@ -76,19 +76,19 @@ happening in Safari or another browser — this pipeline won't help. See
 2. **Seed the cursor (recommended)**
 
    To avoid a flood on first run, seed the cursor to "now" so only future
-   searches are ingested. The snippet uses a subshell so it works regardless
-   of your current directory:
+   searches are ingested. **Run from the skill root** (the directory that
+   contains `SKILL.md`); the snippet's `state/cursor.json` path is relative.
+   The leading guard makes the failure mode obvious if you forget:
 
    ```bash
-   ( cd "$(dirname "$(realpath SKILL.md)")" && \
-     python3 -c 'import json, datetime, pathlib; \
+   [ -f SKILL.md ] || { echo "Run from the skill root (where SKILL.md lives)"; exit 1; }
+   python3 -c 'import json, datetime, pathlib; \
    ts_us = int((datetime.datetime.now(datetime.timezone.utc).timestamp() + 11644473600) * 1_000_000); \
    p = pathlib.Path("state/cursor.json"); p.parent.mkdir(parents=True, exist_ok=True); \
-   json.dump({"last_seen_chrome_ts": ts_us, "recent_hashes": []}, open(p, "w"), indent=2)' )
+   json.dump({"last_seen_chrome_ts": ts_us, "recent_hashes": []}, open(p, "w"), indent=2)'
    ```
 
-   Run it from the skill root (where `SKILL.md` lives). If you'd rather
-   backfill your entire Chrome history, skip this step entirely.
+   Skip this step entirely if you'd rather backfill your full Chrome history.
 
 3. **First run (manual)**
 
@@ -158,6 +158,22 @@ collect-searches/
     ├── cursor.json              { last_seen_chrome_ts, recent_hashes[] }
     └── collect.lock             fcntl mutex (auto-released on process exit)
 ```
+
+## Packaging note
+
+If you ever invoke `package_skill.py` (the official skill validator's
+packager) on this skill *after* running `collect.py` locally, the resulting
+`.skill` archive will include any `scripts/__pycache__/*.pyc` and
+`state/collect.lock` left on disk — `package_skill.py` doesn't honor
+`.gitignore`. Clean them out first:
+
+```bash
+find . -name __pycache__ -prune -exec rm -rf {} +
+rm -f state/collect.lock
+```
+
+This is upstream tooling behavior, not a skill bug. Only matters if you're
+distributing `.skill` archives, not for normal git workflow.
 
 ## Troubleshooting
 

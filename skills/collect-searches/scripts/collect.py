@@ -51,6 +51,21 @@ def log(msg: str) -> None:
     print(f"[collect] {msg}", flush=True)
 
 
+def is_google_search_url(url: str) -> bool:
+    """Return True iff the URL's scheme+host+path is a Google search endpoint.
+
+    Used by both SQL paths so the Google-only contract is enforced uniformly,
+    regardless of whether a row came in via keyword_search_terms or via the
+    google.<tld>/search? URL filter.
+    """
+    if not url:
+        return False
+    parsed = urllib.parse.urlparse(url)
+    return bool(
+        GOOGLE_SEARCH_PATH_RE.match(f"{parsed.scheme}://{parsed.netloc}{parsed.path}")
+    )
+
+
 def chrome_ts_to_iso(chrome_us: int) -> str:
     """Convert Chrome's microseconds-since-1601 to ISO 8601 UTC."""
     unix_seconds = (chrome_us / 1_000_000) - CHROME_EPOCH_OFFSET_SECONDS
@@ -120,7 +135,19 @@ def copy_history_db(src: Path) -> Path:
     return dest
 
 
-def query_keyword_search_terms(conn: sqlite3.Connection, since_chrome_ts: int) -> list[dict]:
+def query_keyword_search_terms(
+    conn: sqlite3.Connection, since_chrome_ts: int
+) -> tuple[list[dict], int]:
+    """Returns (Google-filtered records, max raw chrome_ts seen).
+
+    Chrome populates `keyword_search_terms` for whichever search engine is the
+    user's default. If the default is not Google (or if a third-party keyword
+    provider writes rows), the visited URL won't be a google.<tld>/search? — we
+    drop those rows here to honor the Google-only contract documented in
+    SKILL.md and design.md. The max raw chrome_ts is returned separately so
+    `_run` can still advance the cursor past rejected rows (otherwise the
+    same non-Google rows get re-scanned every run).
+    """
     rows = conn.execute(
         """
         SELECT v.visit_time, kst.term AS query, u.url AS visit_url, u.title AS page_title
@@ -132,20 +159,35 @@ def query_keyword_search_terms(conn: sqlite3.Connection, since_chrome_ts: int) -
         """,
         (since_chrome_ts,),
     ).fetchall()
-    return [
-        {
-            "chrome_ts": r[0],
-            "query": r[1],
-            "url": r[2],
-            "page_title": r[3] or "",
+    records: list[dict] = []
+    max_raw_ts = since_chrome_ts
+    for chrome_ts, query, url, page_title in rows:
+        if chrome_ts > max_raw_ts:
+            max_raw_ts = chrome_ts
+        if not query:
+            continue
+        if not is_google_search_url(url):
+            continue
+        records.append({
+            "chrome_ts": chrome_ts,
+            "query": query,
+            "url": url,
+            "page_title": page_title or "",
             "source": "keyword_search_terms",
-        }
-        for r in rows
-        if r[1]
-    ]
+        })
+    return records, max_raw_ts
 
 
-def query_google_search_urls(conn: sqlite3.Connection, since_chrome_ts: int) -> list[dict]:
+def query_google_search_urls(
+    conn: sqlite3.Connection, since_chrome_ts: int
+) -> tuple[list[dict], int]:
+    """Returns (Google-filtered records, max raw chrome_ts seen).
+
+    The SQL `LIKE '%google.%/search?%'` is intentionally loose to keep the
+    index path fast; the precise host check happens in `is_google_search_url`.
+    Returning the max raw timestamp lets `_run` advance the cursor past
+    SQL-matched-but-regex-rejected rows so they don't get re-scanned forever.
+    """
     rows = conn.execute(
         """
         SELECT v.visit_time, u.url, u.title
@@ -158,11 +200,13 @@ def query_google_search_urls(conn: sqlite3.Connection, since_chrome_ts: int) -> 
         (since_chrome_ts,),
     ).fetchall()
     records: list[dict] = []
+    max_raw_ts = since_chrome_ts
     for chrome_ts, url, title in rows:
-        parsed = urllib.parse.urlparse(url)
-        if not GOOGLE_SEARCH_PATH_RE.match(f"{parsed.scheme}://{parsed.netloc}{parsed.path}"):
+        if chrome_ts > max_raw_ts:
+            max_raw_ts = chrome_ts
+        if not is_google_search_url(url):
             continue
-        params = urllib.parse.parse_qs(parsed.query)
+        params = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
         query = (params.get("q") or [None])[0]
         if not query:
             continue
@@ -173,7 +217,7 @@ def query_google_search_urls(conn: sqlite3.Connection, since_chrome_ts: int) -> 
             "page_title": title or "",
             "source": "urls_google_search",
         })
-    return records
+    return records, max_raw_ts
 
 
 def to_record(raw: dict) -> dict:
@@ -238,18 +282,28 @@ def write_inbox(records: list[dict], inbox_dir: Path) -> int:
         path = inbox_dir / f"{ts}-{h}.json"
         if path.exists():
             continue
-        save_json(path, record)
+        # Strip the internal-only `chrome_ts` before serializing — Stage 2
+        # consumes title / titleUrl / time / query / page_title / source /
+        # products. `chrome_ts` exists only so `filter_new` can enforce the
+        # cursor as a Python-side belt-and-suspenders check.
+        public_record = {k: v for k, v in record.items() if k != "chrome_ts"}
+        save_json(path, public_record)
         written += 1
     return written
 
 
-def advance_cursor(cursor: dict, raw_records: list[dict], new_records: list[dict]) -> dict:
-    if not raw_records:
-        return cursor
-    max_chrome_ts = max(r["chrome_ts"] for r in raw_records)
+def advance_cursor(cursor: dict, new_records: list[dict], sql_max_ts: int) -> dict:
+    """Advance cursor past every SQL row this run saw, regex-rejected ones too.
+
+    Earlier versions advanced only past kept records, which left
+    SQL-matched-but-regex-rejected rows (e.g. news.google.com/search) being
+    re-scanned every run forever — wasted work, not data loss. Using the
+    `sql_max_ts` from the raw SQL result sets closes that nag.
+    """
     new_hashes = [hash_record(r) for r in new_records]
     cursor["recent_hashes"] = (cursor.get("recent_hashes", []) + new_hashes)[-HASH_HISTORY_SIZE:]
-    cursor["last_seen_chrome_ts"] = max_chrome_ts
+    prev_ts = int(cursor.get("last_seen_chrome_ts") or 0)
+    cursor["last_seen_chrome_ts"] = max(prev_ts, int(sql_max_ts))
     return cursor
 
 
@@ -285,13 +339,15 @@ def _run(config: dict) -> int:
     try:
         with sqlite3.connect(f"file:{db_copy}?mode=ro", uri=True) as conn:
             since = int(cursor.get("last_seen_chrome_ts") or 0)
-            kst_rows = query_keyword_search_terms(conn, since)
-            url_rows = query_google_search_urls(conn, since)
+            kst_rows, kst_max_ts = query_keyword_search_terms(conn, since)
+            url_rows, url_max_ts = query_google_search_urls(conn, since)
     finally:
         shutil.rmtree(db_copy.parent, ignore_errors=True)
 
-    log(f"keyword_search_terms: {len(kst_rows)} rows")
-    log(f"google.com/search urls: {len(url_rows)} rows")
+    log(f"keyword_search_terms: {len(kst_rows)} rows (Google-filtered)")
+    log(f"google.com/search urls: {len(url_rows)} rows (regex-filtered)")
+
+    sql_max_ts = max(since, kst_max_ts, url_max_ts)
 
     raw = sorted(kst_rows + url_rows, key=lambda r: r["chrome_ts"])
     records = [to_record(r) for r in raw]
@@ -301,7 +357,7 @@ def _run(config: dict) -> int:
     written = write_inbox(new_records, inbox_dir)
     log(f"wrote {written} files to {inbox_dir}")
 
-    cursor = advance_cursor(cursor, raw, new_records)
+    cursor = advance_cursor(cursor, new_records, sql_max_ts)
     # Cursor advances on Stage 1 success only; Stage 2 (LLM enrich/write) is
     # decoupled and operates on the inbox JSONs, so a Stage 2 failure leaves
     # files in the inbox without rewinding the cursor.
