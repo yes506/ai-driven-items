@@ -85,7 +85,7 @@ when present.
 The inspector reports no local `dev` branch. Check `git branch -r` for
 `origin/dev`. If found, dialog: "dev is on origin but not local. Fetch
 and create local tracking branch (`git fetch origin && git switch dev`),
-or treat as `existing-without-dev` and pick a base?"
+or treat as `on-default-needs-dev` and run the create-dev dialog above?"
 
 ## Worktree creation command sequence
 

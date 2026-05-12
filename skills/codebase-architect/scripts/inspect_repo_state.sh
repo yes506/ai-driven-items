@@ -47,6 +47,21 @@ fi
 # Defensive: collapse any stray whitespace/newlines that would corrupt JSON.
 CURRENT_BRANCH="$(printf '%s' "${CURRENT_BRANCH}" | tr -d '\r\n\t')"
 
+# Zero-commits guard — hoisted ABOVE the branch-name dispatch in step 8 so
+# that an unborn `dev`/`main`/`master` branch (created via `git init -b dev`
+# or similar) is correctly classified as `repo_has_no_commits` rather than
+# being short-circuited into the `on-dev-no-scaffold` / `on-default-needs-dev`
+# paths. symbolic-ref above succeeded with the unborn branch name, so the
+# DETACHED bucket below also doesn't catch this case — must be checked here.
+# 4-reviewer round-3 convergence (D1).
+if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+  MAIN_CHECKOUT_FOR_EMIT="${MAIN_CHECKOUT}"
+  DEFAULT_BRANCH=""
+  DEV_EXISTS=false
+  SCAFFOLD_MARKER_PRESENT=false
+  emit "$(build_json unrelated repo_has_no_commits)"
+fi
+
 # 4. Default branch (main / master) — read from MAIN_CHECKOUT, not cwd.
 DEFAULT_BRANCH=""
 for candidate in main master; do
@@ -102,12 +117,8 @@ if [ "${CURRENT_BRANCH}" = "DETACHED" ]; then
   emit "$(build_json unrelated detached_head)"
 fi
 
-# Zero-commits repo: HEAD points at a branch name but no commit exists yet.
-# symbolic-ref above succeeded with the unborn branch name (e.g. "main"), so
-# this branch isn't covered by the DETACHED check; surface it explicitly.
-if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
-  emit "$(build_json unrelated repo_has_no_commits)"
-fi
+# (Zero-commits guard now lives above step 4 so the dev-branch dispatch can't
+#  short-circuit it for repos initialized via `git init -b dev`.)
 
 # On the default branch but `dev` doesn't exist — surface so Phase 0 can run the
 # "create dev from <default_branch>?" dialog from references/git-worktree-flow.md.

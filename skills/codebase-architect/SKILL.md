@@ -22,8 +22,12 @@ already been baseline-scaffolded (typically by `project-scaffolder`).
 Every method on every emitted interface represents one node in the
 end-to-end pipeline; interfaces aggregate cohesive methods that share a
 responsibility/lifecycle. No implementation may begin until this skill
-emits `phase_completed: human_confirmed` in `.architect-state.json` after
-the user types `confirm architecture`.
+commits the Phase 7 architecture artifacts (`architecture.html` +
+`architecture.mmd`) and lands the architect-merge commit on
+`${BASE_BRANCH}` carrying the `(interfaces only, human-confirmed)`
+marker — see "Implementation gate (downstream contract)" below for the
+canonical check. (`.architect-state.json` is gitignored local-only
+working state for resume tracking, not a downstream gate signal.)
 
 `disable-model-invocation: true` means this skill only fires on explicit
 `/codebase-architect` invocation — never auto-trigger it.
@@ -408,7 +412,9 @@ confirmation to deviate, but default to refusal):
 - `git reset --hard`, `git clean -f`, `git worktree remove --force`
 - `--no-verify` on commits (pre-commit hooks must run)
 - Generating method bodies (implementation) — defer to a separate task
-  outside this skill, gated by `.architect-state.json: human_confirmed`
+  outside this skill, gated by the tracked-artifacts + merge-marker
+  check documented in "Implementation gate (downstream contract)" above
+  (NOT by `.architect-state.json`, which is gitignored local working state)
 - Hardcoded language/framework versions in any generated file
 - Treating user silence as confirmation at any gate
 - Creating `README.md`, `INSTALLATION_GUIDE.md`, etc. inside this skill folder

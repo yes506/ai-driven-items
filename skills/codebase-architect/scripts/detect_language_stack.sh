@@ -59,6 +59,22 @@ fi
 # already promoted `tsconfig.json` (so primary = typescript). If only `package.json`
 # is present, primary stays `javascript` (no first-class skeleton — caller handles).
 
+# `package.json` + `tsconfig.json` is the canonical TS pairing, not a polyglot
+# signal. Drop `package.json` from `detected_build_files` when `tsconfig.json`
+# is also present, so SKILL.md Phase 0's monorepo dialog doesn't fire on every
+# normal TypeScript project (3-reviewer round-3 convergence: D4).
+if printf '%s\n' "${DETECTED[@]:-}" | grep -qx 'tsconfig.json' \
+    && printf '%s\n' "${DETECTED[@]:-}" | grep -qx 'package.json'; then
+  NEW_DETECTED=()
+  for entry in "${DETECTED[@]:-}"; do
+    if [ "${entry}" = "package.json" ]; then
+      continue
+    fi
+    NEW_DETECTED+=("${entry}")
+  done
+  DETECTED=("${NEW_DETECTED[@]}")
+fi
+
 # Emit JSON via Python so paths/build-file names are escaped correctly.
 python3 -c '
 import json, sys
