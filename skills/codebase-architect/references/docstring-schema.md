@@ -101,6 +101,11 @@ class OrderRepository(Protocol):
 
 ### TypeScript (TSDoc)
 
+The TS example returns `Promise<Order>` to illustrate the async-method
+discipline above (the Java example below stays synchronous to keep
+the comparison focused). Either form is correct for `save`; pick what
+matches the language's idiom for I/O in the target project.
+
 ```typescript
 interface OrderRepository {
   /**

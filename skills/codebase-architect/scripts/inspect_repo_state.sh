@@ -69,12 +69,15 @@ if [ -n "${WORKTREE_TOP}" ] && [ "${WORKTREE_TOP}" != "${MAIN_CHECKOUT}" ]; then
   IS_LINKED_WORKTREE=true
 fi
 
-# 7. Scaffold marker — search commit messages on any ref.
+# 7. Scaffold marker — search commit messages on LOCAL branches only.
+#    Using `--branches` (not `--all`) avoids false positives from stale
+#    remote-tracking refs that may carry a force-pushed-over scaffold commit
+#    no longer reachable from any live branch.
 #    Use git's native --grep + output capture (not `| grep -q`); under `pipefail`,
 #    `grep -q` short-circuits and gives `git log` SIGPIPE, which propagates as a
 #    pipeline failure and silently miscategorizes existing scaffold commits.
 SCAFFOLD_MARKER_PRESENT=false
-if [ -n "$(git -C "${MAIN_CHECKOUT}" log --all --grep='chore(scaffold): initialize' --format=%H 2>/dev/null)" ]; then
+if [ -n "$(git -C "${MAIN_CHECKOUT}" log --branches --grep='chore(scaffold): initialize' --format=%H 2>/dev/null)" ]; then
   SCAFFOLD_MARKER_PRESENT=true
 fi
 

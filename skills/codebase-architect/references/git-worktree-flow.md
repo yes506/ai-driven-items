@@ -10,13 +10,14 @@ for maintainers familiar with that skill.
 architect/<project-slug>-<id>               ← branch name
 ```
 
-`<id>` is `date +%s | tail -c 6`-`$$` — short numeric suffix with the
-shell PID appended, so two `/codebase-architect` invocations started
-within the same wall-clock second still get different IDs.
+`<id>` is `date +%s | tail -c 6`-`$$`-`${RANDOM}` — short epoch
+suffix + shell PID + RANDOM. The PID distinguishes host-shell runs;
+`$RANDOM` covers PID-namespaced containers where `$$` is always `1`.
 `<project-slug>` is a short ASCII identifier for the project being
 architected (e.g., `order-service`, `analytics-pipeline`) — lowercase,
-hyphens only, no spaces or path separators. Ask the user in Phase 4 if
-not already obvious, and sanitize defensively before interpolating.
+hyphens only, no spaces or path separators. Phase 4 sanitizes it
+defensively (see the shell snippet there) — a slug like `../etc` is
+collapsed to `etc` so it can't escape `.worktrees/`.
 
 ## Base branch resolution
 
@@ -24,11 +25,16 @@ Default `BASE_BRANCH=dev`. If `dev` doesn't exist:
 
 | State | Action |
 |---|---|
-| `main`/`master` exists, `dev` doesn't | dialog: "Create dev from <default_branch>? Or pick a different base?" |
+| `main`/`master` exists, `dev` doesn't | inspector emits `state: on-default-needs-dev`; SKILL.md Phase 0 runs the dialog "Create dev from `<default_branch>`? Or pick a different base?" |
 | Neither exists | refuse — repo isn't shaped for this skill |
 
 Whatever branch results becomes `BASE_BRANCH` and is persisted in
 `.architect-state.json` for Phase 4 worktree creation and Phase 8 merge.
+
+If `dev` exists only on `origin` (not local), the inspector currently
+returns `unrelated, not_on_dev_in_main_checkout`; ask the user to
+either `git fetch origin && git switch dev` first or pick a different
+base via the dialog above.
 
 ## Edge cases (always stop and ask, never auto-resolve)
 
@@ -90,9 +96,11 @@ The exact sequence (executed only after Phase 3 confirmation):
 grep -qxF '.worktrees/' "${MAIN_CHECKOUT}/.git/info/exclude" \
   || echo '.worktrees/' >> "${MAIN_CHECKOUT}/.git/info/exclude"
 
-# Step 1 — compute ARCHITECT_ID once, interpolate into both path + branch
-# (PID suffix guarantees uniqueness for same-second concurrent runs)
-ARCHITECT_ID="$(date +%s | tail -c 6)-$$"
+# Step 1 — compute ARCHITECT_ID once, interpolate into both path + branch.
+# epoch tail + $$ + $RANDOM: epoch handles cross-second runs, $$ handles
+# concurrent runs on a host shell, $RANDOM covers PID-namespaced containers
+# where $$ is always 1 (so the same-second-concurrent case still gets entropy).
+ARCHITECT_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"
 PROJECT_SLUG="<short-project-slug>"
 git -C "${MAIN_CHECKOUT}" worktree add \
   ".worktrees/architect-${PROJECT_SLUG}-${ARCHITECT_ID}" \

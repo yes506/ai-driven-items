@@ -31,20 +31,23 @@ the user types `confirm architecture`.
 ## Workflow Decision Tree
 
 ```
-Phase 0: Detect repo state ──┬─ on dev (post-scaffold) ────┐
+Phase 0: Detect repo state ──┬─ on-dev-with-scaffold ──────┐
+                             ├─ on-dev-no-scaffold ────────┤── warn + ask to proceed
+                             ├─ on-default-needs-dev ──────┤── run "create dev?" dialog
                              ├─ inside-architect-worktree ─┤── resume from .architect-state.json
-                             ├─ on dev (no scaffold marker) ┤── warn + ask to proceed
-                             └─ unrelated state ──────────── refuse, exit
-                                                            │
+                             ├─ inside-other-worktree ─────┤── refuse, run from MAIN_CHECKOUT
+                             └─ unrelated ──────────────── refuse, surface reason
+                                                          │
 Phase 1: Plan ingestion (no mutations) — multi-method input ─┤
 Phase 2: Package/directory plan (no mutations) ──────────────┤
 Phase 3: Pipeline-node decomposition (no mutations) ─────────┤
          user confirms Phases 1-3 individually — silence = stop, not yes
-Phase 4: Worktree creation (first mutation; ARCHITECT_ID computed once)
+Phase 4: Worktree creation (first mutation; ARCHITECT_ID computed once;
+         initial .architect-state.json written with phase_completed=worktree_created)
 Phase 5: Interface skeleton generation + .architect-state.json (incremental)
 Phase 6: Validate — language-appropriate compile/type-check on the skeleton
 Phase 7: Self-verification artifacts — rubric + checklist + Mermaid DAG + HTML report
-Phase 8: Human gate — `confirm architecture` → mark human_confirmed
+Phase 8: Human gate — `confirm architecture` → mark human_confirmed locally
          then offer `confirm merge` → merge worktree to BASE_BRANCH
 ```
 
@@ -53,7 +56,6 @@ State variables captured during Phase 0 and threaded through later phases:
 - `MAIN_CHECKOUT` — absolute path to the parent main worktree
 - `BASE_BRANCH` — branch the architect worktree branches from (default `dev`)
 - `ARCHITECT_ID` — short suffix used in both worktree path and branch name
-- `ARCHITECT_STATE` — `.architect-state.json` contents on resume
 - `LANGUAGE_STACK` — detected from build files; drives Phase 5/6 commands
 
 ---
@@ -96,9 +98,11 @@ at the project root.
 `detected_build_files` lists more than one entry (e.g. `pom.xml` AND
 `package.json`), the primary recommendation alone will silently hide
 the secondary stack. Ask the user explicitly which stack codebase-architect
-should design for; if the user wants to cover both, surface that this skill
-is single-stack per invocation and recommend running it twice in separate
-worktrees (one per stack).
+should design for; if the user wants to cover both, surface that this
+skill is single-stack per invocation and recommend running it twice in
+separate worktrees, **with distinct project slugs per stack** (e.g.
+`myproj-backend` for the Java side, `myproj-frontend` for the TS side)
+— same slug across runs would collide on the worktree path.
 
 If `language` is `unknown`, follow the dialog in
 [language-skeletons.md](references/language-skeletons.md) to capture from
@@ -168,12 +172,19 @@ Order matters — only after Phase 3 confirmation:
      || echo '.worktrees/' >> "${MAIN_CHECKOUT}/.git/info/exclude"
    ```
 1. Compute `ARCHITECT_ID` **once**, then interpolate consistently into
-   both the path and the branch name. The `$$` (shell PID) suffix
-   guarantees uniqueness even if two `/codebase-architect` invocations
-   start within the same second:
+   both the path and the branch name. The `$$-$RANDOM` suffix gives
+   true uniqueness — `$$` distinguishes within a host shell, `$RANDOM`
+   covers PID-namespaced containers where `$$` is always `1`:
    ```bash
-   ARCHITECT_ID="$(date +%s | tail -c 6)-$$"
-   PROJECT_SLUG="<short-project-slug>"   # ascii lowercase/hyphens only
+   ARCHITECT_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"
+
+   # Sanitize PROJECT_SLUG defensively before interpolation — even if
+   # the user typed a clean value, this prevents path-traversal /
+   # nested-ref bugs from a slug like '../../etc' or 'my/slug'.
+   raw_slug="<short-project-slug>"   # captured from user
+   PROJECT_SLUG="$(printf '%s' "${raw_slug}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-')"
+   [ -z "${PROJECT_SLUG}" ] && { echo "Empty slug after sanitization — ask user for an ASCII slug"; exit 1; }
+
    git -C "${MAIN_CHECKOUT}" worktree add \
      ".worktrees/architect-${PROJECT_SLUG}-${ARCHITECT_ID}" \
      -b "architect/${PROJECT_SLUG}-${ARCHITECT_ID}" "${BASE_BRANCH}"
@@ -183,6 +194,13 @@ Order matters — only after Phase 3 confirmation:
    `.gitignore` if either is missing. Lands on `${BASE_BRANCH}` via
    Phase 8's merge so future contributors never see those paths as
    untracked.
+4. **Write the initial `.architect-state.json`** with
+   `phase_completed: worktree_created`, plus `project_slug`,
+   `main_checkout`, `base_branch`, `architect_id`, `language_stack`,
+   `validation_command` from Phase 0. This is what makes resume work
+   if the skill crashes between Phase 4 and Phase 5's first sub-step
+   (without this initial write, Phase 0 on resume sees no state file
+   and refuses).
 
 Edge cases (path collision, dirty `BASE_BRANCH`, nested invocation,
 untracked files on resume, merge conflicts at the gate) are documented
@@ -351,7 +369,7 @@ canonical check on the current branch:
 
 ```bash
 test -f architecture.html && test -f architecture.mmd \
-  && git log -1 --format=%s | grep -q '(interfaces only, human-confirmed)'
+  && git log --grep='(interfaces only, human-confirmed)' --format=%H | grep -q .
 ```
 
 If any part fails, REFUSE to write implementation and ask the user to
@@ -359,10 +377,10 @@ complete `/codebase-architect` first. The check is two-pronged:
 
 - `architecture.html` + `architecture.mmd` exist on the current branch
   (they were committed at Phase 7 of a completed architect run)
-- The most recent commit message contains the `(interfaces only,
-  human-confirmed)` marker that Phase 8's merge commit carries (or that
-  marker appears in `git log --grep=...` on the branch's recent history,
-  if other commits have landed on top)
+- The architect-merge marker `(interfaces only, human-confirmed)`
+  appears anywhere in `git log` history on the current branch — using
+  `--grep` (not `git log -1`) so the gate continues to pass after
+  unrelated commits land on top of the merge
 
 **Honest limitations**: this gate is a documented social contract, not
 a cryptographic one. A determined user can hand-craft the marker files

@@ -32,7 +32,8 @@ def _label_escape(name: str) -> str:
     Mermaid renders `id["LABEL"]` blocks; the label is HTML-decoded by the
     renderer, so we use #-prefixed entity codes (Mermaid's preferred form)
     plus standard HTML entities to neutralize quotes, brackets, click
-    directives, and newlines.
+    directives, newlines, and backticks (Mermaid v10+ alternate label
+    delimiter).
     """
     return (
         str(name)
@@ -45,6 +46,7 @@ def _label_escape(name: str) -> str:
         .replace("|", "&#124;")
         .replace("[", "&#91;")
         .replace("]", "&#93;")
+        .replace("`", "&#96;")
     )
 
 

@@ -52,7 +52,7 @@ interface OrderService {
 | `OrderIntake` | `receive`, `validate` | `lifecycle` — both methods operate on a single Order as it advances through the intake stage (raw → validated); `validate` is meaningful only on the output of `receive` |
 | `InventoryReservation` | `reserve`, `release` | `lifecycle` — paired methods on a Reservation aggregate |
 | `PaymentCharger` | `authorize`, `capture`, `refund` | `state` — all three read/write the same payment-state machine |
-| `OrderRepository` | `save`, `findById`, `markStatus` | `collaboration` — invoked by the same upstream pipeline stage to mediate persistence |
+| `OrderRepository` | `save`, `findById`, `markStatus` | `state` — all three read/write the same persistence-backed Order state. (Not `collaboration`: these methods are terminal — they don't call other interfaces — so they fail the cohesion test's "calls the same downstream collaborators" half.) |
 | `CustomerNotifier` | `notify` | single responsibility; may grow if more notification channels appear |
 | `OrderEventPublisher` | `publish` | `failure_domain` — event-bus failures must not block the synchronous Order path |
 

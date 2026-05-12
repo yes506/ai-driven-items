@@ -9,7 +9,16 @@ Score each criterion 1–4. Total /24.
 | Criterion | 4 (Excellent) | 3 (Proficient) | 2 (Developing) | 1 (Beginning) |
 |---|---|---|---|---|
 | **Decomposition completeness** | Every E2E pipeline stage from Phase 1 has a method node; no "method-shaped class" wrappers hiding multi-stage logic | All major stages, 1 minor gap | 2–3 stages missing or stages bundled into multi-purpose methods | 4+ missing or method-shaped class present |
-| **Docstring quality** | All 9 fields filled meaningfully on every method | All 9 fields, ≤3 thin fields across the whole skeleton | Some fields missing on some methods, or many fields generic/placeholder | Many methods missing fields, or async-semantics gaps (per docstring-schema.md) |
+| **Docstring quality** | All 9 fields filled meaningfully on every method | All 9 fields, ≤3 *thin* fields across the whole skeleton | Some fields missing on some methods, or many fields generic/placeholder | Many methods missing fields, or async-semantics gaps (per docstring-schema.md) |
+
+*"Thin" field* = present but conveys no information beyond what the
+field name and the method signature already imply. Concrete examples:
+`Inputs: order: Order — an order` (restates the type), `Failure-modes:
+errors may occur` (no enumeration), `Collaborators: depends on
+implementation` (deferred), `Postconditions: returns the saved order`
+(echoes Outputs). A field with `None.` is NOT thin if `None.` is
+genuinely accurate (no side effects, no collaborators, etc.) — it's
+thin only when there IS something to say and the field elides it.
 | **Interface cohesion** | Cohesion test passes on every interface; no god-interfaces (7+ unrelated methods) | Cohesion test passes on all but 1 interface | 2–3 interfaces fail the cohesion test or look like grab-bags | God-interfaces present, or majority fail cohesion |
 | **Dependency direction** | Acyclic, layered, every edge justified | Acyclic but 1–2 questionable edges | One cycle present | Multiple cycles or unclear direction |
 | **Validation status** | Phase 6 passed cleanly first run | Phase 6 passed with warnings | Phase 6 had to be re-run after a fix | Phase 6 unresolved at submission |

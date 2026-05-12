@@ -13,6 +13,7 @@ Read-only: writes only to stdout. Caller redirects with `> architecture.html`.
 
 import html
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -47,7 +48,19 @@ def _mermaid_label(name) -> str:
         .replace("|", "&#124;")
         .replace("[", "&#91;")
         .replace("]", "&#93;")
+        .replace("`", "&#96;")  # Mermaid v10+ supports backtick label syntax
     )
+
+
+def _render_template(template: str, replacements: dict) -> str:
+    """Replace each {{NAME}} placeholder exactly ONCE in a single pass.
+
+    Avoids the double-substitution bug of chained `str.replace()` calls
+    where, e.g., a user-provided plan goal containing the literal text
+    `{{MERMAID}}` would get re-substituted by a later replace() call.
+    """
+    pattern = re.compile(r"\{\{(" + "|".join(re.escape(k) for k in replacements) + r")\}\}")
+    return pattern.sub(lambda m: replacements[m.group(1)], template)
 
 
 # ---------- section renderers ---------------------------------------------
@@ -179,16 +192,18 @@ def main() -> int:
     state = json.loads(state_path.read_text(encoding="utf-8"))
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
 
-    out = template
-    out = out.replace("{{PROJECT_SLUG}}", _esc(state.get("project_slug", "(unnamed)")))
-    out = out.replace("{{LANGUAGE}}", _esc(state.get("language_stack", "?")))
-    out = out.replace("{{PHASE}}", _esc(state.get("phase_completed", "?")))
-    out = out.replace("{{PLAN}}", _render_plan(state.get("plan") or {}))
-    out = out.replace("{{PACKAGES}}", _render_packages(state.get("packages") or []))
-    out = out.replace("{{INTERFACES}}", _render_interfaces(state.get("interfaces") or []))
-    out = out.replace("{{MERMAID}}", _render_mermaid(state.get("interfaces") or []))
-    out = out.replace("{{RUBRIC}}", _render_rubric(state.get("rubric_scores") or {}))
-    out = out.replace("{{CHECKLIST}}", _CHECKLIST_HTML)
+    replacements = {
+        "PROJECT_SLUG": _esc(state.get("project_slug", "(unnamed)")),
+        "LANGUAGE":     _esc(state.get("language_stack", "?")),
+        "PHASE":        _esc(state.get("phase_completed", "?")),
+        "PLAN":         _render_plan(state.get("plan") or {}),
+        "PACKAGES":     _render_packages(state.get("packages") or []),
+        "INTERFACES":   _render_interfaces(state.get("interfaces") or []),
+        "MERMAID":      _render_mermaid(state.get("interfaces") or []),
+        "RUBRIC":       _render_rubric(state.get("rubric_scores") or {}),
+        "CHECKLIST":    _CHECKLIST_HTML,
+    }
+    out = _render_template(template, replacements)
 
     sys.stdout.write(out)
     if not out.endswith("\n"):
