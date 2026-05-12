@@ -3,6 +3,21 @@
 How to wire up `collect-searches` on a fresh machine. The design rationale,
 architecture, and what is / isn't captured live in [design.md](design.md).
 
+## Install the skill
+
+Before doing anything below, make sure Claude Code can see the skill. From the
+repo root:
+
+```bash
+mkdir -p ~/.claude/skills
+ln -s "$(pwd)/skills/collect-searches" ~/.claude/skills/collect-searches
+```
+
+Per-tool variants and project-scoped install are documented in the top-level
+[README.md](../../../README.md). The rest of this file assumes the skill is
+installed and you're working inside its directory (e.g.
+`~/.claude/skills/collect-searches/` if you symlinked).
+
 ## Prerequisites
 
 - Python 3.11+ (uses stdlib `tomllib`, `fcntl`, `sqlite3` — Unix-like systems
@@ -54,22 +69,26 @@ happening in Safari or another browser — this pipeline won't help. See
    ```
 
    Edit `config.toml` and confirm `vault.path` and `chrome.history_path` are
-   correct. Both fields accept `~` / `$HOME`. Multi-profile users: replace
-   `Default` with `Profile 1`, `Profile 2`, etc.
+   correct. Both fields accept `~` (expanded via `Path.expanduser()`); use
+   absolute paths otherwise. Multi-profile users: replace `Default` with
+   `Profile 1`, `Profile 2`, etc.
 
 2. **Seed the cursor (recommended)**
 
    To avoid a flood on first run, seed the cursor to "now" so only future
-   searches are ingested:
+   searches are ingested. The snippet uses a subshell so it works regardless
+   of your current directory:
 
    ```bash
-   python3 -c 'import json, datetime, pathlib; \
+   ( cd "$(dirname "$(realpath SKILL.md)")" && \
+     python3 -c 'import json, datetime, pathlib; \
    ts_us = int((datetime.datetime.now(datetime.timezone.utc).timestamp() + 11644473600) * 1_000_000); \
    p = pathlib.Path("state/cursor.json"); p.parent.mkdir(parents=True, exist_ok=True); \
-   json.dump({"last_seen_chrome_ts": ts_us, "recent_hashes": []}, open(p, "w"), indent=2)'
+   json.dump({"last_seen_chrome_ts": ts_us, "recent_hashes": []}, open(p, "w"), indent=2)' )
    ```
 
-   Skip this step if you want to backfill your entire Chrome history.
+   Run it from the skill root (where `SKILL.md` lives). If you'd rather
+   backfill your entire Chrome history, skip this step entirely.
 
 3. **First run (manual)**
 

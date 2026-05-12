@@ -16,8 +16,10 @@ category folder under `<Vault>/Search/` it should live in.
 
 ## Input
 
-A JSON object that includes `title` (the search query, prefixed by "Searched for "),
-`titleUrl`, `time` (ISO timestamp), and possibly `subtitles` and `details`.
+A JSON object emitted by Stage 1 with these fields: `title` (the search query
+prefixed by "Searched for "), `titleUrl` (the visit URL), `time` (ISO
+timestamp), `query` (the bare query text), `page_title`, `source` (one of
+`keyword_search_terms` or `urls_google_search`), and `products` (`["Search"]`).
 
 ## Examples
 
@@ -25,7 +27,11 @@ Input: `{"title": "Searched for rust async runtime tokio vs async-std", ...}`
 Output: `category: Tech`
 
 Input: `{"title": "Searched for 강남 점심 맛집", ...}`
-Output: `category: Korean`
+Output: `category: Food`
 
 Input: `{"title": "Searched for symptoms of vitamin D deficiency", ...}`
 Output: `category: Health`
+
+(The second example is categorized by *topic* — food / restaurants — not by
+the *language* of the query. The query happens to be in Korean, but the
+classification rule is about subject matter.)

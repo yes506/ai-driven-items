@@ -18,6 +18,12 @@ preserves the original search and appends complementary research.
    skip enrichment. Mark `enrichment: skipped` in frontmatter.
 5. Use Obsidian-friendly formatting: YAML frontmatter, headings, `[[wikilinks]]`
    only when you're sure the linked note exists in this vault.
+6. **YAML escaping** — the `query:` field can contain arbitrary user text
+   including double quotes, single quotes, colons, and `#`. Use YAML
+   single-quoted scalars and double any inner single quotes
+   (`query: 'she said ''hi'''`). If the query contains a newline, use the
+   literal block form (`query: |` followed by an indented next line).
+   Never paste the raw query into a double-quoted scalar without escaping.
 
 ## Output template
 
@@ -26,7 +32,7 @@ preserves the original search and appends complementary research.
 date: <ISO datetime of the search>
 source: google-search
 category: <Category from classify step>
-query: "<original query text>"
+query: '<original query text — single-quoted, inner single quotes doubled>'
 tags: [search, <category-lower>, <1-3 topical tags>]
 enrichment: <complete | skipped>
 ---

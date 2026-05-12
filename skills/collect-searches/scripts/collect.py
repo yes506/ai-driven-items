@@ -39,15 +39,16 @@ LOCK_PATH = STATE_DIR / "collect.lock"
 
 CHROME_EPOCH_OFFSET_SECONDS = 11_644_473_600  # 1601-01-01 → 1970-01-01
 
-GOOGLE_SEARCH_PATH_RE = re.compile(r"^https?://(www\.)?google\.[a-z.]+/search$")
+# Constrained to the Google TLD shape: google.<2-3 letters>(.<2-3 letters>)?
+# Real examples: google.com, google.de, google.co.kr, google.com.au, google.co.uk
+# Rejects look-alike hosts such as google.example.com or google.evil-site.com.
+GOOGLE_SEARCH_PATH_RE = re.compile(
+    r"^https?://(www\.)?google\.[a-z]{2,3}(\.[a-z]{2,3})?/search$"
+)
 
 
 def log(msg: str) -> None:
     print(f"[collect] {msg}", flush=True)
-
-
-def utc_now() -> dt.datetime:
-    return dt.datetime.now(dt.timezone.utc)
 
 
 def chrome_ts_to_iso(chrome_us: int) -> str:
@@ -86,6 +87,10 @@ def save_json(path: Path, data) -> None:
 
 
 def acquire_lock():
+    # The lock file at state/collect.lock is created on first run and remains
+    # on disk afterwards. fcntl.flock is released automatically when the file
+    # descriptor closes (process exit or fp.close()); the file itself is just
+    # a stable inode for flock to attach to and is intentionally not unlinked.
     LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     fp = open(LOCK_PATH, "w")
     try:
@@ -100,6 +105,11 @@ def copy_history_db(src: Path) -> Path:
     """Chrome holds an exclusive lock on the live DB. Copy it to a temp path first."""
     if not src.exists():
         raise SystemExit(f"Chrome history DB not found at {src}")
+    if not src.is_file():
+        raise SystemExit(
+            f"chrome.history_path is not a file: {src}. "
+            "Point it at Chrome's `History` SQLite file, not the containing profile directory."
+        )
     tmpdir = Path(tempfile.mkdtemp(prefix="chrome-hist-"))
     dest = tmpdir / "History"
     shutil.copy2(src, dest)
@@ -167,12 +177,17 @@ def query_google_search_urls(conn: sqlite3.Connection, since_chrome_ts: int) -> 
 
 
 def to_record(raw: dict) -> dict:
-    """Shape compatible with Stage 2 prompts (title / titleUrl / time)."""
+    """Shape compatible with Stage 2 prompts (title / titleUrl / time).
+
+    `chrome_ts` is preserved so `filter_new` can enforce the cursor as a
+    Python-side belt-and-suspenders check on top of the SQL `WHERE` clause.
+    """
     iso_time = chrome_ts_to_iso(raw["chrome_ts"])
     return {
         "title": f"Searched for {raw['query']}",
         "titleUrl": raw["url"],
         "time": iso_time,
+        "chrome_ts": raw["chrome_ts"],
         "query": raw["query"],
         "page_title": raw["page_title"],
         "products": ["Search"],
@@ -186,11 +201,19 @@ def hash_record(record: dict) -> str:
 
 
 def filter_new(records: list[dict], cursor: dict) -> list[dict]:
-    last_ts = cursor.get("last_seen_chrome_ts") or 0
+    """Belt-and-suspenders dedup: hash-based identity + cursor-based time bound.
+
+    The SQL `WHERE v.visit_time > ?` already filters by cursor, but defending
+    against a future backfill path (or an out-of-order record) requires the
+    Python check too.
+    """
+    last_ts = int(cursor.get("last_seen_chrome_ts") or 0)
     seen_hashes = set(cursor.get("recent_hashes", []))
     seen_in_batch: set[str] = set()
     new_records: list[dict] = []
     for record in records:
+        if int(record.get("chrome_ts") or 0) <= last_ts:
+            continue
         h = hash_record(record)
         if h in seen_hashes or h in seen_in_batch:
             continue
@@ -246,6 +269,11 @@ def main() -> int:
 
 def _run(config: dict) -> int:
     vault_path = Path(config["vault"]["path"]).expanduser()
+    if not vault_path.is_dir():
+        raise SystemExit(
+            f"vault.path does not exist or is not a directory: {vault_path}. "
+            "Create the Obsidian vault first, then re-run."
+        )
     inbox_dir = vault_path / "Search" / "_inbox"
     history_src = Path(config["chrome"]["history_path"]).expanduser()
 
@@ -274,6 +302,9 @@ def _run(config: dict) -> int:
     log(f"wrote {written} files to {inbox_dir}")
 
     cursor = advance_cursor(cursor, raw, new_records)
+    # Cursor advances on Stage 1 success only; Stage 2 (LLM enrich/write) is
+    # decoupled and operates on the inbox JSONs, so a Stage 2 failure leaves
+    # files in the inbox without rewinding the cursor.
     save_json(CURSOR_PATH, cursor)
     log(f"cursor advanced to chrome_ts={cursor.get('last_seen_chrome_ts')}")
     return 0

@@ -1,6 +1,6 @@
 # Copy this file to config.toml (next to it) and fill in your values.
-# Both fields accept `~` and `$HOME`; the collector expands them with
-# Path.expanduser().
+# Both fields accept `~` (expanded via `Path.expanduser()`). Use absolute
+# paths if you'd rather not rely on `~`.
 
 [vault]
 # Absolute path to your Obsidian vault. Notes land at <path>/Search/<Category>/.
