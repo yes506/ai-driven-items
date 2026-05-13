@@ -13,6 +13,11 @@ message, not in this file. See SKILL.md "Implementation gate
 
 ```json
 {
+  "scale": "feature | system (state file is only created at these scales)",
+  "scope_score": "int 0-3 (Phase 0.5 triage)",
+  "risk_score": "int 0-3 (Phase 0.5 triage)",
+  "ambiguity_score": "int 0-3 (Phase 0.5 triage)",
+  "scale_overridden": "bool (true if user manually picked a different lane than the AI suggested)",
   "project_slug": "string (kebab-case ascii, used in worktree path + branch name)",
   "main_checkout": "absolute path to the main worktree (physical, symlinks resolved)",
   "base_branch": "string (default: dev; configurable when dev doesn't exist)",
@@ -20,7 +25,7 @@ message, not in this file. See SKILL.md "Implementation gate
   "language_stack": "java | python | typescript | go | rust",
   "validation_command": "string (the actual command to run in Phase 6, with <package> already substituted)",
   "detected_build_files": ["array (from detect_language_stack.sh output; non-empty when project is a monorepo)"],
-  "phase_completed": "worktree_created | plan_normalized | packages_planned | decomposition_done | skeleton_written | validated | artifacts_emitted | human_confirmed",
+  "phase_completed": "triage_done | worktree_created | plan_normalized | packages_planned | decomposition_done | skeleton_written | validated | artifacts_emitted | human_confirmed",
   "plan": {
     "goal": "string",
     "in_scope": ["..."],

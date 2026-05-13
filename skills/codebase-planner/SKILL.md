@@ -1,15 +1,14 @@
 ---
 name: codebase-planner
 description: |
-  Plan a project's package/directory layout and emit interface-only
-  language-appropriate skeletons (Java interface / Python Protocol /
-  TypeScript interface / Go interface / Rust trait) with a structured
-  9-field docstring on every method, BEFORE any implementation begins.
-  Sequences after `project-scaffolder`. Runs entirely inside an isolated
-  git worktree and emits a human-confirmation gate (rubric self-review +
-  checklist + Mermaid DAG + HTML report) that downstream skills/agents
-  must observe before generating implementation code. Language-agnostic.
-  Manual invocation only — `/codebase-planner`.
+  Decide how much planning a code change needs, then produce the right
+  weight of plan — from a 3-bullet sketch for a small function to a
+  fully decomposed interface-skeleton architecture with human gate.
+  First-class decision is **planning scale** (micro / local / feature /
+  system); lane drives whether a worktree is created, whether skeletons
+  are emitted, and what downstream marker (if any) the implementer skill
+  honors. Language-agnostic. Manual invocation only —
+  `/codebase-planner`.
 disable-model-invocation: true
 ---
 
@@ -17,50 +16,59 @@ disable-model-invocation: true
 
 ## Overview
 
-Plan packages and emit interface-only skeletons for a project that has
-already been baseline-scaffolded (typically by `project-scaffolder`).
-Every method on every emitted interface represents one node in the
-end-to-end pipeline; interfaces aggregate cohesive methods that share a
-responsibility/lifecycle. No implementation may begin until this skill
-commits the Phase 7 architecture artifacts (`architecture.html` +
-`architecture.mmd`) and lands the planner-merge commit on
-`${BASE_BRANCH}` carrying the `(interfaces only, human-confirmed)`
-marker — see "Implementation gate (downstream contract)" below for the
-canonical check. (`.planner-state.json` is gitignored local-only
-working state for resume tracking, not a downstream gate signal.)
+Plan a code change at the **lightest sufficient weight** for the task.
+The skill classifies the request into one of four scale lanes before
+any mutation, then runs only the phases that lane needs.
 
-`disable-model-invocation: true` means this skill only fires on explicit
-`/codebase-planner` invocation — never auto-trigger it.
+| Scale lane | Worktree | Artifacts | Skeletons emitted | Downstream marker |
+|---|---|---|---|---|
+| **micro** | no | none | no | `(plan-micro, human-confirmed)` — chat only |
+| **local** | no | none | no | `(plan-local, human-confirmed)` — chat only |
+| **feature** | yes | `plan.md` + `plan.mmd` | optional (only on real cross-boundary contract) | `(plan-feature, human-confirmed)` |
+| **system** | yes | `architecture.html` + `architecture.mmd` | yes (full interface skeletons + 9-field docstrings) | `(interfaces only, human-confirmed)` |
+
+The system lane preserves the **full pre-rename `codebase-architect`
+workflow verbatim** — worktree, Phase 5 interface skeletons, Phase 7
+HTML rubric, merge marker. The other three lanes are progressively
+lighter. See [triage-and-readiness.md](references/triage-and-readiness.md)
+for the scoring tuple and [implementer-contract.md](references/implementer-contract.md)
+for the downstream gate.
+
+`disable-model-invocation: true` — the skill spans read-only (micro,
+local) and side-effect (feature, system) lanes; uniform manual
+invocation prevents mode confusion. Never auto-trigger.
 
 ## Workflow Decision Tree
 
 ```
-Phase 0: Detect repo state ──┬─ on-dev-with-scaffold ──────┐
-                             ├─ on-dev-no-scaffold ────────┤── warn + ask to proceed
-                             ├─ on-default-needs-dev ──────┤── run "create dev?" dialog
-                             ├─ inside-planner-worktree ─┤── resume from .planner-state.json
-                             ├─ inside-other-worktree ─────┤── refuse, run from MAIN_CHECKOUT
-                             └─ unrelated ──────────────── refuse, surface reason
-                                                          │
-Phase 1: Plan ingestion (no mutations) — multi-method input ─┤
-Phase 2: Package/directory plan (no mutations) ──────────────┤
-Phase 3: Pipeline-node decomposition (no mutations) ─────────┤
-         user confirms Phases 1-3 individually — silence = stop, not yes
-Phase 4: Worktree creation (first mutation; PLANNER_ID computed once;
-         initial .planner-state.json written with phase_completed=worktree_created)
-Phase 5: Interface skeleton generation + .planner-state.json (incremental)
-Phase 6: Validate — language-appropriate compile/type-check on the skeleton
-Phase 7: Self-verification artifacts — rubric + checklist + Mermaid DAG + HTML report
-Phase 8: Human gate — `confirm plan` → mark human_confirmed locally
-         then offer `confirm merge` → merge worktree to BASE_BRANCH
+Phase 0:   Detect repo state ──┬─ on-dev-with-scaffold ─────┐
+                               ├─ on-dev-no-scaffold ───────┤── feature/system: warn + ask
+                               │                            │   micro/local: proceed (no scaffold needed)
+                               ├─ on-default-needs-dev ─────┤── feature/system only: create-dev dialog
+                               ├─ inside-planner-worktree ──┤── resume from .planner-state.json
+                               ├─ inside-legacy-architect-worktree ── refuse, ask user to finish/discard legacy run
+                               ├─ inside-other-worktree ────┤── refuse, run from MAIN_CHECKOUT
+                               └─ unrelated ─────────────────── refuse, surface reason
+Phase 0.5: Triage + readiness ─┬─ discovery (read CLAUDE.md, named files, callers, git log)
+                               ├─ score tuple (scope, risk, ambiguity)
+                               └─ pick lane: micro | local | feature | system
+                                  │
+                  ┌───────────────┼────────────────┬──────────────────┐
+                  ▼               ▼                ▼                  ▼
+              MICRO LANE      LOCAL LANE      FEATURE LANE       SYSTEM LANE
+              chat plan only  chat plan only  Phases 1, 3,       Phases 1-8 full
+              + confirm plan  + confirm plan  4-8 (plan.md +     (architecture.html
+                                              plan.mmd, optional + .mmd, skeletons,
+                                              skeletons)         9-field docstrings)
 ```
 
-State variables captured during Phase 0 and threaded through later phases:
+State variables captured during Phase 0/0.5 and threaded through later phases:
 
 - `MAIN_CHECKOUT` — absolute path to the parent main worktree
-- `BASE_BRANCH` — branch the planner worktree branches from (default `dev`)
-- `PLANNER_ID` — short suffix used in both worktree path and branch name
-- `LANGUAGE_STACK` — detected from build files; drives Phase 5/6 commands
+- `BASE_BRANCH` — branch the planner worktree branches from (default `dev`); only used by feature+system lanes
+- `PLANNER_ID` — short suffix used in both worktree path and branch name (feature+system only)
+- `LANGUAGE_STACK` — detected from build files; drives Phase 5/6 commands (feature+system only)
+- `SCALE` — `micro` | `local` | `feature` | `system` — chosen in Phase 0.5
 
 ---
 
@@ -77,17 +85,20 @@ Parse the JSON. The `state` field classifies into:
 
 | State | Meaning | Action |
 |---|---|---|
-| `on-dev-with-scaffold` | on `dev`, project-scaffolder marker commit present | proceed to Phase 1 |
-| `on-dev-no-scaffold` | on `dev` but no `chore(scaffold): initialize` commit in history | warn user, ask explicit confirmation to proceed without a scaffold baseline |
-| `on-default-needs-dev` | on `main`/`master`, but `dev` does not exist locally | run the "create dev from `<default_branch>`?" dialog from [git-worktree-flow.md](references/git-worktree-flow.md) |
+| `on-dev-with-scaffold` | on `dev`, project-scaffolder marker commit present | proceed to Phase 0.5 |
+| `on-dev-no-scaffold` | on `dev` but no `chore(scaffold): initialize` commit in history | for feature/system lanes: warn + ask. For micro/local: proceed (scaffold not needed). Lane is decided at Phase 0.5 — defer this branch until then |
+| `on-default-needs-dev` | on `main`/`master`, but `dev` does not exist locally | for feature/system lanes: run the "create dev from `<default_branch>`?" dialog from [git-worktree-flow.md](references/git-worktree-flow.md). For micro/local: skip — no worktree will be created |
 | `inside-planner-worktree` | cwd is inside an `*/.worktrees/planner-*` worktree (root or subdirectory) | resume from `.planner-state.json` if present, else refuse |
+| `inside-legacy-architect-worktree` | cwd is inside an `*/.worktrees/architect-*` worktree from the pre-rename `codebase-architect` skill | refuse with clear message: "legacy architect-run detected. Finish it via the old skill if still installed, or `git worktree remove <path>` to discard. No auto-migration." |
 | `inside-other-worktree` | inside a non-planner linked worktree | refuse, instruct user to run from `MAIN_CHECKOUT` |
 | `unrelated` | not in a git repo, detached HEAD, repo with no commits, or some other branch | refuse, surface the `reason` field from the JSON to the user |
 
 Capture from JSON: `MAIN_CHECKOUT`, `default_branch`. Set `BASE_BRANCH`
-to `dev` by default (configurable via dialog if the user objects).
+to `dev` by default for feature/system lanes (configurable via dialog
+if the user objects); micro/local lanes don't use `BASE_BRANCH`.
 
-Detect language stack:
+Detect language stack (feature/system lanes only — defer if the Phase 0.5
+classifier picks micro/local):
 
 ```bash
 bash "${CLAUDE_SKILL_DIR}/scripts/detect_language_stack.sh"
@@ -120,7 +131,56 @@ plain JS).
 
 See [git-worktree-flow.md](references/git-worktree-flow.md) for edge cases.
 
-**Gate**: do not advance unless `BASE_BRANCH` and `LANGUAGE_STACK` are decided.
+**Gate**: capture `MAIN_CHECKOUT` + `default_branch` before Phase 0.5.
+`BASE_BRANCH` + `LANGUAGE_STACK` are decided lazily once Phase 0.5
+picks a lane (only feature/system need them).
+
+---
+
+## Phase 0.5 — Triage & readiness
+
+See [triage-and-readiness.md](references/triage-and-readiness.md) for
+full rubric, discovery rule, and worked examples.
+
+1. **Discovery first** (no user questions yet): read CLAUDE.md /
+   AGENTS.md / README.md, every file the user named, grep call sites +
+   tests, `git log -n 20 --oneline -- <path>`. Surface what you found.
+2. **Score** `(scope, risk, ambiguity)` each 0–3, with reasoning shown.
+3. **Resolve lane**: `final_scale = max(scope, risk)` →
+   `micro` (0) / `local` (1) / `feature` (2) / `system` (3).
+4. **Block if `ambiguity >= 2` AND `final_scale <= 1`**: one
+   consolidated question round; re-score with answers. No silent
+   upgrades.
+5. Print classification, prompt `confirm scale` / suggest different
+   lane (upgrade free; downgrade needs `confirm downgrade`) / `revise`.
+
+Persist `SCALE` and the three scores to `.planner-state.json`
+(feature/system only — micro/local create no state file).
+
+**After Phase 0.5:**
+- micro / local → "Lightweight lanes" below
+- feature → Phase 1 (decomposition + `plan.md` / `plan.mmd`; see
+  [self-verification.md](references/self-verification.md))
+- system → Phase 1 (full pipeline below, Phases 1–8 unchanged)
+
+---
+
+## Lightweight lanes (micro & local)
+
+Read-only. No worktree, no commits, no skeleton, no state file. Chat is
+the entire artifact. The 9-field docstring schema does NOT apply.
+
+1. **Verbal-only ingestion** — chat request is the plan; don't ask for
+   files/URLs (see [plan-ingestion.md](references/plan-ingestion.md)).
+2. **3–7 bullet plan reflection** — touched files, logical steps,
+   validation/test plan, risks. No Mermaid DAG.
+3. **Prompt** `confirm plan` / `revise` / `escalate` (bump lane).
+4. **Hand-off marker on confirm** — one chat line:
+   `scale: <micro|local>   marker: (plan-<lane>, human-confirmed)`.
+   Downstream implementer reads this from chat per
+   [implementer-contract.md](references/implementer-contract.md).
+
+Concurrency: stateless and may overlap freely with any other invocation.
 
 ---
 
@@ -326,7 +386,7 @@ Print:
 4. The exact prompt:
 
 ```
-Type `confirm plan` to mark this architecture human-confirmed
+Type `confirm plan` to mark this planner output human-confirmed
 (unlocks the implementation gate), or `revise` to iterate.
 ```
 
@@ -371,33 +431,27 @@ On no: leave it.
 ## Implementation gate (downstream contract)
 
 Skills, subagents, and Claude sessions that intend to write
-**implementation** code (method bodies for the interfaces this skill
-emitted) MUST first verify the planner phase has been merged. The
-canonical check on the current branch:
+**implementation** code based on a planner run MUST honor the
+**scale-tagged marker family** documented in
+[implementer-contract.md](references/implementer-contract.md). Summary:
 
-```bash
-test -f architecture.html && test -f architecture.mmd \
-  && git log --grep='(interfaces only, human-confirmed)' --format=%H | grep -q .
-```
+| Scale | Marker | Where to find it | Files to check |
+|---|---|---|---|
+| micro | `(plan-micro, human-confirmed)` | chat history | — |
+| local | `(plan-local, human-confirmed)` | chat history | — |
+| feature | `(plan-feature, human-confirmed)` | `git log` merge commit | `plan.md` + `plan.mmd` |
+| system | `(interfaces only, human-confirmed)` | `git log` merge commit | `architecture.html` + `architecture.mmd` |
 
-If any part fails, REFUSE to write implementation and ask the user to
-complete `/codebase-planner` first. The check is two-pronged:
+The system marker is preserved verbatim from the pre-rename
+`codebase-architect` skill; downstream automation that already greps
+for it continues to work. Lower scales are additive.
 
-- `architecture.html` + `architecture.mmd` exist on the current branch
-  (they were committed at Phase 7 of a completed planner run)
-- The planner-merge marker `(interfaces only, human-confirmed)`
-  appears anywhere in `git log` history on the current branch — using
-  `--grep` (not `git log -1`) so the gate continues to pass after
-  unrelated commits land on top of the merge
-
-**Honest limitations**: this gate is a documented social contract, not
-a cryptographic one. A determined user can hand-craft the marker files
-and a fake merge commit message to bypass the check; the goal is to
-catch accidental misuse and make any deliberate bypass visible in git
-history. Stronger physical enforcement (signed commits / git notes
-verified against a maintainer key / external service) is out of scope
-for this skill. If your downstream automation needs that, layer it on
-top of this contract — do not replace it.
+**Honest limitations**: the gate is a documented social contract, not
+cryptographic. A determined user can fake marker files / commit
+messages; the goal is catching accidental misuse and making deliberate
+bypass visible in git history. Stronger enforcement (signed commits,
+git notes, external attestation) is out of scope — layer on top, do
+not replace.
 
 ---
 
@@ -423,6 +477,8 @@ confirmation to deviate, but default to refusal):
 - Treating user silence as confirmation at any gate
 - Creating `README.md`, `INSTALLATION_GUIDE.md`, etc. inside this skill folder
 - Writing fewer than the 9 docstring fields on any generated method
+  (applies to feature+system lanes that emit interface skeletons;
+  micro/local emit no methods so the rule has no enforcement target)
 
 ---
 

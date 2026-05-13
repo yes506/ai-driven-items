@@ -98,7 +98,8 @@ fi
 # 8. Classify
 if [ "${IS_LINKED_WORKTREE}" = "true" ]; then
   case "${WORKTREE_TOP}" in
-    */.worktrees/planner-*)  emit "$(build_json inside-planner-worktree)" ;;
+    */.worktrees/planner-*)     emit "$(build_json inside-planner-worktree)" ;;
+    */.worktrees/architect-*)   emit "$(build_json inside-legacy-architect-worktree)" ;;
     *)                          emit "$(build_json inside-other-worktree)" ;;
   esac
 fi

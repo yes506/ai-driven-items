@@ -4,7 +4,25 @@ Phase 1 of the skill collects the project plan via multiple input methods,
 **presented separately** so each can be normalized in isolation before
 synthesis. The user may supply zero, one, or many of each kind.
 
-## Accepted input methods
+## Verbal-only path (micro & local lanes)
+
+For `micro` and `local` lanes, the chat request **is** the canonical
+plan. Do NOT prompt for file paths, URLs, or pasted text. Skip the
+multi-method ingestion below and proceed directly to the 3–7 bullet
+plan reflection.
+
+The verbal request is captured in chat history; no `plan.sources[]`
+entry is recorded because the lightweight lanes don't create a state
+file. If the request is too vague to plan (ambiguity ≥ 2 per
+[triage-and-readiness.md](triage-and-readiness.md)), Phase 0.5 will
+have already blocked and asked one consolidated question round before
+this point — so by the time the planner reaches Phase 1 with a
+micro/local lane, the verbal request is sufficient by construction.
+
+For `feature` and `system` lanes, proceed with the multi-method
+ingestion below.
+
+## Accepted input methods (feature & system lanes)
 
 ### Files on disk
 
