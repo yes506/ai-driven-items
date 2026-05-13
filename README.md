@@ -17,7 +17,7 @@ This README is the **item index** for the repo. Items are grouped by type below;
 | Skill | What it does |
 |---|---|
 | [`project-scaffolder`](skills/project-scaffolder/) | Language-agnostic project bootstrapping. Walks intent → 2-4 tech-stack options → scaffolded baseline (lint, test, logging, config, CI stub, health endpoint). Runs entirely inside an isolated git worktree and merges back to `dev` only after explicit user confirmation. Tier-1 stacks: Next.js, Spring Boot, FastAPI, Go, Node/Express. |
-| [`codebase-architect`](skills/codebase-architect/) | Sequences after `project-scaffolder`. Plans packages and emits one language-appropriate abstract component (Java interface / Python Protocol / TypeScript interface / Go interface / Rust trait) per cohesive responsibility, with a structured 9-field docstring on every method. Runs inside an isolated git worktree; emits a human-confirmation gate (rubric self-review + checklist + Mermaid DAG + self-contained HTML report) that downstream skills/agents must clear before any implementation begins. |
+| [`codebase-planner`](skills/codebase-planner/) | Decides how much planning a code change needs, then runs only the phases that lane requires. Four scale lanes: **micro** (one-function, 3–7 bullet chat plan, no worktree), **local** (≤3 files / 1 module, chat plan), **feature** (worktree + `plan.md` + Mermaid DAG, optional skeletons), **system** (full interface-skeleton workflow inherited verbatim from the prior codebase-architect skill — worktree + 9-field docstrings + Mermaid DAG + HTML report + human-confirmation merge gate). Lane is picked by a scored tuple (scope, risk, ambiguity) before any mutation; ambiguous requests block-and-ask rather than silently over-engineer. Downstream `codebase-implementer` reads a scale-tagged marker family. Manual invocation only — `/codebase-planner`. |
 
 #### Agents
 
@@ -37,7 +37,7 @@ _(planned — none shipped yet)_
 ai-driven-items/
 ├── skills/             Claude Code skills (procedural workflows + bundled resources)
 │   ├── project-scaffolder/
-│   └── codebase-architect/
+│   └── codebase-planner/
 ├── agents/             (planned) Custom Claude Code subagents
 ├── mcp-servers/        (planned) Model Context Protocol servers
 ├── playbooks/          (planned) Reusable, AI-consumable implementation guides
@@ -46,7 +46,7 @@ ai-driven-items/
 
 ### Installing
 
-The install instructions below use `project-scaffolder` as the running example. **Substitute `<name>`** with the directory name of any other utility from the index above (e.g. `codebase-architect`).
+The install instructions below use `project-scaffolder` as the running example. **Substitute `<name>`** with the directory name of any other utility from the index above (e.g. `codebase-planner`).
 
 #### Claude Code (native)
 
@@ -189,7 +189,7 @@ Released into the public domain via [CC0 1.0 Universal](https://creativecommons.
 | 스킬 | 설명 |
 |---|---|
 | [`project-scaffolder`](skills/project-scaffolder/) | 언어 무관 프로젝트 부트스트래퍼. 의도 파악 → 2-4개 스택 옵션 추천 → 베이스라인 스캐폴딩 (린트, 테스트, 로깅, 설정, CI 스텁, 헬스 엔드포인트) 흐름으로 진행합니다. 모든 작업은 격리된 git worktree 안에서만 일어나며, 사용자가 명시적으로 확인해야만 `dev` 브랜치로 머지됩니다. Tier-1 스택: Next.js, Spring Boot, FastAPI, Go, Node/Express. |
-| [`codebase-architect`](skills/codebase-architect/) | `project-scaffolder` 다음 단계로 실행됩니다. 패키지 구조를 설계하고, 응집도 있는 책임 단위마다 언어에 적합한 추상 구성요소(Java interface / Python Protocol / TypeScript interface / Go interface / Rust trait) 하나씩을 생성합니다. 각 메서드에는 구조화된 9-필드 docstring이 붙습니다. 격리된 git worktree 안에서 동작하며, 인간 확인 게이트(루브릭 자가 검증 + 체크리스트 + Mermaid DAG + 단일 파일 HTML 리포트)를 통과해야만 다운스트림 스킬/에이전트가 실제 구현 코드를 작성할 수 있습니다. |
+| [`codebase-planner`](skills/codebase-planner/) | 코드 변경에 필요한 **계획 규모**를 먼저 판정한 뒤, 해당 레인에 필요한 단계만 실행합니다. 네 단계 스케일: **micro**(단일 함수 수준, 3–7 항목 채팅 플랜, worktree 없음), **local**(≤3 파일·단일 모듈, 채팅 플랜), **feature**(worktree + `plan.md` + Mermaid DAG, 스켈레톤 선택적), **system**(이전 codebase-architect 스킬의 전체 인터페이스-스켈레톤 워크플로 — worktree + 9-필드 docstring + Mermaid DAG + HTML 리포트 + 사람 확인 머지 게이트). 레인은 mutation 직전에 (scope, risk, ambiguity) 점수 튜플로 결정되며, 요청이 모호하면 silently 과설계하지 않고 명확화 질문으로 차단합니다. 다운스트림 `codebase-implementer`는 scale-tagged marker family를 읽습니다. 수동 호출 전용 — `/codebase-planner`. |
 
 #### 에이전트
 
@@ -209,7 +209,7 @@ _(예정 — 아직 제공되는 항목 없음)_
 ai-driven-items/
 ├── skills/             Claude Code 스킬 (절차적 워크플로 + 번들 리소스)
 │   ├── project-scaffolder/
-│   └── codebase-architect/
+│   └── codebase-planner/
 ├── agents/             (예정) Claude Code 커스텀 서브에이전트
 ├── mcp-servers/        (예정) Model Context Protocol 서버
 ├── playbooks/          (예정) 재사용 가능한 AI 친화적 구현 가이드
@@ -218,7 +218,7 @@ ai-driven-items/
 
 ### 설치
 
-아래 설치 방법은 `project-scaffolder` 를 예시로 사용합니다. 위 인덱스의 다른 유틸리티를 설치하려면 **`<name>` 부분을 해당 디렉터리 이름으로 치환**하세요(예: `codebase-architect`).
+아래 설치 방법은 `project-scaffolder` 를 예시로 사용합니다. 위 인덱스의 다른 유틸리티를 설치하려면 **`<name>` 부분을 해당 디렉터리 이름으로 치환**하세요(예: `codebase-planner`).
 
 #### Claude Code (네이티브)
 
