@@ -1,0 +1,1 @@
+# No external runtime dependencies — Python 3.11+ stdlib (sqlite3, tomllib, fcntl) is sufficient.
