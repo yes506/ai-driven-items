@@ -126,4 +126,8 @@ if [ -n "${DEFAULT_BRANCH}" ] && [ "${CURRENT_BRANCH}" = "${DEFAULT_BRANCH}" ] &
   emit "$(build_json on-default-needs-dev)"
 fi
 
-emit "$(build_json unrelated not_on_dev_in_main_checkout)"
+# On a non-base branch in the main checkout (e.g. a feature branch).
+# Not a refusal: micro/local lanes can still proceed (read-only, no
+# worktree, no BASE_BRANCH needed). Feature/system must refuse at this
+# state because they need a clean worktree off `dev`/base.
+emit "$(build_json on-nonbase-main-checkout)"

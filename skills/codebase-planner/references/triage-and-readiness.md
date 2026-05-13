@@ -115,19 +115,22 @@ Record both the AI's classification AND the user's final choice in
 
 ## Worked examples
 
-### Example A — micro
+### Example A — bounded local (intentionally non-auth)
 
-> "Add a null-check to `User.fromJson()` in `auth/user.dart`."
+> "Add a null-check to `User.fromJson()` in `models/user.dart`."
 
 | Score | Value | Reasoning |
 |---|---|---|
 | scope | 0 | one file, one known method |
-| risk | 1 | local logic, tests cheap |
+| risk | 1 | local logic, tests cheap; path is not auth/payment/security |
 | ambiguity | 0 | fully specified |
 
-→ `final_scale = 1 → local`. Wait, max(0, 1) = 1. So this is local, not
-micro. That's correct — touching auth-adjacent code earns one notch up
-even with bounded scope.
+→ `final_scale = max(0, 1) = 1 → local`. Common-mistake note: scope=0
+does NOT imply micro — micro requires `final_scale = 0`, which means
+risk must also be 0. Even a trivial-scope change earns the local lane
+the moment risk crosses into "local logic with cheap tests" territory.
+For an auth-adjacent equivalent of this request, see Example B —
+risk_score escalates the same scope-0 change all the way to system.
 
 ### Example B — risk-escalated
 

@@ -25,7 +25,7 @@ message, not in this file. See SKILL.md "Implementation gate
   "language_stack": "java | python | typescript | go | rust",
   "validation_command": "string (the actual command to run in Phase 6, with <package> already substituted)",
   "detected_build_files": ["array (from detect_language_stack.sh output; non-empty when project is a monorepo)"],
-  "phase_completed": "triage_done | worktree_created | plan_normalized | packages_planned | decomposition_done | skeleton_written | validated | artifacts_emitted | human_confirmed",
+  "phase_completed": "worktree_created | plan_normalized | packages_planned | decomposition_done | skeleton_written | validated | artifacts_emitted | human_confirmed",
   "plan": {
     "goal": "string",
     "in_scope": ["..."],
@@ -125,14 +125,11 @@ language-native writer (Python: `json.dump`).
 
 Downstream automation does NOT read `.planner-state.json` (it's
 gitignored — wouldn't survive merge to dev). The canonical
-implementation-gate check looks at the **tracked** architecture
-artifacts and the planner-merge commit on the current branch:
-
-```bash
-test -f architecture.html && test -f architecture.mmd \
-  && git log --grep='(interfaces only, human-confirmed)' \
-       --format=%H | grep -q .
-```
-
-See SKILL.md "Implementation gate (downstream contract)" for the full
-contract, including its honest forgeability limitations.
+implementation-gate check is a **scale-tagged marker family** — system
+lane keeps the original `(interfaces only, human-confirmed)` marker
+plus `architecture.html`/`.mmd` files; feature lane uses
+`(plan-feature, human-confirmed)` plus `plan.md`/`plan.mmd`; micro and
+local use chat-history gates only. See
+[implementer-contract.md](implementer-contract.md) for the full
+per-lane check and SKILL.md "Implementation gate (downstream contract)"
+for the canonical summary table.

@@ -88,6 +88,7 @@ Parse the JSON. The `state` field classifies into:
 | `on-dev-with-scaffold` | on `dev`, project-scaffolder marker commit present | proceed to Phase 0.5 |
 | `on-dev-no-scaffold` | on `dev` but no `chore(scaffold): initialize` commit in history | for feature/system lanes: warn + ask. For micro/local: proceed (scaffold not needed). Lane is decided at Phase 0.5 — defer this branch until then |
 | `on-default-needs-dev` | on `main`/`master`, but `dev` does not exist locally | for feature/system lanes: run the "create dev from `<default_branch>`?" dialog from [git-worktree-flow.md](references/git-worktree-flow.md). For micro/local: skip — no worktree will be created |
+| `on-nonbase-main-checkout` | in main checkout, on a non-`dev` non-default branch (e.g. a feature branch) | for micro/local lanes: **proceed** — they're read-only and don't need a worktree. For feature/system: refuse and ask user to switch to `dev` (or run with explicit `BASE_BRANCH` override via the dialog) |
 | `inside-planner-worktree` | cwd is inside an `*/.worktrees/planner-*` worktree (root or subdirectory) | resume from `.planner-state.json` if present, else refuse |
 | `inside-legacy-architect-worktree` | cwd is inside an `*/.worktrees/architect-*` worktree from the pre-rename `codebase-architect` skill | refuse with clear message: "legacy architect-run detected. Finish it via the old skill if still installed, or `git worktree remove <path>` to discard. No auto-migration." |
 | `inside-other-worktree` | inside a non-planner linked worktree | refuse, instruct user to run from `MAIN_CHECKOUT` |
@@ -180,7 +181,9 @@ the entire artifact. The 9-field docstring schema does NOT apply.
    Downstream implementer reads this from chat per
    [implementer-contract.md](references/implementer-contract.md).
 
-Concurrency: stateless and may overlap freely with any other invocation.
+Concurrency: stateless on disk; the implementer pairs planner-output
+and confirm token by chat-adjacency, so two parallel micro/local runs
+in one conversation should be paired carefully (see implementer-contract.md).
 
 ---
 
@@ -277,11 +280,17 @@ the user — never auto-resolve.
 
 ---
 
-## Phase 5 — Interface skeleton generation
+## Phase 5 — Interface skeleton generation (system + feature-with-contract)
 
 For each interface from Phase 3, generate a language-appropriate
 abstraction (interface / Protocol / trait / etc.) per
 [language-skeletons.md](references/language-skeletons.md).
+
+**Feature-lane branch**: if `SCALE == feature`, Phase 5 fires only when
+Phase 3 detected a real cross-boundary contract AND the user explicitly
+typed `emit skeletons`. Otherwise skip Phase 5 entirely and proceed to
+Phase 7 with plan-only artifacts. See
+[feature-lane.md](references/feature-lane.md) for the full conditional.
 
 **Every method MUST carry the 9-field docstring** per
 [docstring-schema.md](references/docstring-schema.md). No exceptions.
@@ -322,13 +331,10 @@ Run the language-appropriate compile/type-check on the empty skeleton
 | Go | `go build ./...` |
 | Rust | `cargo check` |
 
-**Python substitution**: `detect_language_stack.sh` emits
-`mypy --strict <package>` as a template (with the `<package>`
-placeholder). Before running, substitute `<package>` with the actual
-package directory from Phase 2 (e.g. `mypy --strict src/myproj`).
-**Never run `mypy --strict .` over the worktree root** — it picks up
-generated artifacts, virtualenvs, and other noise that inflate false
-failures.
+**Python placeholder substitution** + monorepo paths are documented in
+[language-skeletons.md](references/language-skeletons.md). Never run
+`mypy --strict .` over the worktree root — substitute the actual
+package directory from Phase 2.
 
 If validation fails: stop, report failure, **never auto-prune the
 worktree**. Update `.planner-state.json` `phase_completed: validated`
@@ -338,34 +344,32 @@ on success.
 
 ## Phase 7 — Self-verification artifacts
 
-Produce all three handoff outputs per
-[self-verification.md](references/self-verification.md):
-
-1. **Rubric-scored self-review** — analytic 4-point rubric across 6
-   criteria (decomposition completeness, docstring quality, interface
-   cohesion, dependency direction, validation status, plan coverage).
-2. **Human-confirmation checklist** — single-point rubric (proficiency
-   threshold + space for above/below comments).
-3. **Visual outputs:**
-   - Mermaid dependency DAG (interface names are HTML-entity-escaped at
-     emit time so malicious names in the state file cannot inject
-     `click ... href` directives if the file is later rendered):
-     ```bash
-     python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" \
-       .planner-state.json > architecture.mmd
-     ```
-   - HTML report (fully self-contained — no CDN, no external scripts;
-     the Mermaid block is inlined as plain text for the reviewer to
-     paste into a renderer of their choice):
-     ```bash
-     python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py" \
-       .planner-state.json > architecture.html
-     ```
-
-Both visual artifacts go in the worktree root and are committed via:
+Pick lane-conditional names + marker:
 
 ```bash
-git add architecture.mmd architecture.html
+case "${SCALE}" in
+  system)  ARTIFACTS="architecture.mmd architecture.html"; MARKER="(interfaces only, human-confirmed)" ;;
+  feature) ARTIFACTS="plan.mmd plan.md";                   MARKER="(plan-feature, human-confirmed)" ;;
+esac
+```
+
+Outputs per [self-verification.md](references/self-verification.md):
+rubric-scored self-review (4-point × 6 criteria for system, drop
+"Docstring quality" + "Interface cohesion" for feature without
+skeletons), human-confirmation checklist, and visual artifacts. The
+Mermaid renderer escapes interface names so malicious state-file
+content cannot inject `click ... href` directives.
+
+```bash
+# System: render both visuals
+python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py"  .planner-state.json > architecture.mmd
+python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py"  .planner-state.json > architecture.html
+
+# Feature: render plan.mmd + compose plan.md per feature-lane.md template
+python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py"  .planner-state.json > plan.mmd
+
+# Commit (both lanes)
+git add ${ARTIFACTS}
 git commit -m "docs(planner): self-verification artifacts"
 ```
 
@@ -410,15 +414,17 @@ Type `confirm plan` to mark this planner output human-confirmed
     Type `confirm merge` to merge planner/<slug>-<id> into <BASE_BRANCH>,
     or `keep` to leave the worktree intact for further iteration.
     ```
-  - On `confirm merge`:
+  - On `confirm merge` (uses the `${MARKER}` set in Phase 7):
     ```bash
     git -C "${MAIN_CHECKOUT}" checkout "${BASE_BRANCH}"
     git -C "${MAIN_CHECKOUT}" merge --no-ff "planner/${PROJECT_SLUG}-${PLANNER_ID}" \
-      -m "feat(planner): merge ${PROJECT_SLUG} architecture (interfaces only, human-confirmed)"
+      -m "feat(planner): merge ${PROJECT_SLUG} ${MARKER}"
     ```
-    The explicit `-m` is mandatory — without it git drops into `$EDITOR`
-    and hangs in non-interactive use. **Do not** `git push` — that is the
-    user's call.
+    For system this expands to `... merge <slug> (interfaces only,
+    human-confirmed)`; for feature, `... merge <slug> (plan-feature,
+    human-confirmed)`. The explicit `-m` is mandatory — without it git
+    drops into `$EDITOR` and hangs in non-interactive use. **Do not**
+    `git push` — that is the user's call.
 - `revise` → leave worktree intact, return to relevant phase.
 - Anything else → re-ask.
 
