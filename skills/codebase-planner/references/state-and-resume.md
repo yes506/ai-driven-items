@@ -3,11 +3,13 @@
 The state file lives at the worktree root and is **gitignored** on the
 planner branch (per Phase 4 step 3). It is local-only working state,
 updated **incrementally** after each Phase sub-step so any mid-run
-failure stays resumable. It is NEVER committed; Phase 8's
-human-confirmation marker lives in the architecture artifacts
-(`architecture.html`, `architecture.mmd`) and the merge commit
-message, not in this file. See SKILL.md "Implementation gate
-(downstream contract)" for the canonical gate check.
+failure stays resumable. It is NEVER committed; the human-confirmation
+marker lives in the tracked artifacts (system: `architecture.html` +
+`architecture.mmd`; feature: `plan.md` + `plan.mmd`) and the merge
+commit message, not in this file. See
+[implementer-contract.md](implementer-contract.md) for the full
+per-lane gate check and SKILL.md "Implementation gate (downstream
+contract)" for the summary table.
 
 ## Schema
 
@@ -59,10 +61,11 @@ message, not in this file. See SKILL.md "Implementation gate
   ],
   "value_objects": ["string (Java enums, Python dataclasses, TS types — non-interface helpers)"],
   "validation_status": "pending | passed | failed",
+  "feature_skeletons_choice": "emit | skip | null (feature lane only — captured at the Phase 3 → Phase 5 transition; null for system lane where skeletons are mandatory)",
   "rubric_scores": {
     "decomposition_completeness": "int 1-4",
-    "docstring_quality": "int 1-4",
-    "interface_cohesion": "int 1-4",
+    "docstring_quality": "int 1-4 (system + feature-with-skeletons only; omit when no methods are emitted)",
+    "interface_cohesion": "int 1-4 (system + feature-with-skeletons only; omit when no interfaces are emitted)",
     "dependency_direction": "int 1-4",
     "validation_status": "int 1-4",
     "plan_coverage": "int 1-4"
@@ -81,7 +84,8 @@ message, not in this file. See SKILL.md "Implementation gate
 | `worktree_created` | Phase 1 (plan ingestion) |
 | `plan_normalized` | Phase 2 (packages) |
 | `packages_planned` | Phase 3 (decomposition) |
-| `decomposition_done` | Phase 5 (skeleton) |
+| `decomposition_done` (system, or feature with `feature_skeletons_choice=emit`) | Phase 5 (skeleton) |
+| `decomposition_done` (feature with `feature_skeletons_choice=skip`) | Phase 7 (plan artifacts; Phase 5 + Phase 6 skipped) |
 | `skeleton_written` | Phase 6 (validate) |
 | `validated` | Phase 7 (artifacts) |
 | `artifacts_emitted` | Phase 8 (human gate) |

@@ -331,10 +331,10 @@ Run the language-appropriate compile/type-check on the empty skeleton
 | Go | `go build ./...` |
 | Rust | `cargo check` |
 
-**Python placeholder substitution** + monorepo paths are documented in
-[language-skeletons.md](references/language-skeletons.md). Never run
-`mypy --strict .` over the worktree root — substitute the actual
-package directory from Phase 2.
+**Python placeholder + monorepo paths**: see
+[language-skeletons.md](references/language-skeletons.md); never `mypy --strict .` the worktree root.
+**Feature lane with skeletons skipped**: no compile target — validation moves into Phase 7 as a header + Mermaid smoke check
+([feature-lane.md](references/feature-lane.md)).
 
 If validation fails: stop, report failure, **never auto-prune the
 worktree**. Update `.planner-state.json` `phase_completed: validated`
@@ -361,14 +361,13 @@ Mermaid renderer escapes interface names so malicious state-file
 content cannot inject `click ... href` directives.
 
 ```bash
-# System: render both visuals
-python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py"  .planner-state.json > architecture.mmd
-python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py"  .planner-state.json > architecture.html
-
-# Feature: render plan.mmd + compose plan.md per feature-lane.md template
-python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py"  .planner-state.json > plan.mmd
-
-# Commit (both lanes)
+case "${SCALE}" in
+  system)  python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" .planner-state.json > architecture.mmd
+           python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py" .planner-state.json > architecture.html ;;
+  feature) python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" .planner-state.json > plan.mmd
+           # compose plan.md per feature-lane.md template; smoke-check headers + Mermaid before commit
+           ;;
+esac
 git add ${ARTIFACTS}
 git commit -m "docs(planner): self-verification artifacts"
 ```
@@ -386,7 +385,7 @@ Print:
 
 1. The rubric scores (Phase 7.1)
 2. The human-confirmation checklist (Phase 7.2)
-3. Paths to `architecture.mmd` and `architecture.html`
+3. Paths to the artifacts emitted in Phase 7 (`${ARTIFACTS}` — `architecture.mmd`+`.html` for system, `plan.mmd`+`plan.md` for feature)
 4. The exact prompt:
 
 ```
@@ -400,14 +399,13 @@ Type `confirm plan` to mark this planner output human-confirmed
     `phase_completed: human_confirmed`, record reviewer + ISO-8601
     timestamp.
   - The canonical confirmation record on the planner branch is the
-    Phase 7 commit of `architecture.mmd` + `architecture.html` (already
-    in place) plus the Phase 8 merge commit message
-    `feat(planner): merge ... (interfaces only, human-confirmed)` that
+    Phase 7 commit of `${ARTIFACTS}` (already in place) plus the Phase 8
+    merge commit message `feat(planner): merge ... ${MARKER}` that
     follows next. There is intentionally NO separate
     `.planner-state.json` commit — the file is gitignored on the
     worktree's `.gitignore`, so `git add` of it is a silent no-op and
     `git commit` would fail with "nothing to commit". Downstream
-    automation looks at the architecture artifacts and the merge commit
+    automation looks at the tracked artifacts and the merge commit
     instead (see "Implementation gate" below).
   - Then prompt:
     ```

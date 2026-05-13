@@ -45,13 +45,24 @@ artifacts will land in Phase 7's commit instead.
 
 ### Phase 6 — Validate (conditional)
 
-- If skeletons were emitted: run the language-appropriate compile/type
-  check as documented in SKILL.md Phase 6.
-- If skeletons were skipped: validate `plan.md` and `plan.mmd` instead:
-  - `plan.md` is non-empty and contains the required headers
-    (`## Goal`, `## Package layout`, `## Decomposition`).
-  - `plan.mmd` parses as valid Mermaid (smoke-check: `head -1` returns
-    `flowchart` or `graph`).
+- **Skeletons emitted**: run the language-appropriate compile/type
+  check as documented in SKILL.md Phase 6. State transitions to
+  `phase_completed: validated`.
+- **Skeletons skipped**: Phase 6 is **skipped entirely** — there is no
+  compile target. The plan artifacts don't exist yet (Phase 7 creates
+  them). Plan-artifact validation happens *inside Phase 7* immediately
+  after rendering, before the commit. State transitions from
+  `decomposition_done` directly to `artifacts_emitted` once Phase 7's
+  smoke-check passes.
+
+The smoke-check (run after rendering in Phase 7):
+- `plan.md` is non-empty and contains the required headers (`## Goal`,
+  `## Package layout`, `## Decomposition`).
+- `plan.mmd` parses as valid Mermaid (`head -1` returns `flowchart`
+  or `graph`).
+
+If either check fails, do not commit; surface to user and ask to
+revise.
 
 ### Phase 7 — Self-verification artifacts
 
@@ -60,6 +71,9 @@ filename) and `plan.md` manually composed from the state file's
 `plan.*` and decomposition fields. **Do NOT emit `architecture.html`** —
 that filename is system-lane-only and signals a different downstream
 contract.
+
+For skeletons-skipped runs, run the Phase 6 smoke-check above *before*
+`git add` / `git commit`.
 
 Rubric: drop the "Docstring quality" and "Interface cohesion" criteria
 (they don't apply when no methods/interfaces were emitted). The
