@@ -1,4 +1,4 @@
-# Git worktree flow for codebase-architect
+# Git worktree flow for codebase-planner
 
 Mirrors `project-scaffolder`'s flow exactly to keep mental overhead low
 for maintainers familiar with that skill.
@@ -6,8 +6,8 @@ for maintainers familiar with that skill.
 ## Worktree path + branch name
 
 ```
-.worktrees/architect-<project-slug>-<id>/   ← physical path
-architect/<project-slug>-<id>               ← branch name
+.worktrees/planner-<project-slug>-<id>/   ← physical path
+planner/<project-slug>-<id>                 ← branch name
 ```
 
 `<id>` is `date +%s | tail -c 6`-`$$`-`${RANDOM}` — short epoch
@@ -29,7 +29,7 @@ Default `BASE_BRANCH=dev`. If `dev` doesn't exist:
 | Neither exists | refuse — repo isn't shaped for this skill |
 
 Whatever branch results becomes `BASE_BRANCH` and is persisted in
-`.architect-state.json` for Phase 4 worktree creation and Phase 8 merge.
+`.planner-state.json` for Phase 4 worktree creation and Phase 8 merge.
 
 If `dev` exists only on `origin` (not local), the inspector currently
 returns `unrelated, not_on_dev_in_main_checkout`; ask the user to
@@ -40,9 +40,9 @@ base via the dialog above.
 
 ### Path collision
 
-`.worktrees/architect-<slug>-<id>` already exists. Likely a partial prior
+`.worktrees/planner-<slug>-<id>` already exists. Likely a partial prior
 run. Surface what's there and ask: "Resume that one (read its
-`.architect-state.json`), or pick a different slug?"
+`.planner-state.json`), or pick a different slug?"
 
 ### Dirty BASE_BRANCH
 
@@ -52,9 +52,9 @@ commits/stashes/discards. Show the dirty paths so the user can decide.
 
 ### Nested invocation
 
-The user re-runs `/codebase-architect` while already inside an architect
-worktree. Phase 0 detects this as `inside-architect-worktree`. If
-`.architect-state.json` is present → resume per
+The user re-runs `/codebase-planner` while already inside a planner
+worktree. Phase 0 detects this as `inside-planner-worktree`. If
+`.planner-state.json` is present → resume per
 [state-and-resume.md](state-and-resume.md). Otherwise refuse and ask the
 user to either remove the worktree or supply a state file.
 
@@ -67,9 +67,9 @@ before proceeding.
 
 ### Merge conflicts at Phase 8
 
-Architect branch can't fast-forward or 3-way merge cleanly into
+Planner branch can't fast-forward or 3-way merge cleanly into
 `${BASE_BRANCH}`. Refuse to merge. Surface the conflicts. Ask the user
-to either: (a) update the architect branch with `git pull --rebase`
+to either: (a) update the planner branch with `git pull --rebase`
 from a fresh checkout of `${BASE_BRANCH}` and re-run Phase 8, or
 (b) abort the merge and decide manually. Do NOT use `--strategy=ours`
 or any conflict-skipping flag.
@@ -77,7 +77,7 @@ or any conflict-skipping flag.
 ### Default branch is `master`, not `main`
 
 The inspector returns `default_branch=master`. Honor it for any base-branch
-fallback dialog. The architect worktree itself still branches from `dev`
+fallback dialog. The planner worktree itself still branches from `dev`
 when present.
 
 ### Missing `dev` locally but present on `origin`
@@ -96,22 +96,22 @@ The exact sequence (executed only after Phase 3 confirmation):
 grep -qxF '.worktrees/' "${MAIN_CHECKOUT}/.git/info/exclude" \
   || echo '.worktrees/' >> "${MAIN_CHECKOUT}/.git/info/exclude"
 
-# Step 1 — compute ARCHITECT_ID once, interpolate into both path + branch.
+# Step 1 — compute PLANNER_ID once, interpolate into both path + branch.
 # epoch tail + $$ + $RANDOM: epoch handles cross-second runs, $$ handles
 # concurrent runs on a host shell, $RANDOM covers PID-namespaced containers
 # where $$ is always 1 (so the same-second-concurrent case still gets entropy).
-ARCHITECT_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"
+PLANNER_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"
 PROJECT_SLUG="<short-project-slug>"
 git -C "${MAIN_CHECKOUT}" worktree add \
-  ".worktrees/architect-${PROJECT_SLUG}-${ARCHITECT_ID}" \
-  -b "architect/${PROJECT_SLUG}-${ARCHITECT_ID}" "${BASE_BRANCH}"
+  ".worktrees/planner-${PROJECT_SLUG}-${PLANNER_ID}" \
+  -b "planner/${PROJECT_SLUG}-${PLANNER_ID}" "${BASE_BRANCH}"
 
 # Step 2 — cd into the worktree for all subsequent file ops
-cd "${MAIN_CHECKOUT}/.worktrees/architect-${PROJECT_SLUG}-${ARCHITECT_ID}"
+cd "${MAIN_CHECKOUT}/.worktrees/planner-${PROJECT_SLUG}-${PLANNER_ID}"
 
-# Step 3 — committed gitignore so .worktrees/ + .architect-state.json
+# Step 3 — committed gitignore so .worktrees/ + .planner-state.json
 # are hidden after the merge to ${BASE_BRANCH}
-for entry in '.worktrees/' '.architect-state.json'; do
+for entry in '.worktrees/' '.planner-state.json'; do
   grep -qxF "${entry}" .gitignore 2>/dev/null \
     || echo "${entry}" >> .gitignore
 done
@@ -123,9 +123,9 @@ Inherits the global rules from CLAUDE.md:
 
 - No `git push`, `git push --force`
 - No `git reset --hard`, `git clean -f`, `git worktree remove --force`
-- No `git merge` without `--no-ff` for the architect branch
+- No `git merge` without `--no-ff` for the planner branch
 - No `git merge` or `git commit` without `-m` (would hang on `$EDITOR`)
 - No `--no-verify` on commits
-- No `git commit --amend` once a commit lands on the architect branch
+- No `git commit --amend` once a commit lands on the planner branch
   — create a new commit instead, even if the previous was trivially
   wrong. Amend rewrites history that `--no-ff` was meant to preserve.

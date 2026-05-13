@@ -1,5 +1,9 @@
 # 9-field docstring schema
 
+**Applies to:** `feature` lane (when interface skeletons are emitted)
+and `system` lane (always). The `micro` and `local` lanes emit no
+methods, so this schema has no enforcement target there.
+
 Every method on every emitted interface MUST carry these 9 fields. Missing
 any field is a Phase 7 rubric failure on the "Docstring quality"
 criterion.

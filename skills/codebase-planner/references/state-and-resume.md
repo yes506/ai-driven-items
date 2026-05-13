@@ -1,22 +1,29 @@
-# `.architect-state.json` — schema and resume
+# `.planner-state.json` — schema and resume
 
 The state file lives at the worktree root and is **gitignored** on the
-architect branch (per Phase 4 step 3). It is local-only working state,
+planner branch (per Phase 4 step 3). It is local-only working state,
 updated **incrementally** after each Phase sub-step so any mid-run
-failure stays resumable. It is NEVER committed; Phase 8's
-human-confirmation marker lives in the architecture artifacts
-(`architecture.html`, `architecture.mmd`) and the merge commit
-message, not in this file. See SKILL.md "Implementation gate
-(downstream contract)" for the canonical gate check.
+failure stays resumable. It is NEVER committed; the human-confirmation
+marker lives in the tracked artifacts (system: `architecture.html` +
+`architecture.mmd`; feature: `plan.md` + `plan.mmd`) and the merge
+commit message, not in this file. See
+[implementer-contract.md](implementer-contract.md) for the full
+per-lane gate check and SKILL.md "Implementation gate (downstream
+contract)" for the summary table.
 
 ## Schema
 
 ```json
 {
+  "scale": "feature | system (state file is only created at these scales)",
+  "scope_score": "int 0-3 (Phase 0.5 triage)",
+  "risk_score": "int 0-3 (Phase 0.5 triage)",
+  "ambiguity_score": "int 0-3 (Phase 0.5 triage)",
+  "scale_overridden": "bool (true if user manually picked a different lane than the AI suggested)",
   "project_slug": "string (kebab-case ascii, used in worktree path + branch name)",
   "main_checkout": "absolute path to the main worktree (physical, symlinks resolved)",
   "base_branch": "string (default: dev; configurable when dev doesn't exist)",
-  "architect_id": "string (e.g. '12345-67890' — `date +%s | tail -c 6`-`$$`)",
+  "planner_id": "string (e.g. '12345-67890' — `date +%s | tail -c 6`-`$$`)",
   "language_stack": "java | python | typescript | go | rust",
   "validation_command": "string (the actual command to run in Phase 6, with <package> already substituted)",
   "detected_build_files": ["array (from detect_language_stack.sh output; non-empty when project is a monorepo)"],
@@ -54,10 +61,11 @@ message, not in this file. See SKILL.md "Implementation gate
   ],
   "value_objects": ["string (Java enums, Python dataclasses, TS types — non-interface helpers)"],
   "validation_status": "pending | passed | failed",
+  "feature_skeletons_choice": "emit | skip | null (feature lane only — captured at the Phase 3 → Phase 5 transition; null for system lane where skeletons are mandatory)",
   "rubric_scores": {
     "decomposition_completeness": "int 1-4",
-    "docstring_quality": "int 1-4",
-    "interface_cohesion": "int 1-4",
+    "docstring_quality": "int 1-4 (system + feature-with-skeletons only; omit when no methods are emitted)",
+    "interface_cohesion": "int 1-4 (system + feature-with-skeletons only; omit when no interfaces are emitted)",
     "dependency_direction": "int 1-4",
     "validation_status": "int 1-4",
     "plan_coverage": "int 1-4"
@@ -76,13 +84,14 @@ message, not in this file. See SKILL.md "Implementation gate
 | `worktree_created` | Phase 1 (plan ingestion) |
 | `plan_normalized` | Phase 2 (packages) |
 | `packages_planned` | Phase 3 (decomposition) |
-| `decomposition_done` | Phase 5 (skeleton) |
+| `decomposition_done` (system, or feature with `feature_skeletons_choice=emit`) | Phase 5 (skeleton) |
+| `decomposition_done` (feature with `feature_skeletons_choice=skip`) | Phase 7 (plan artifacts; Phase 5 + Phase 6 skipped) |
 | `skeleton_written` | Phase 6 (validate) |
 | `validated` | Phase 7 (artifacts) |
 | `artifacts_emitted` | Phase 8 (human gate) |
 | `human_confirmed` | Phase 8 (merge offer) — re-prompt for `confirm merge` |
 
-If `inside-architect-worktree` but no state file → refuse and ask the
+If `inside-planner-worktree` but no state file → refuse and ask the
 user to either delete the worktree or supply a state file.
 
 If the state file exists but `phase_completed` is missing or invalid →
@@ -96,8 +105,8 @@ can't corrupt it):
 
 ```bash
 tmp="$(mktemp)"
-jq '. + {phase_completed: "skeleton_written"}' .architect-state.json > "$tmp"
-mv "$tmp" .architect-state.json
+jq '. + {phase_completed: "skeleton_written"}' .planner-state.json > "$tmp"
+mv "$tmp" .planner-state.json
 ```
 
 The file is gitignored, so the temp-file dance doesn't dirty git status.
@@ -118,16 +127,13 @@ language-native writer (Python: `json.dump`).
 > ref-existence check returns false). Treat the `state` field as
 > authoritative; `current_branch` and `dev_exists` are diagnostic.
 
-Downstream automation does NOT read `.architect-state.json` (it's
+Downstream automation does NOT read `.planner-state.json` (it's
 gitignored — wouldn't survive merge to dev). The canonical
-implementation-gate check looks at the **tracked** architecture
-artifacts and the architect-merge commit on the current branch:
-
-```bash
-test -f architecture.html && test -f architecture.mmd \
-  && git log --grep='(interfaces only, human-confirmed)' \
-       --format=%H | grep -q .
-```
-
-See SKILL.md "Implementation gate (downstream contract)" for the full
-contract, including its honest forgeability limitations.
+implementation-gate check is a **scale-tagged marker family** — system
+lane keeps the original `(interfaces only, human-confirmed)` marker
+plus `architecture.html`/`.mmd` files; feature lane uses
+`(plan-feature, human-confirmed)` plus `plan.md`/`plan.mmd`; micro and
+local use chat-history gates only. See
+[implementer-contract.md](implementer-contract.md) for the full
+per-lane check and SKILL.md "Implementation gate (downstream contract)"
+for the canonical summary table.
