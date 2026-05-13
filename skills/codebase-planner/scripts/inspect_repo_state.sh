@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# inspect_repo_state.sh — read-only repo state inspector for codebase-architect.
+# inspect_repo_state.sh — read-only repo state inspector for codebase-planner.
 # Emits a single JSON line on stdout. Never mutates anything.
 
 set -euo pipefail
@@ -98,7 +98,7 @@ fi
 # 8. Classify
 if [ "${IS_LINKED_WORKTREE}" = "true" ]; then
   case "${WORKTREE_TOP}" in
-    */.worktrees/architect-*)  emit "$(build_json inside-architect-worktree)" ;;
+    */.worktrees/planner-*)  emit "$(build_json inside-planner-worktree)" ;;
     *)                          emit "$(build_json inside-other-worktree)" ;;
   esac
 fi

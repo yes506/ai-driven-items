@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a Mermaid DAG from .architect-state.json.
+"""Render a Mermaid DAG from .planner-state.json.
 
 Reads the state file (path arg) and emits a Mermaid `graph LR` block to stdout.
 Edges come from each interface's methods' `collaborators` field if present in
@@ -61,7 +61,7 @@ def _unique_id(base: str, taken: dict) -> str:
 
 def main() -> int:
     if len(sys.argv) != 2:
-        sys.stderr.write("usage: render_mermaid_dag.py <path-to-.architect-state.json>\n")
+        sys.stderr.write("usage: render_mermaid_dag.py <path-to-.planner-state.json>\n")
         return 2
 
     state_path = Path(sys.argv[1])

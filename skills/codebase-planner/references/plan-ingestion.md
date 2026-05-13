@@ -16,7 +16,7 @@ User provides one or more file paths. Read each, capturing:
   request page ranges from the user before reading
 
 Track each file's path and read timestamp in
-`.architect-state.json`'s `plan.sources[]` for the audit trail.
+`.planner-state.json`'s `plan.sources[]` for the audit trail.
 
 ### URLs (Notion / wiki / GitHub issue / spec page)
 
@@ -95,7 +95,7 @@ modifies any field in their reply, re-render the synthesis and re-ask.
 
 ## Persistence
 
-The normalized synthesis goes into `.architect-state.json`'s `plan` field
+The normalized synthesis goes into `.planner-state.json`'s `plan` field
 (see [state-and-resume.md](state-and-resume.md) for the schema) at the
 moment Phase 4 creates the worktree — not before, since Phase 1 has no
 mutations. Re-resume picks up the synthesis from there.

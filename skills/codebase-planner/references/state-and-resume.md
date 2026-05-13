@@ -1,7 +1,7 @@
-# `.architect-state.json` — schema and resume
+# `.planner-state.json` — schema and resume
 
 The state file lives at the worktree root and is **gitignored** on the
-architect branch (per Phase 4 step 3). It is local-only working state,
+planner branch (per Phase 4 step 3). It is local-only working state,
 updated **incrementally** after each Phase sub-step so any mid-run
 failure stays resumable. It is NEVER committed; Phase 8's
 human-confirmation marker lives in the architecture artifacts
@@ -16,7 +16,7 @@ message, not in this file. See SKILL.md "Implementation gate
   "project_slug": "string (kebab-case ascii, used in worktree path + branch name)",
   "main_checkout": "absolute path to the main worktree (physical, symlinks resolved)",
   "base_branch": "string (default: dev; configurable when dev doesn't exist)",
-  "architect_id": "string (e.g. '12345-67890' — `date +%s | tail -c 6`-`$$`)",
+  "planner_id": "string (e.g. '12345-67890' — `date +%s | tail -c 6`-`$$`)",
   "language_stack": "java | python | typescript | go | rust",
   "validation_command": "string (the actual command to run in Phase 6, with <package> already substituted)",
   "detected_build_files": ["array (from detect_language_stack.sh output; non-empty when project is a monorepo)"],
@@ -82,7 +82,7 @@ message, not in this file. See SKILL.md "Implementation gate
 | `artifacts_emitted` | Phase 8 (human gate) |
 | `human_confirmed` | Phase 8 (merge offer) — re-prompt for `confirm merge` |
 
-If `inside-architect-worktree` but no state file → refuse and ask the
+If `inside-planner-worktree` but no state file → refuse and ask the
 user to either delete the worktree or supply a state file.
 
 If the state file exists but `phase_completed` is missing or invalid →
@@ -96,8 +96,8 @@ can't corrupt it):
 
 ```bash
 tmp="$(mktemp)"
-jq '. + {phase_completed: "skeleton_written"}' .architect-state.json > "$tmp"
-mv "$tmp" .architect-state.json
+jq '. + {phase_completed: "skeleton_written"}' .planner-state.json > "$tmp"
+mv "$tmp" .planner-state.json
 ```
 
 The file is gitignored, so the temp-file dance doesn't dirty git status.
@@ -118,10 +118,10 @@ language-native writer (Python: `json.dump`).
 > ref-existence check returns false). Treat the `state` field as
 > authoritative; `current_branch` and `dev_exists` are diagnostic.
 
-Downstream automation does NOT read `.architect-state.json` (it's
+Downstream automation does NOT read `.planner-state.json` (it's
 gitignored — wouldn't survive merge to dev). The canonical
 implementation-gate check looks at the **tracked** architecture
-artifacts and the architect-merge commit on the current branch:
+artifacts and the planner-merge commit on the current branch:
 
 ```bash
 test -f architecture.html && test -f architecture.mmd \

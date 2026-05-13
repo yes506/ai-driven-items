@@ -1,5 +1,5 @@
 ---
-name: codebase-architect
+name: codebase-planner
 description: |
   Plan a project's package/directory layout and emit interface-only
   language-appropriate skeletons (Java interface / Python Protocol /
@@ -9,11 +9,11 @@ description: |
   git worktree and emits a human-confirmation gate (rubric self-review +
   checklist + Mermaid DAG + HTML report) that downstream skills/agents
   must observe before generating implementation code. Language-agnostic.
-  Manual invocation only — `/codebase-architect`.
+  Manual invocation only — `/codebase-planner`.
 disable-model-invocation: true
 ---
 
-# Codebase Architect
+# Codebase Planner
 
 ## Overview
 
@@ -23,14 +23,14 @@ Every method on every emitted interface represents one node in the
 end-to-end pipeline; interfaces aggregate cohesive methods that share a
 responsibility/lifecycle. No implementation may begin until this skill
 commits the Phase 7 architecture artifacts (`architecture.html` +
-`architecture.mmd`) and lands the architect-merge commit on
+`architecture.mmd`) and lands the planner-merge commit on
 `${BASE_BRANCH}` carrying the `(interfaces only, human-confirmed)`
 marker — see "Implementation gate (downstream contract)" below for the
-canonical check. (`.architect-state.json` is gitignored local-only
+canonical check. (`.planner-state.json` is gitignored local-only
 working state for resume tracking, not a downstream gate signal.)
 
 `disable-model-invocation: true` means this skill only fires on explicit
-`/codebase-architect` invocation — never auto-trigger it.
+`/codebase-planner` invocation — never auto-trigger it.
 
 ## Workflow Decision Tree
 
@@ -38,7 +38,7 @@ working state for resume tracking, not a downstream gate signal.)
 Phase 0: Detect repo state ──┬─ on-dev-with-scaffold ──────┐
                              ├─ on-dev-no-scaffold ────────┤── warn + ask to proceed
                              ├─ on-default-needs-dev ──────┤── run "create dev?" dialog
-                             ├─ inside-architect-worktree ─┤── resume from .architect-state.json
+                             ├─ inside-planner-worktree ─┤── resume from .planner-state.json
                              ├─ inside-other-worktree ─────┤── refuse, run from MAIN_CHECKOUT
                              └─ unrelated ──────────────── refuse, surface reason
                                                           │
@@ -46,20 +46,20 @@ Phase 1: Plan ingestion (no mutations) — multi-method input ─┤
 Phase 2: Package/directory plan (no mutations) ──────────────┤
 Phase 3: Pipeline-node decomposition (no mutations) ─────────┤
          user confirms Phases 1-3 individually — silence = stop, not yes
-Phase 4: Worktree creation (first mutation; ARCHITECT_ID computed once;
-         initial .architect-state.json written with phase_completed=worktree_created)
-Phase 5: Interface skeleton generation + .architect-state.json (incremental)
+Phase 4: Worktree creation (first mutation; PLANNER_ID computed once;
+         initial .planner-state.json written with phase_completed=worktree_created)
+Phase 5: Interface skeleton generation + .planner-state.json (incremental)
 Phase 6: Validate — language-appropriate compile/type-check on the skeleton
 Phase 7: Self-verification artifacts — rubric + checklist + Mermaid DAG + HTML report
-Phase 8: Human gate — `confirm architecture` → mark human_confirmed locally
+Phase 8: Human gate — `confirm plan` → mark human_confirmed locally
          then offer `confirm merge` → merge worktree to BASE_BRANCH
 ```
 
 State variables captured during Phase 0 and threaded through later phases:
 
 - `MAIN_CHECKOUT` — absolute path to the parent main worktree
-- `BASE_BRANCH` — branch the architect worktree branches from (default `dev`)
-- `ARCHITECT_ID` — short suffix used in both worktree path and branch name
+- `BASE_BRANCH` — branch the planner worktree branches from (default `dev`)
+- `PLANNER_ID` — short suffix used in both worktree path and branch name
 - `LANGUAGE_STACK` — detected from build files; drives Phase 5/6 commands
 
 ---
@@ -80,8 +80,8 @@ Parse the JSON. The `state` field classifies into:
 | `on-dev-with-scaffold` | on `dev`, project-scaffolder marker commit present | proceed to Phase 1 |
 | `on-dev-no-scaffold` | on `dev` but no `chore(scaffold): initialize` commit in history | warn user, ask explicit confirmation to proceed without a scaffold baseline |
 | `on-default-needs-dev` | on `main`/`master`, but `dev` does not exist locally | run the "create dev from `<default_branch>`?" dialog from [git-worktree-flow.md](references/git-worktree-flow.md) |
-| `inside-architect-worktree` | cwd is inside an `*/.worktrees/architect-*` worktree (root or subdirectory) | resume from `.architect-state.json` if present, else refuse |
-| `inside-other-worktree` | inside a non-architect linked worktree | refuse, instruct user to run from `MAIN_CHECKOUT` |
+| `inside-planner-worktree` | cwd is inside an `*/.worktrees/planner-*` worktree (root or subdirectory) | resume from `.planner-state.json` if present, else refuse |
+| `inside-other-worktree` | inside a non-planner linked worktree | refuse, instruct user to run from `MAIN_CHECKOUT` |
 | `unrelated` | not in a git repo, detached HEAD, repo with no commits, or some other branch | refuse, surface the `reason` field from the JSON to the user |
 
 Capture from JSON: `MAIN_CHECKOUT`, `default_branch`. Set `BASE_BRANCH`
@@ -105,7 +105,7 @@ combination of build files is reported verbatim.)
 **Handle multi-build-file projects (monorepos)**: when
 `detected_build_files` lists more than one entry (e.g. `pom.xml` AND
 `package.json`), the primary recommendation alone will silently hide
-the secondary stack. Ask the user explicitly which stack codebase-architect
+the secondary stack. Ask the user explicitly which stack codebase-planner
 should design for; if the user wants to cover both, surface that this
 skill is single-stack per invocation and recommend running it twice in
 separate worktrees, **with distinct project slugs per stack** (e.g.
@@ -174,17 +174,17 @@ Wait for `confirm decomposition` before Phase 4.
 Order matters — only after Phase 3 confirmation:
 
 0. **Locally** ignore `.worktrees/` in the main checkout so the in-flight
-   architect work doesn't dirty `git status` on `${BASE_BRANCH}`:
+   planner work doesn't dirty `git status` on `${BASE_BRANCH}`:
    ```bash
    grep -qxF '.worktrees/' "${MAIN_CHECKOUT}/.git/info/exclude" \
      || echo '.worktrees/' >> "${MAIN_CHECKOUT}/.git/info/exclude"
    ```
-1. Compute `ARCHITECT_ID` **once**, then interpolate consistently into
+1. Compute `PLANNER_ID` **once**, then interpolate consistently into
    both the path and the branch name. The `$$-$RANDOM` suffix gives
    true uniqueness — `$$` distinguishes within a host shell, `$RANDOM`
    covers PID-namespaced containers where `$$` is always `1`:
    ```bash
-   ARCHITECT_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"
+   PLANNER_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"
 
    # Sanitize PROJECT_SLUG defensively before interpolation — even if
    # the user typed a clean value, this prevents path-traversal /
@@ -194,17 +194,17 @@ Order matters — only after Phase 3 confirmation:
    [ -z "${PROJECT_SLUG}" ] && { echo "Empty slug after sanitization — ask user for an ASCII slug"; exit 1; }
 
    git -C "${MAIN_CHECKOUT}" worktree add \
-     ".worktrees/architect-${PROJECT_SLUG}-${ARCHITECT_ID}" \
-     -b "architect/${PROJECT_SLUG}-${ARCHITECT_ID}" "${BASE_BRANCH}"
+     ".worktrees/planner-${PROJECT_SLUG}-${PLANNER_ID}" \
+     -b "planner/${PROJECT_SLUG}-${PLANNER_ID}" "${BASE_BRANCH}"
    ```
 2. `cd` into the new worktree for all subsequent file operations.
-3. Append `.worktrees/` and `.architect-state.json` to the **worktree's**
+3. Append `.worktrees/` and `.planner-state.json` to the **worktree's**
    `.gitignore` if either is missing. Lands on `${BASE_BRANCH}` via
    Phase 8's merge so future contributors never see those paths as
    untracked.
-4. **Write the initial `.architect-state.json`** with
+4. **Write the initial `.planner-state.json`** with
    `phase_completed: worktree_created`, plus `project_slug`,
-   `main_checkout`, `base_branch`, `architect_id`, `language_stack`,
+   `main_checkout`, `base_branch`, `planner_id`, `language_stack`,
    `validation_command` from Phase 0. This is what makes resume work
    if the skill crashes between Phase 4 and Phase 5's first sub-step
    (without this initial write, Phase 0 on resume sees no state file
@@ -228,18 +228,18 @@ abstraction (interface / Protocol / trait / etc.) per
 A method without the docstring fails Phase 7 self-verification rubric
 explicitly.
 
-Write `.architect-state.json` **incrementally** at the worktree root
+Write `.planner-state.json` **incrementally** at the worktree root
 after each sub-step per
 [state-and-resume.md](references/state-and-resume.md), so a mid-run
 failure stays resumable.
 
-Initial commit on the architect branch (use the explicit `-m` form — a
+Initial commit on the planner branch (use the explicit `-m` form — a
 bare `git commit` would drop into `$EDITOR` and hang in non-interactive
 runs):
 
 ```bash
 git add -A
-git commit -m "chore(architect): initialize ${PROJECT_SLUG} interface skeleton (no implementation)"
+git commit -m "chore(planner): initialize ${PROJECT_SLUG} interface skeleton (no implementation)"
 ```
 
 The state file is gitignored (Phase 4 step 3) so it does not appear in
@@ -271,7 +271,7 @@ generated artifacts, virtualenvs, and other noise that inflate false
 failures.
 
 If validation fails: stop, report failure, **never auto-prune the
-worktree**. Update `.architect-state.json` `phase_completed: validated`
+worktree**. Update `.planner-state.json` `phase_completed: validated`
 on success.
 
 ---
@@ -292,21 +292,21 @@ Produce all three handoff outputs per
      `click ... href` directives if the file is later rendered):
      ```bash
      python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" \
-       .architect-state.json > architecture.mmd
+       .planner-state.json > architecture.mmd
      ```
    - HTML report (fully self-contained — no CDN, no external scripts;
      the Mermaid block is inlined as plain text for the reviewer to
      paste into a renderer of their choice):
      ```bash
      python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py" \
-       .architect-state.json > architecture.html
+       .planner-state.json > architecture.html
      ```
 
 Both visual artifacts go in the worktree root and are committed via:
 
 ```bash
 git add architecture.mmd architecture.html
-git commit -m "docs(architect): self-verification artifacts"
+git commit -m "docs(planner): self-verification artifacts"
 ```
 
 Update state: `phase_completed: artifacts_emitted`.
@@ -326,35 +326,35 @@ Print:
 4. The exact prompt:
 
 ```
-Type `confirm architecture` to mark this architecture human-confirmed
+Type `confirm plan` to mark this architecture human-confirmed
 (unlocks the implementation gate), or `revise` to iterate.
 ```
 
-- `confirm architecture` →
-  - Update `.architect-state.json` **locally** (file is gitignored —
+- `confirm plan` →
+  - Update `.planner-state.json` **locally** (file is gitignored —
     used for resume tracking only): set
     `phase_completed: human_confirmed`, record reviewer + ISO-8601
     timestamp.
-  - The canonical confirmation record on the architect branch is the
+  - The canonical confirmation record on the planner branch is the
     Phase 7 commit of `architecture.mmd` + `architecture.html` (already
     in place) plus the Phase 8 merge commit message
-    `feat(architect): merge ... (interfaces only, human-confirmed)` that
+    `feat(planner): merge ... (interfaces only, human-confirmed)` that
     follows next. There is intentionally NO separate
-    `.architect-state.json` commit — the file is gitignored on the
+    `.planner-state.json` commit — the file is gitignored on the
     worktree's `.gitignore`, so `git add` of it is a silent no-op and
     `git commit` would fail with "nothing to commit". Downstream
     automation looks at the architecture artifacts and the merge commit
     instead (see "Implementation gate" below).
   - Then prompt:
     ```
-    Type `confirm merge` to merge architect/<slug>-<id> into <BASE_BRANCH>,
+    Type `confirm merge` to merge planner/<slug>-<id> into <BASE_BRANCH>,
     or `keep` to leave the worktree intact for further iteration.
     ```
   - On `confirm merge`:
     ```bash
     git -C "${MAIN_CHECKOUT}" checkout "${BASE_BRANCH}"
-    git -C "${MAIN_CHECKOUT}" merge --no-ff "architect/${PROJECT_SLUG}-${ARCHITECT_ID}" \
-      -m "feat(architect): merge ${PROJECT_SLUG} architecture (interfaces only, human-confirmed)"
+    git -C "${MAIN_CHECKOUT}" merge --no-ff "planner/${PROJECT_SLUG}-${PLANNER_ID}" \
+      -m "feat(planner): merge ${PROJECT_SLUG} architecture (interfaces only, human-confirmed)"
     ```
     The explicit `-m` is mandatory — without it git drops into `$EDITOR`
     and hangs in non-interactive use. **Do not** `git push` — that is the
@@ -372,7 +372,7 @@ On no: leave it.
 
 Skills, subagents, and Claude sessions that intend to write
 **implementation** code (method bodies for the interfaces this skill
-emitted) MUST first verify the architect phase has been merged. The
+emitted) MUST first verify the planner phase has been merged. The
 canonical check on the current branch:
 
 ```bash
@@ -381,11 +381,11 @@ test -f architecture.html && test -f architecture.mmd \
 ```
 
 If any part fails, REFUSE to write implementation and ask the user to
-complete `/codebase-architect` first. The check is two-pronged:
+complete `/codebase-planner` first. The check is two-pronged:
 
 - `architecture.html` + `architecture.mmd` exist on the current branch
-  (they were committed at Phase 7 of a completed architect run)
-- The architect-merge marker `(interfaces only, human-confirmed)`
+  (they were committed at Phase 7 of a completed planner run)
+- The planner-merge marker `(interfaces only, human-confirmed)`
   appears anywhere in `git log` history on the current branch — using
   `--grep` (not `git log -1`) so the gate continues to pass after
   unrelated commits land on top of the merge
@@ -408,9 +408,9 @@ them mid-flow (politely surface the forbidden item and ask for
 confirmation to deviate, but default to refusal):
 
 - `git push`, `git push --force`
-- `git merge` without the `--no-ff` flag for the architect branch
+- `git merge` without the `--no-ff` flag for the planner branch
 - `git merge` or `git commit` without the `-m` flag (would hang on `$EDITOR`)
-- `git commit --amend` once a commit has landed on the architect branch
+- `git commit --amend` once a commit has landed on the planner branch
   (create a new commit instead — amend rewrites history that the merge
   commit's `--no-ff` was meant to preserve)
 - `git reset --hard`, `git clean -f`, `git worktree remove --force`
@@ -418,7 +418,7 @@ confirmation to deviate, but default to refusal):
 - Generating method bodies (implementation) — defer to a separate task
   outside this skill, gated by the tracked-artifacts + merge-marker
   check documented in "Implementation gate (downstream contract)" above
-  (NOT by `.architect-state.json`, which is gitignored local working state)
+  (NOT by `.planner-state.json`, which is gitignored local working state)
 - Hardcoded language/framework versions in any generated file
 - Treating user silence as confirmation at any gate
 - Creating `README.md`, `INSTALLATION_GUIDE.md`, etc. inside this skill folder
@@ -428,11 +428,11 @@ confirmation to deviate, but default to refusal):
 
 ## Resumability
 
-If re-invoked from inside an existing architect worktree
-(`inside-architect-worktree`), read `.architect-state.json` and resume
+If re-invoked from inside an existing planner worktree
+(`inside-planner-worktree`), read `.planner-state.json` and resume
 from the next phase after `phase_completed`. See
 [state-and-resume.md](references/state-and-resume.md) for the full
 mapping.
 
-If `inside-architect-worktree` but no state file → refuse and ask the
+If `inside-planner-worktree` but no state file → refuse and ask the
 user to either delete the worktree or supply a state file.
