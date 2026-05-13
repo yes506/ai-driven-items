@@ -30,7 +30,7 @@ Priority order (first match becomes primary; multiple matches are listed in `det
 
 **Multi-build-file projects (monorepos)**: `detected_build_files`
 will list more than one entry. Do NOT silently honor only the primary
-— ask the user explicitly which stack codebase-architect should
+— ask the user explicitly which stack codebase-planner should
 design for. This skill is single-stack per invocation; for repos with
 both a Java backend and a TypeScript frontend, run it twice in
 separate worktrees.
@@ -63,7 +63,7 @@ construct.
 
 - **Abstraction kind**: `typing.Protocol` (preferred for structural
   typing) or `abc.ABC` (when runtime `isinstance` checks are needed).
-  Record the choice in `.architect-state.json`'s
+  Record the choice in `.planner-state.json`'s
   `interfaces[].python_kind` field (`protocol` | `abc`) so downstream
   implementers know which to subclass.
 - **File layout**: one `.py` per interface, OR a single `interfaces.py`
@@ -129,7 +129,7 @@ The skeleton is interface-only. **No method bodies.**
 
 If a language idiom requires a non-interface helper (e.g., a Java
 `enum`, a Python `@dataclass` for a value object, a TS `type` alias),
-generate it but record it in `.architect-state.json`'s `value_objects`
+generate it but record it in `.planner-state.json`'s `value_objects`
 field separately so the self-verification rubric distinguishes it from
 the interface count.
 
@@ -143,6 +143,6 @@ If Phase 6's command fails:
    Excerpt: `<output>`. Fix the skeleton or revise the decomposition?"
 4. Do NOT auto-fix
 5. Do NOT prune the worktree
-6. Update `.architect-state.json` to `validation_status: failed` and
+6. Update `.planner-state.json` to `validation_status: failed` and
    leave `phase_completed` at its previous value (`skeleton_written`)
    so resume returns to Phase 6

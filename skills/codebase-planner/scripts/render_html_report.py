@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a self-contained HTML handoff report from .architect-state.json.
+"""Render a self-contained HTML handoff report from .planner-state.json.
 
 Reads the state file (path arg) plus the bundled HTML template
 (assets/html-report-template.html), populates placeholders, and emits HTML
@@ -169,7 +169,7 @@ _CHECKLIST_HTML = """
   <li>No interface looks like a grab-bag of unrelated methods</li>
   <li>The Mermaid DAG (architecture.mmd) is acyclic</li>
   <li>No method body has been written (interface-only)</li>
-  <li>The validation command (Phase 6) passed — see <code>.architect-state.json</code>: <code>validation_status</code></li>
+  <li>The validation command (Phase 6) passed — see <code>.planner-state.json</code>: <code>validation_status</code></li>
 </ul>
 """.strip()
 
@@ -178,7 +178,7 @@ _CHECKLIST_HTML = """
 
 def main() -> int:
     if len(sys.argv) != 2:
-        sys.stderr.write("usage: render_html_report.py <path-to-.architect-state.json>\n")
+        sys.stderr.write("usage: render_html_report.py <path-to-.planner-state.json>\n")
         return 2
 
     state_path = Path(sys.argv[1])

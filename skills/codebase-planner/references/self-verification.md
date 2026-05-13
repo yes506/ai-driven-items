@@ -1,5 +1,10 @@
 # Self-verification — Phase 7
 
+**Applies to:** `system` lane (full). For `feature` lane deltas
+(plan.md / plan.mmd, rubric criteria dropped when no skeletons), see
+[feature-lane.md](feature-lane.md). For `micro`/`local`, see SKILL.md
+"Lightweight lanes" — no Phase 7 artifacts.
+
 Three artifacts must be produced before Phase 8's human gate.
 
 ## 1. Rubric-scored self-review (analytic rubric, 4-point scale)
@@ -53,7 +58,7 @@ Reviewer checklist — please verify each:
 [ ] The Mermaid DAG (architecture.mmd) is acyclic
 [ ] No method body has been written (interface-only)
 [ ] The validation command (Phase 6) passed — see
-    .architect-state.json: validation_status
+    .planner-state.json: validation_status
 
 (The embedded checklist inside architecture.html omits an explicit
 "HTML opens" item because the report has no JavaScript and degrades to
@@ -67,11 +72,11 @@ Below-bar comments (REQUIRED if any box unchecked):
 
 ### Mermaid dependency DAG
 
-Generated from `.architect-state.json`:
+Generated from `.planner-state.json`:
 
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" \
-  .architect-state.json > architecture.mmd
+  .planner-state.json > architecture.mmd
 ```
 
 Edges come from each method's `Collaborators` field. Edge labels are
@@ -96,11 +101,11 @@ score of 1–2; surface explicitly and recommend revision.
 
 ### HTML report
 
-Generated from `.architect-state.json`:
+Generated from `.planner-state.json`:
 
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py" \
-  .architect-state.json > architecture.html
+  .planner-state.json > architecture.html
 ```
 
 The HTML renders:
@@ -123,7 +128,7 @@ The HTML renders:
 
 ```bash
 git add architecture.mmd architecture.html
-git commit -m "docs(architect): self-verification artifacts"
+git commit -m "docs(planner): self-verification artifacts"
 ```
 
 Update state: `phase_completed: artifacts_emitted`.

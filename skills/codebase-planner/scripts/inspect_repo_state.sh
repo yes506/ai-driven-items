@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# inspect_repo_state.sh — read-only repo state inspector for codebase-architect.
+# inspect_repo_state.sh — read-only repo state inspector for codebase-planner.
 # Emits a single JSON line on stdout. Never mutates anything.
 
 set -euo pipefail
@@ -98,7 +98,8 @@ fi
 # 8. Classify
 if [ "${IS_LINKED_WORKTREE}" = "true" ]; then
   case "${WORKTREE_TOP}" in
-    */.worktrees/architect-*)  emit "$(build_json inside-architect-worktree)" ;;
+    */.worktrees/planner-*)     emit "$(build_json inside-planner-worktree)" ;;
+    */.worktrees/architect-*)   emit "$(build_json inside-legacy-architect-worktree)" ;;
     *)                          emit "$(build_json inside-other-worktree)" ;;
   esac
 fi
@@ -125,4 +126,8 @@ if [ -n "${DEFAULT_BRANCH}" ] && [ "${CURRENT_BRANCH}" = "${DEFAULT_BRANCH}" ] &
   emit "$(build_json on-default-needs-dev)"
 fi
 
-emit "$(build_json unrelated not_on_dev_in_main_checkout)"
+# On a non-base branch in the main checkout (e.g. a feature branch).
+# Not a refusal: micro/local lanes can still proceed (read-only, no
+# worktree, no BASE_BRANCH needed). Feature/system must refuse at this
+# state because they need a clean worktree off `dev`/base.
+emit "$(build_json on-nonbase-main-checkout)"
