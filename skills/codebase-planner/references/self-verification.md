@@ -1,5 +1,10 @@
 # Self-verification — Phase 7
 
+**Applies to:** `system` lane (full). For `feature` lane deltas
+(plan.md / plan.mmd, rubric criteria dropped when no skeletons), see
+[feature-lane.md](feature-lane.md). For `micro`/`local`, see SKILL.md
+"Lightweight lanes" — no Phase 7 artifacts.
+
 Three artifacts must be produced before Phase 8's human gate.
 
 ## 1. Rubric-scored self-review (analytic rubric, 4-point scale)

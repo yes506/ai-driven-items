@@ -143,7 +143,7 @@ Downstream implementers reading the gate per
 <otherwise: list interface names + method count, with link to source path>
 
 ## Validation
-<output of Phase 6 check>
+<output of Phase 6 compile check (skeletons emitted) OR Phase 7 plan-artifact smoke-check (skeletons skipped)>
 ```
 
 ## Lane-variable shortcut for Phase 7/8 bash

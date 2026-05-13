@@ -344,30 +344,27 @@ on success.
 
 ## Phase 7 — Self-verification artifacts
 
-Pick lane-conditional names + marker:
+Outputs per [self-verification.md](references/self-verification.md)
+(system defaults; feature deltas in
+[feature-lane.md](references/feature-lane.md)): rubric (4-point × 6
+criteria — drop "Docstring quality"+"Interface cohesion" for feature
+without skeletons), checklist, visual artifacts. The Mermaid renderer
+escapes interface names against `click ... href` injection.
 
 ```bash
 case "${SCALE}" in
-  system)  ARTIFACTS="architecture.mmd architecture.html"; MARKER="(interfaces only, human-confirmed)" ;;
-  feature) ARTIFACTS="plan.mmd plan.md";                   MARKER="(plan-feature, human-confirmed)" ;;
+  system)  ARTIFACTS="architecture.mmd architecture.html"; MARKER="(interfaces only, human-confirmed)"
+           python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" .planner-state.json > architecture.mmd
+           python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py" .planner-state.json > architecture.html ;;
+  feature) ARTIFACTS="plan.mmd plan.md";                   MARKER="(plan-feature, human-confirmed)"
+           python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" .planner-state.json > plan.mmd ;;
 esac
 ```
 
-Outputs per [self-verification.md](references/self-verification.md):
-rubric-scored self-review (4-point × 6 criteria for system, drop
-"Docstring quality" + "Interface cohesion" for feature without
-skeletons), human-confirmation checklist, and visual artifacts. The
-Mermaid renderer escapes interface names so malicious state-file
-content cannot inject `click ... href` directives.
+**Agent step (feature only, not shell)**: compose `plan.md` per
+feature-lane.md and run smoke-check (headers + Mermaid parse) before:
 
 ```bash
-case "${SCALE}" in
-  system)  python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" .planner-state.json > architecture.mmd
-           python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py" .planner-state.json > architecture.html ;;
-  feature) python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" .planner-state.json > plan.mmd
-           # compose plan.md per feature-lane.md template; smoke-check headers + Mermaid before commit
-           ;;
-esac
 git add ${ARTIFACTS}
 git commit -m "docs(planner): self-verification artifacts"
 ```
