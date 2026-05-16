@@ -18,6 +18,7 @@ This README is the **item index** for the repo. Items are grouped by type below;
 |---|---|
 | [`project-scaffolder`](skills/project-scaffolder/) | Language-agnostic project bootstrapping. Walks intent → 2-4 tech-stack options → scaffolded baseline (lint, test, logging, config, CI stub, health endpoint). Runs entirely inside an isolated git worktree and merges back to `dev` only after explicit user confirmation. Tier-1 stacks: Next.js, Spring Boot, FastAPI, Go, Node/Express. |
 | [`codebase-planner`](skills/codebase-planner/) | Decides how much planning a code change needs, then runs only the phases that lane requires. Four scale lanes: **micro** (one-function, 3–7 bullet chat plan, no worktree), **local** (≤3 files / 1 module, chat plan), **feature** (worktree + `plan.md` + Mermaid DAG, optional skeletons), **system** (full interface-skeleton workflow inherited verbatim from the prior codebase-architect skill — worktree + 9-field docstrings + Mermaid DAG + HTML report + human-confirmation merge gate). Lane is picked by a scored tuple (scope, risk, ambiguity) before any mutation; ambiguous requests block-and-ask rather than silently over-engineer. Downstream implementer agents (planned: `codebase-implementer`) read a scale-tagged marker family. Manual invocation only — `/codebase-planner`. |
+| [`collect-searches`](skills/collect-searches/) | Two-stage Chrome-search-history → Obsidian pipeline. Stage 1 is a deterministic Python collector (`scripts/collect.py`) that reads Chrome's local SQLite history, owns the cursor and lock, and stages new Google searches as JSON in a vault inbox. Stage 2 is a prompt-orchestrated workflow that classifies each query into an Obsidian category folder, enriches it with 1–3 WebSearch sources, and writes one Markdown note per search. Designed for periodic runs (e.g. `/loop 6h /collect-searches`). Has side effects (writes notes, deletes inbox files on success); manual invocation only — `/collect-searches`. |
 
 #### Agents
 
@@ -37,7 +38,8 @@ _(planned — none shipped yet)_
 ai-driven-items/
 ├── skills/             Claude Code skills (procedural workflows + bundled resources)
 │   ├── project-scaffolder/
-│   └── codebase-planner/
+│   ├── codebase-planner/
+│   └── collect-searches/
 ├── agents/             (planned) Custom Claude Code subagents
 ├── mcp-servers/        (planned) Model Context Protocol servers
 ├── playbooks/          (planned) Reusable, AI-consumable implementation guides
@@ -190,6 +192,7 @@ Released into the public domain via [CC0 1.0 Universal](https://creativecommons.
 |---|---|
 | [`project-scaffolder`](skills/project-scaffolder/) | 언어 무관 프로젝트 부트스트래퍼. 의도 파악 → 2-4개 스택 옵션 추천 → 베이스라인 스캐폴딩 (린트, 테스트, 로깅, 설정, CI 스텁, 헬스 엔드포인트) 흐름으로 진행합니다. 모든 작업은 격리된 git worktree 안에서만 일어나며, 사용자가 명시적으로 확인해야만 `dev` 브랜치로 머지됩니다. Tier-1 스택: Next.js, Spring Boot, FastAPI, Go, Node/Express. |
 | [`codebase-planner`](skills/codebase-planner/) | 코드 변경에 필요한 **계획 규모**를 먼저 판정한 뒤, 해당 레인에 필요한 단계만 실행합니다. 네 단계 스케일: **micro**(단일 함수 수준, 3–7 항목 채팅 플랜, worktree 없음), **local**(≤3 파일·단일 모듈, 채팅 플랜), **feature**(worktree + `plan.md` + Mermaid DAG, 스켈레톤 선택적), **system**(이전 codebase-architect 스킬의 전체 인터페이스-스켈레톤 워크플로 — worktree + 9-필드 docstring + Mermaid DAG + HTML 리포트 + 사람 확인 머지 게이트). 레인은 mutation 직전에 (scope, risk, ambiguity) 점수 튜플로 결정되며, 요청이 모호하면 silently 과설계하지 않고 명확화 질문으로 차단합니다. 다운스트림 구현 에이전트(계획: `codebase-implementer`)는 scale-tagged marker family를 읽습니다. 수동 호출 전용 — `/codebase-planner`. |
+| [`collect-searches`](skills/collect-searches/) | 두 단계로 동작하는 Chrome 검색 기록 → Obsidian 파이프라인. 1단계는 결정론적 Python 컬렉터(`scripts/collect.py`)로 Chrome 로컬 SQLite 기록을 읽고, cursor와 lock을 소유하며, 새 Google 검색을 JSON 파일로 vault 인박스에 적재합니다. 2단계는 프롬프트 기반 워크플로로 각 검색을 Obsidian 카테고리 폴더로 분류하고, WebSearch로 1–3개 신뢰 가능한 출처를 보강해 검색별 Markdown 노트를 한 개씩 작성합니다. 주기 실행용으로 설계됨(예: `/loop 6h /collect-searches`). 부수효과 있음(노트 작성, 성공 시 인박스 파일 삭제). 수동 호출 전용 — `/collect-searches`. |
 
 #### 에이전트
 
@@ -209,7 +212,8 @@ _(예정 — 아직 제공되는 항목 없음)_
 ai-driven-items/
 ├── skills/             Claude Code 스킬 (절차적 워크플로 + 번들 리소스)
 │   ├── project-scaffolder/
-│   └── codebase-planner/
+│   ├── codebase-planner/
+│   └── collect-searches/
 ├── agents/             (예정) Claude Code 커스텀 서브에이전트
 ├── mcp-servers/        (예정) Model Context Protocol 서버
 ├── playbooks/          (예정) 재사용 가능한 AI 친화적 구현 가이드
