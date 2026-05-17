@@ -16,6 +16,7 @@ contract)" for the summary table.
 ```json
 {
   "scale": "feature | system (state file is only created at these scales)",
+  "language": "Korean | English (captured at Phase L; written for the first time when this state file is created at Phase 4; absent value on resume defaults to Korean for backward compat with pre-Phase-L state files)",
   "scope_score": "int 0-3 (Phase 0.5 triage)",
   "risk_score": "int 0-3 (Phase 0.5 triage)",
   "ambiguity_score": "int 0-3 (Phase 0.5 triage)",
@@ -24,7 +25,7 @@ contract)" for the summary table.
   "main_checkout": "absolute path to the main worktree (physical, symlinks resolved)",
   "base_branch": "string (default: dev; configurable when dev doesn't exist)",
   "planner_id": "string (e.g. '12345-67890' — `date +%s | tail -c 6`-`$$`)",
-  "language_stack": "java | python | typescript | go | rust",
+  "language_stack": "java | python | typescript | javascript | go | rust",
   "validation_command": "string (the actual command to run in Phase 6, with <package> already substituted)",
   "detected_build_files": ["array (from detect_language_stack.sh output; non-empty when project is a monorepo)"],
   "phase_completed": "worktree_created | plan_normalized | packages_planned | decomposition_done | skeleton_written | validated | artifacts_emitted | human_confirmed",
@@ -90,6 +91,24 @@ contract)" for the summary table.
 | `validated` | Phase 7 (artifacts) |
 | `artifacts_emitted` | Phase 8 (human gate) |
 | `human_confirmed` | Phase 8 (merge offer) — re-prompt for `confirm merge` |
+
+Before trusting the loaded state file, run these defensive checks
+(mirrors the implementer's resume protocol — same threat model,
+hand-staged worktree directories and tampered state files):
+
+1. **Verify the worktree is registered.** Run `git -C
+   "${MAIN_CHECKOUT}" worktree list --porcelain` and confirm the
+   current path is listed. Defends against a hand-staged
+   `.worktrees/planner-fake/` directory dropped in to trick
+   path-prefix detection. If not registered: refuse.
+2. **Validate the loaded state structurally.** `scale` ∈
+   {feature, system}; `phase_completed` ∈ the documented enum;
+   `main_checkout` resolves to an existing directory that is itself a
+   git worktree top; `base_branch` is a non-empty string. On any
+   failure → refuse with a clear "state file is corrupt or hostile"
+   message. Do NOT attempt to repair.
+3. `language` field absent on resume → default to `Korean` and
+   continue (legacy state file from a pre-Phase-L build).
 
 If `inside-planner-worktree` but no state file → refuse and ask the
 user to either delete the worktree or supply a state file.

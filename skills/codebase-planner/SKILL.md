@@ -41,9 +41,9 @@ invocation prevents mode confusion. Never auto-trigger.
 ## Workflow Decision Tree
 
 ```
+Phase L:   Dialog language (preamble) — see references/language-selection.md
 Phase 0:   Detect repo state ──┬─ on-dev-with-scaffold ─────┐
-                               ├─ on-dev-no-scaffold ───────┤── feature/system: warn + ask
-                               │                            │   micro/local: proceed (no scaffold needed)
+                               ├─ on-dev-no-scaffold ───────┤── feature/system: warn + ask; micro/local: proceed
                                ├─ on-default-needs-dev ─────┤── feature/system only: create-dev dialog
                                ├─ inside-planner-worktree ──┤── resume from .planner-state.json
                                ├─ inside-legacy-architect-worktree ── refuse, ask user to finish/discard legacy run
@@ -53,13 +53,7 @@ Phase 0.5: Triage + readiness ─┬─ discovery (read CLAUDE.md, named files, 
                                ├─ score tuple (scope, risk, ambiguity)
                                └─ pick lane: micro | local | feature | system
                                   │
-                  ┌───────────────┼────────────────┬──────────────────┐
-                  ▼               ▼                ▼                  ▼
-              MICRO LANE      LOCAL LANE      FEATURE LANE       SYSTEM LANE
-              chat plan only  chat plan only  Phases 1, 3,       Phases 1-8 full
-              + confirm plan  + confirm plan  4-8 (plan.md +     (architecture.html
-                                              plan.mmd, optional + .mmd, skeletons,
-                                              skeletons)         9-field docstrings)
+                                  └─→ per-lane phases below; full rubric in references/triage-and-readiness.md
 ```
 
 State variables captured during Phase 0/0.5 and threaded through later phases:
@@ -68,7 +62,14 @@ State variables captured during Phase 0/0.5 and threaded through later phases:
 - `BASE_BRANCH` — branch the planner worktree branches from (default `dev`); only used by feature+system lanes
 - `PLANNER_ID` — short suffix used in both worktree path and branch name (feature+system only)
 - `LANGUAGE_STACK` — detected from build files; drives Phase 5/6 commands (feature+system only)
+- `LANGUAGE` — dialog language (`Korean` default | `English`); captured at Phase L (preamble) per [references/language-selection.md](references/language-selection.md); persisted at Phase 4 for feature+system, memory-only for micro+local
 - `SCALE` — `micro` | `local` | `feature` | `system` — chosen in Phase 0.5
+
+---
+
+## Phase L — Dialog language (preamble, runs before Phase 0)
+
+Detect `LANGUAGE` from invocation utterance (Korean default, English fallback), echo + confirm. Persist at Phase 4 (feature+system); memory-only otherwise. Spec — including resume + mid-flow switches: [references/language-selection.md](references/language-selection.md).
 
 ---
 
@@ -236,11 +237,14 @@ Wait for `confirm decomposition` before Phase 4.
 
 Order matters — only after Phase 3 confirmation:
 
-0. **Locally** ignore `.worktrees/` in the main checkout so the in-flight
-   planner work doesn't dirty `git status` on `${BASE_BRANCH}`:
+0. **Locally** ignore `.worktrees/` in the main checkout. CRITICAL:
+   `--git-common-dir` returns a RELATIVE path on older git; use
+   `--path-format=absolute` (git ≥ 2.31) with manual-absolutize fallback,
+   else the exclude lands at `<cwd>/.git/info/exclude` not `MAIN_CHECKOUT`'s:
    ```bash
-   grep -qxF '.worktrees/' "${MAIN_CHECKOUT}/.git/info/exclude" \
-     || echo '.worktrees/' >> "${MAIN_CHECKOUT}/.git/info/exclude"
+   COMMON_DIR="$(git -C "${MAIN_CHECKOUT}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || git -C "${MAIN_CHECKOUT}" rev-parse --git-common-dir)"
+   case "${COMMON_DIR}" in /*) ;; *) COMMON_DIR="${MAIN_CHECKOUT}/${COMMON_DIR}" ;; esac
+   grep -qxF '.worktrees/' "${COMMON_DIR}/info/exclude" || echo '.worktrees/' >> "${COMMON_DIR}/info/exclude"
    ```
 1. Compute `PLANNER_ID` **once**, then interpolate consistently into
    both the path and the branch name. The `$$-$RANDOM` suffix gives
@@ -249,11 +253,11 @@ Order matters — only after Phase 3 confirmation:
    ```bash
    PLANNER_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"
 
-   # Sanitize PROJECT_SLUG defensively before interpolation — even if
-   # the user typed a clean value, this prevents path-traversal /
-   # nested-ref bugs from a slug like '../../etc' or 'my/slug'.
+   # Sanitize PROJECT_SLUG defensively: lowercase → strip non-[a-z0-9-] →
+   # strip leading dash (else `git worktree add -b "-foo"` is misread as
+   # a flag) → collapse consecutive dashes → cap at 40 chars.
    raw_slug="<short-project-slug>"   # captured from user
-   PROJECT_SLUG="$(printf '%s' "${raw_slug}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-')"
+   PROJECT_SLUG="$(printf '%s' "${raw_slug}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | sed -e 's/^-*//' -e 's/-\{2,\}/-/g' -e 's/-*$//' | cut -c1-40)"
    [ -z "${PROJECT_SLUG}" ] && { echo "Empty slug after sanitization — ask user for an ASCII slug"; exit 1; }
 
    git -C "${MAIN_CHECKOUT}" worktree add \

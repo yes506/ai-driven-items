@@ -92,9 +92,16 @@ or treat as `on-default-needs-dev` and run the create-dev dialog above?"
 The exact sequence (executed only after Phase 3 confirmation):
 
 ```bash
-# Step 0 — local exclude so .worktrees/ doesn't dirty status
-grep -qxF '.worktrees/' "${MAIN_CHECKOUT}/.git/info/exclude" \
-  || echo '.worktrees/' >> "${MAIN_CHECKOUT}/.git/info/exclude"
+# Step 0 — local exclude so .worktrees/ doesn't dirty status. Resolve
+# common-dir via git so the exclude lands on the real .git even if
+# MAIN_CHECKOUT is itself a linked worktree. CRITICAL: --git-common-dir
+# returns a RELATIVE path on older git; use --path-format=absolute (git ≥
+# 2.31) and fall back to manual absolutization.
+COMMON_DIR="$(git -C "${MAIN_CHECKOUT}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null \
+              || git -C "${MAIN_CHECKOUT}" rev-parse --git-common-dir)"
+case "${COMMON_DIR}" in /*) ;; *) COMMON_DIR="${MAIN_CHECKOUT}/${COMMON_DIR}" ;; esac
+grep -qxF '.worktrees/' "${COMMON_DIR}/info/exclude" \
+  || echo '.worktrees/' >> "${COMMON_DIR}/info/exclude"
 
 # Step 1 — compute PLANNER_ID once, interpolate into both path + branch.
 # epoch tail + $$ + $RANDOM: epoch handles cross-second runs, $$ handles
