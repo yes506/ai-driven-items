@@ -38,6 +38,9 @@ for the downstream gate.
 local) and side-effect (feature, system) lanes; uniform manual
 invocation prevents mode confusion. Never auto-trigger.
 
+**Thought publishing** — each meaningful checkpoint writes to canvas-terminal's
+collab-memory for peer agents (silent no-op when no session resolves; spec, table, heredoc form: [thought-publishing.md](references/thought-publishing.md)).
+
 ## Workflow Decision Tree
 
 ```
@@ -60,7 +63,7 @@ State variables captured during Phase 0/0.5 and threaded through later phases:
 
 - `MAIN_CHECKOUT` — absolute path to the parent main worktree
 - `BASE_BRANCH` — branch the planner worktree branches from (default `dev`); only used by feature+system lanes
-- `PLANNER_ID` — short suffix used in both worktree path and branch name (feature+system only)
+- `PLANNER_ID` — stable run handle; computed at Phase 0.5 for ALL lanes (drives collab-memory checkpoints; reused as worktree/branch suffix in feature+system Phase 4)
 - `LANGUAGE_STACK` — detected from build files; drives Phase 5/6 commands (feature+system only)
 - `LANGUAGE` — dialog language (`Korean` default | `English`); captured at Phase L (preamble) per [references/language-selection.md](references/language-selection.md); persisted at Phase 4 for feature+system, memory-only for micro+local
 - `SCALE` — `micro` | `local` | `feature` | `system` — chosen in Phase 0.5
@@ -155,6 +158,8 @@ full rubric, discovery rule, and worked examples.
    upgrades.
 5. Print classification, prompt `confirm scale` / suggest different
    lane (upgrade free; downgrade needs `confirm downgrade`) / `revise`.
+6. Compute `PLANNER_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"`; publish each
+   checkpoint via `${CLAUDE_SKILL_DIR}/scripts/publish_thought.sh` (**heredoc body** per [thought-publishing.md](references/thought-publishing.md)).
 
 Persist `SCALE` and the three scores to `.planner-state.json`
 (feature/system only — micro/local create no state file).
@@ -176,11 +181,14 @@ the entire artifact. The 9-field docstring schema does NOT apply.
    files/URLs (see [plan-ingestion.md](references/plan-ingestion.md)).
 2. **3–7 bullet plan reflection** — touched files, logical steps,
    validation/test plan, risks. No Mermaid DAG.
-3. **Prompt** `confirm plan` / `revise` / `escalate` (bump lane).
+3. **Prompt** `confirm plan` / `revise` / `escalate`. On each prompt publish
+   `light/plan` via `publish_thought.sh "${PLANNER_ID}" light plan` (**heredoc
+   body required** per [thought-publishing.md](references/thought-publishing.md) — a bare call writes an empty body).
 4. **Hand-off marker on confirm** — one chat line:
    `scale: <micro|local>   marker: (plan-<lane>, human-confirmed)`.
    Downstream implementer reads this from chat per
    [implementer-contract.md](references/implementer-contract.md).
+   Also publish `8/outcome` (body = the marker line; heredoc per thought-publishing.md).
 
 Concurrency: stateless on disk; the implementer pairs planner-output
 and confirm token by chat-adjacency, so two parallel micro/local runs
@@ -237,22 +245,14 @@ Wait for `confirm decomposition` before Phase 4.
 
 Order matters — only after Phase 3 confirmation:
 
-0. **Locally** ignore `.worktrees/` in the main checkout. CRITICAL:
-   `--git-common-dir` returns a RELATIVE path on older git; use
-   `--path-format=absolute` (git ≥ 2.31) with manual-absolutize fallback,
-   else the exclude lands at `<cwd>/.git/info/exclude` not `MAIN_CHECKOUT`'s:
+0. **Locally** ignore `.worktrees/` in the main checkout (rationale + path-format fallback: [git-worktree-flow.md](references/git-worktree-flow.md)):
    ```bash
    COMMON_DIR="$(git -C "${MAIN_CHECKOUT}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || git -C "${MAIN_CHECKOUT}" rev-parse --git-common-dir)"
    case "${COMMON_DIR}" in /*) ;; *) COMMON_DIR="${MAIN_CHECKOUT}/${COMMON_DIR}" ;; esac
    grep -qxF '.worktrees/' "${COMMON_DIR}/info/exclude" || echo '.worktrees/' >> "${COMMON_DIR}/info/exclude"
    ```
-1. Compute `PLANNER_ID` **once**, then interpolate consistently into
-   both the path and the branch name. The `$$-$RANDOM` suffix gives
-   true uniqueness — `$$` distinguishes within a host shell, `$RANDOM`
-   covers PID-namespaced containers where `$$` is always `1`:
+1. **Reuse `PLANNER_ID`** from Phase 0.5 (stable across the entire run):
    ```bash
-   PLANNER_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"
-
    # Sanitize PROJECT_SLUG defensively: lowercase → strip non-[a-z0-9-] →
    # strip leading dash (else `git worktree add -b "-foo"` is misread as
    # a flag) → collapse consecutive dashes → cap at 40 chars.
@@ -431,6 +431,9 @@ After a successful merge, ask: "Remove the worktree at `.worktrees/...`?"
 On yes: `git -C "${MAIN_CHECKOUT}" worktree remove <path>` (no `--force`).
 On no: leave it.
 
+After any prompt resolves (outer `confirm plan`/`revise`, inner `confirm merge`/`keep`;
+"Anything else → re-ask" is NOT a resolution), publish `8/outcome` via `publish_thought.sh "${PLANNER_ID}" 8 outcome` (heredoc per [thought-publishing.md](references/thought-publishing.md)).
+
 ---
 
 ## Implementation gate (downstream contract)
@@ -474,16 +477,14 @@ confirmation to deviate, but default to refusal):
   commit's `--no-ff` was meant to preserve)
 - `git reset --hard`, `git clean -f`, `git worktree remove --force`
 - `--no-verify` on commits (pre-commit hooks must run)
-- Generating method bodies (implementation) — defer to a separate task
-  outside this skill, gated by the tracked-artifacts + merge-marker
-  check documented in "Implementation gate (downstream contract)" above
-  (NOT by `.planner-state.json`, which is gitignored local working state)
+- Generating method bodies — defer to the implementer skill (gated by
+  the tracked artifacts + merge marker per "Implementation gate" above,
+  NOT by `.planner-state.json` which is gitignored local working state)
 - Hardcoded language/framework versions in any generated file
 - Treating user silence as confirmation at any gate
 - Creating `README.md`, `INSTALLATION_GUIDE.md`, etc. inside this skill folder
 - Writing fewer than the 9 docstring fields on any generated method
-  (applies to feature+system lanes that emit interface skeletons;
-  micro/local emit no methods so the rule has no enforcement target)
+  (feature+system lanes only — micro/local emit no methods)
 
 ---
 
