@@ -103,11 +103,9 @@ case "${COMMON_DIR}" in /*) ;; *) COMMON_DIR="${MAIN_CHECKOUT}/${COMMON_DIR}" ;;
 grep -qxF '.worktrees/' "${COMMON_DIR}/info/exclude" \
   || echo '.worktrees/' >> "${COMMON_DIR}/info/exclude"
 
-# Step 1 — compute PLANNER_ID once, interpolate into both path + branch.
-# epoch tail + $$ + $RANDOM: epoch handles cross-second runs, $$ handles
-# concurrent runs on a host shell, $RANDOM covers PID-namespaced containers
-# where $$ is always 1 (so the same-second-concurrent case still gets entropy).
-PLANNER_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"
+# Step 1 — reuse PLANNER_ID from Phase 0.5 (stable across the entire run).
+# Rationale for the entropy source is documented in references/thought-publishing.md
+# under "PLANNER_ID for all lanes" — do NOT recompute here.
 PROJECT_SLUG="<short-project-slug>"
 git -C "${MAIN_CHECKOUT}" worktree add \
   ".worktrees/planner-${PROJECT_SLUG}-${PLANNER_ID}" \
