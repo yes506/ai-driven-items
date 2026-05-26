@@ -5,13 +5,12 @@ description: |
   planning starts. Runs an interactive elicitation dialog (Socratic loops +
   5 Whys + example/counter-example disambiguation), auto-detects whether the
   user brings a feature/product idea or a problem/pain, and emits a dual-
-  format artifact: `intent.<slug>.md` (AI-parseable seed, shaped 1:1 with
-  `codebase-planner`'s Phase 1 normalization rubric) and
+  format artifact: `intent.<slug>.md` (structured AI-parseable seed) and
   `intent.<slug>.html` (static, self-contained, human-verifiable).
   Slug-scoped filenames let multiple intents coexist at the repo root
-  after merge. Upstream of `codebase-planner`
-  in the chain: intent-aligner → planner → implementer. Manual invocation
-  only — `/intent-aligner`.
+  after merge. Upstream of `plan-establisher` in the chain:
+  intent-aligner → plan-establisher → codebase-planner →
+  codebase-implementer. Manual invocation only — `/intent-aligner`.
 disable-model-invocation: true
 ---
 
@@ -27,7 +26,7 @@ then emits two artifacts:
 
 | Output | Audience | Purpose |
 |---|---|---|
-| `intent.<slug>.md` | AI (next-hop is `codebase-planner`) | Structured seed, shaped to match planner's Phase 1 normalization rubric so it ingests with zero translation |
+| `intent.<slug>.md` | AI (next-hop is `plan-establisher`) | Structured seed listing the user's goal, scope, constraints, and reasoning |
 | `intent.<slug>.html` | Human | Static, self-contained, print-friendly verification doc — the user reads it and confirms "yes, that's what I meant" |
 
 Artifact names are **slug-scoped** so multiple intents can coexist at
@@ -35,14 +34,18 @@ the repo root after merge — running `/intent-aligner` for two different
 projects produces `intent.foo.md` and `intent.bar.md` without
 overwriting each other.
 
-The skill sits **upstream** of `codebase-planner`. Chain position:
+The skill sits **upstream** of `plan-establisher`. Chain position:
 
 ```
-[/intent-aligner] → /codebase-planner → /codebase-implementer
-       │                    │                     │
-intent.<slug>.md       plan.md /             impl + report
-intent.<slug>.html     architecture.html
+[/intent-aligner] → /plan-establisher → /codebase-planner → /codebase-implementer
+       │                    │                     │                    │
+intent.<slug>.md     (planner-ready          plan.md /             impl + report
+intent.<slug>.html    handoff artifacts)     architecture.html
 ```
+
+`plan-establisher` re-shapes `intent.<slug>.md` into whatever the
+next-hop planner needs. Intent-aligner is **stack-, planner-, and
+lane-agnostic** — it just captures intent.
 
 `disable-model-invocation: true` — the skill has side effects (writes
 files, creates a git worktree, merges branches). Never auto-trigger.
@@ -77,9 +80,10 @@ State variables captured during Phases L–4 and threaded through later phases:
 - `PROJECT_SLUG` — short ASCII identifier captured from the user at
   Phase 3 synthesis (sanitized at Phase 4 before use).
 - `MODE` — `feature` | `problem` — chosen in Phase 1.
-- `INTENT` — the in-memory normalized representation (Goal, In-scope,
-  Out-of-scope, Constraints, Success criteria, Open questions, plus
-  mode-specific extras); persisted to `.intent-state.json` at Phase 4.
+- `INTENT` — the in-memory normalized representation (Goal,
+  In-scope features, Out-of-scope, Constraints, Success criteria,
+  Open questions, plus mode-specific extras); persisted to
+  `.intent-state.json` at Phase 4.
 
 All persisted per
 [references/state-and-resume.md](references/state-and-resume.md).
@@ -194,30 +198,27 @@ Mode: <feature | problem>
 Project slug (proposed): <short-ascii-slug>
 
 Goal: For <persona-short>, <outcome / relief>. (one sentence,
-      persona-prefix form — makes the planner's "for whom?" rubric
-      survive normalization; see references/output-schema.md)
+      persona-prefix form — answers "what is this for whom?" in one
+      read. See references/output-schema.md)
 
 User persona: <who, what they do — single sentence>
 
-In-scope:
+In-scope features:
   - ...
 
-Out-of-scope:                   ← fold counter-example reasons in
-  - <non-goal> (counter-example: <reason>)
+Out-of-scope:
   - ...
 
-Constraints:                    ← (problem mode) fold final root-cause step
+Constraints:
   - ...
-  - Root cause: <X>             ← problem mode only
 
-Success criteria:               ← fold most-concrete example as observable scenario
+Success criteria:
   - ...
-  - <example-folded scenario>   ← skip ONLY if example is already a success criterion
 
 Concrete examples (happy paths):
   - ...
 
-Counter-examples (must NOT happen):
+Counter-examples (must NOT happen, with the reason):
   - ...
 
 Root-cause (problem mode only — full chain):
@@ -311,11 +312,10 @@ Render both artifacts at the worktree root. Filenames are
 repo root after merge without overwriting each other.
 
 1. **`intent.${PROJECT_SLUG}.md`** — the AI-parseable seed. Structure
-   per [references/output-schema.md](references/output-schema.md),
-   which is shaped to match `codebase-planner`'s Phase 1 normalization
-   rubric 1:1. Field NAMES stay in English (machine grammar — the
-   planner's parser reads them); field VALUES follow `LANGUAGE` per
-   Phase L. Write directly with `Write` (not shell).
+   per [references/output-schema.md](references/output-schema.md).
+   Field NAMES stay in English (machine grammar — downstream parsers
+   read them); field VALUES follow `LANGUAGE` per Phase L. Write
+   directly with `Write` (not shell).
 
 2. **`intent.${PROJECT_SLUG}.html`** — the human-verifiable doc. Generate via:
 
@@ -360,34 +360,16 @@ Print:
 1. Paths to `intent.${PROJECT_SLUG}.md` and
    `intent.${PROJECT_SLUG}.html` (absolute, so the user can open the
    HTML in a browser without computing the path themselves).
-2. The **lane-agnostic copy-pasteable invocation block** — works
-   regardless of which lane the planner triages into. The path MUST
-   be in the same message as the invocation so Phase 0.5's
-   discovery-before-questions rule reads it before scoring (a bare
-   invocation scores ambiguity=3 and blocks). The inline 6-field
-   summary is redundant-but-harmless for feature/system lanes (planner
-   ingests both file and inline as multi-source per
-   `plan-ingestion.md`) AND load-bearing for micro/local lanes (where
-   the verbal-only path uses the chat request as the canonical plan).
-   Full rationale:
-   [references/planner-handoff.md](references/planner-handoff.md).
-   Interpolate `${PROJECT_SLUG}` and the actual `INTENT` field values
-   before printing:
+2. The next-step pointer (transition-safe — `plan-establisher` is
+   the intended next hop but may not be installed yet):
    ```
-   /codebase-planner   plan from ${MAIN_CHECKOUT}/intent.${PROJECT_SLUG}.md
-
-   Planner seed summary:
-   Goal: <intent.goal verbatim — single sentence in "For <persona>, <outcome>" form>
-   In-scope features:
-   <intent.in_scope[*] as bullets>
-   Out-of-scope:
-   <intent.out_of_scope[*] as bullets, each "<non-goal> (counter-example: <reason>)" form>
-   Constraints:
-   <intent.constraints[*] as bullets, including "Root cause: <X>" if problem mode>
-   Success criteria:
-   <intent.success_criteria[*] as bullets, including example-folded observable scenario>
-   Open questions:
-   <intent.open_questions[*] as bullets — or "(none)" if empty>
+   Next step: run `/plan-establisher` to shape this for the planner.
+   It reads ${MAIN_CHECKOUT}/intent.${PROJECT_SLUG}.md and produces a
+   planner-ready handoff. If `/plan-establisher` isn't installed
+   yet, you can also pass intent.${PROJECT_SLUG}.md directly to
+   `/codebase-planner` — the 6 rubric fields (Goal, In-scope features,
+   etc.) are readable as-is, you'll just lose the planner-rubric folds
+   that plan-establisher will eventually add.
    ```
 3. The exact prompt:
 
@@ -437,7 +419,7 @@ Update state: `phase_completed: human_confirmed`, record `merged_at`.
 
 ---
 
-## Downstream contract (planner handoff)
+## Downstream contract
 
 The merge commit message `feat(intent): merge <slug> (intent,
 human-confirmed)` makes the intent landing visible in `git log` — the
@@ -445,10 +427,10 @@ same pattern the planner+implementer chain uses. The marker is a social
 contract, not cryptographic; the goal is catching accidental misuse and
 making deliberate bypass visible in git history.
 
-The intent-aligner does NOT auto-launch `/codebase-planner` — the user
-runs it explicitly when ready. Phase 6 prints the suggested invocation
-line so it's one copy-paste away. Full guidance:
-[references/planner-handoff.md](references/planner-handoff.md).
+The intent-aligner does NOT auto-launch any downstream skill. The user
+runs `/plan-establisher` (and any further planners) explicitly when
+ready. Intent-aligner's job ends at the merged `intent.<slug>.md` —
+shaping for the planner's rubric is `plan-establisher`'s concern.
 
 ---
 
@@ -472,10 +454,10 @@ confirmation to deviate, but default to refusal):
   strongest disambiguator; without it the synthesis is guessing)
 - Inventing intent fields the user didn't confirm — leave them as
   `[unspecified]` instead
-- Hardcoding the user's intent into a tech-stack recommendation (that's
-  the planner's job; intent-aligner is stack-agnostic)
-- Auto-launching `/codebase-planner` from Phase 6 (the user runs it
-  explicitly when ready)
+- Hardcoding the user's intent into a tech-stack recommendation
+  (that's a downstream concern; intent-aligner is stack-agnostic)
+- Auto-launching `/plan-establisher` or `/codebase-planner` from
+  Phase 6 (the user runs the next-hop explicitly when ready)
 - Creating `README.md`, `INSTALLATION_GUIDE.md`, or similar docs inside
   this skill folder
 

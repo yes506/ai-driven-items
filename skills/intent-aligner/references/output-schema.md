@@ -7,39 +7,12 @@ confirmed in Phase 3. The two formats serve different audiences:
 
 | Artifact | Audience | How it's used |
 |---|---|---|
-| `intent.<slug>.md` | AI (`codebase-planner` Phase 1 ingests it as a file-path input) | Structured seed; planner's normalization rubric maps 1:1 to its fields |
+| `intent.<slug>.md` | AI (downstream skills ingest it as a file-path input) | Structured seed listing the user's goal, scope, constraints, and reasoning |
 | `intent.<slug>.html` | Human (user opens in browser to verify) | Static, self-contained, print-friendly visualization |
 
 The `<slug>` is the sanitized `PROJECT_SLUG` from Phase 4 (lowercase
 ASCII, hyphens). So a slug of `payments-rewrite` produces
 `intent.payments-rewrite.md` and `intent.payments-rewrite.html`.
-
-## Field-name alignment with codebase-planner
-
-`codebase-planner`'s Phase 1 normalization rubric (per its
-`references/plan-ingestion.md`) extracts these fields from any input
-source: **Goal**, **In-scope features**, **Out-of-scope**,
-**Constraints**, **Success criteria**, **Open questions**.
-
-`intent.<slug>.md` uses those exact field names (English, verbatim) so the
-planner's parser ingests it natively without any translation layer.
-
-Intent-aligner adds five fields on top of the planner's six:
-
-- **Mode** — `feature` or `problem` (the planner ignores this; humans
-  reading the HTML use it to set expectations)
-- **Persona** — single sentence, who the work is for
-- **Examples** — happy-path scenarios in feature mode, concrete
-  incidents in problem mode
-- **Counter-examples** — explicit non-examples (the boundary)
-- **Root-cause** — ordered list of "why" steps; only meaningful in
-  problem mode (in feature mode the HTML renders an explicit
-  "not applicable" note and the markdown omits the section)
-
-The planner gracefully ignores fields it doesn't know about — they
-just don't appear in its Phase 1 synthesis. So the extras are
-information for the human and the next-hop without breaking the
-contract.
 
 ## intent.<slug>.md — exact structure
 
@@ -65,13 +38,13 @@ For <persona-short>, <outcome / relief>. (single sentence)
 
 ## Out-of-scope
 
-- <non-goal> (counter-example: <reason it's NOT in scope>)
+- <bullet>
 - <bullet>
 
 ## Constraints
 
 - <bullet>
-- (problem mode) Root cause: <final root-cause step from Phase 2 Pass 4>
+- <bullet>
 
 ## Success criteria
 
@@ -95,7 +68,7 @@ For <persona-short>, <outcome / relief>. (single sentence)
 1. <symptom>
 2. <why 1>
 3. <why 2>
-4. <why 3 — root> ← also appears folded into Constraints above
+4. <why 3 — root>
 
 ## Open questions
 
@@ -109,42 +82,28 @@ For <persona-short>, <outcome / relief>. (single sentence)
 - Language used during elicitation: <Korean | English>
 ```
 
-### Why some content appears in two places
+## Fields
 
-`codebase-planner`'s Phase 1 normalization rubric only extracts 6 named
-fields (`Goal`, `In-scope features`, `Out-of-scope`, `Constraints`,
-`Success criteria`, `Open questions`); the extras (`Mode`, `Persona`,
-`Examples`, `Counter-examples`, `Root-cause`) survive in the file body
-for the human's HTML verification and for the planner's Phase 0.5
-discovery, but they do NOT appear in the planner's `confirm plan`
-synthesis. So the load-bearing extras are deliberately **folded** into
-planner-known fields at intent-capture time:
+Notes on the three fields that have shape rules beyond "bullet list of
+user's words":
 
-- **Persona** is folded into **Goal** via the "For `<persona-short>`,
-  `<outcome>`" form. Matches the planner's `Goal` rubric question
-  ("what does this project do for whom?"). When persona is generic
-  (e.g. "any user of the system"), drop the prefix and fall back to a
-  single-outcome sentence — but document why in Open Questions.
-- **Counter-example reasons** are folded into **Out-of-scope** entries
-  as `<non-goal> (counter-example: <reason>)`. The standalone
-  `## Counter-examples` section keeps the human-readable form for the
-  HTML; the Out-of-scope bullets are what the planner ingests.
-- **Final root-cause step** (problem mode only) is folded into
-  **Constraints** as `Root cause: <X>`. The standalone `## Root-cause`
-  section keeps the full chain for the HTML; the Constraints bullet is
-  what the planner ingests as causal signal.
-- **Most-concrete example** (or, in problem mode, the inverse of the
-  freshest incident) is folded into **Success criteria** as an
-  observable scenario. The standalone `## Examples` section keeps the
-  narrative form for the HTML; the Success-criteria bullet is what
-  the planner ingests as a concrete realization of the goal. Fold is
-  mandatory in spirit; skip ONLY if the example is already verbatim
-  a success criterion (rare in practice — examples are usually
-  scenarios while criteria are usually metrics).
+- **Mode** — `feature` or `problem`. Sets expectations for downstream
+  skills and gates whether the Root-cause section appears.
+- **Goal** — single sentence in **"For `<persona>`, `<outcome>`" form**.
+  The persona prefix answers "what is this for whom?" in one read.
+  When persona is generic (e.g. "any user of the system"), drop the
+  prefix, fall back to a single-outcome sentence, and document the
+  genericness in Open questions.
+- **Root-cause** — ordered list; problem mode only. Step 1 is the
+  symptom as the user first stated it; each subsequent step is the
+  next "why" deeper. In feature mode the markdown omits the section
+  entirely.
 
-This is the contract that makes intent-aligner a faithful seed for
-`codebase-planner` despite the rubric mismatch. See
-[planner-handoff.md](planner-handoff.md) for the full handoff design.
+All other fields (In-scope features, Out-of-scope, Constraints,
+Success criteria, Examples, Counter-examples, Open questions) are
+plain bullet lists. Standalone — no folds, no cross-references between
+fields. The downstream `plan-establisher` skill is responsible for
+re-shaping these into whatever the next-hop planner needs.
 
 ### Rules for filling fields
 
@@ -165,9 +124,6 @@ This is the contract that makes intent-aligner a faithful seed for
 - **Counter-examples include the reason**. "Internal cache transitions
   — they'd drown out the audit log signal" is a counter-example.
   "Internal cache transitions" alone is not.
-- **Root-cause is ordered**. Step 1 is the symptom as the user first
-  stated it; each subsequent step is the next "why" deeper. Order
-  matters for the human reading the HTML.
 
 ## intent.<slug>.html — structure
 
@@ -183,12 +139,10 @@ The HTML is a **first-class human verification document**, not a
 Markdown-to-HTML conversion of `intent.<slug>.md`. It deliberately
 diverges from the markdown's section list:
 
-- **Machine-only fields are not rendered.** `intent_id`,
-  `language` (the knob, not the rendered content), and the
-  planner-handoff invocation text live in `intent.<slug>.md` and in
-  the Phase 6 chat output — they do NOT appear in the HTML. The
-  human verifying the intent doesn't need them and they create
-  noise.
+- **Machine-only fields are not rendered.** `intent_id` and
+  `language` (the knob, not the rendered content) live in
+  `intent.<slug>.md` but do NOT appear in the HTML. The human
+  verifying the intent doesn't need them and they create noise.
 - **Sections are mode- and content-conditional.** A section
   renders only when it has something to say. `Root-cause` exists
   only in problem mode; `Open questions` is rendered only when
@@ -197,7 +151,7 @@ diverges from the markdown's section list:
 - **Chrome is localized.** `<html lang="…">` and all section
   labels follow `state.language` (`Korean` → `ko`, otherwise
   English fallback). Body content already follows `LANGUAGE` per
-  Phase L; the chrome now matches.
+  Phase L; the chrome matches.
 
 Sections (top-to-bottom, all conditional except header/footer):
 
@@ -208,46 +162,43 @@ Sections (top-to-bottom, all conditional except header/footer):
    summary; everything below it is supporting detail. Rendered when
    either `goal` or `persona` is present.
 3. **Scope grid** — side-by-side ✓ in-scope vs ✗ not-in-scope
-   columns. When an out-of-scope entry follows the
-   `<non-goal> (counter-example: <reason>)` form, the reason is
-   split off and rendered as a small italic annotation under the
-   non-goal so the boundary is visually paired with the *why*.
+   columns.
 4. **Success criteria** — checkbox-style checklist (☐ items). One
    item per row, visually scannable.
-5. **Constraints** — compact list with subtle bullet markers. In
-   problem mode this list includes the folded `Root cause: <X>`
-   bullet (per the schema fold) — that's redundant-with-the-flow,
-   which is deliberate: humans don't always read top to bottom.
+5. **Constraints** — compact list with subtle bullet markers.
 6. **Root-cause flow** (problem mode only) — horizontal chain of
    colored boxes connected by `→` arrows. First box is labeled
    `Symptom` (red tint), last is labeled `Root cause` (green tint),
    intermediates are `Why 1`, `Why 2`, etc. On narrow screens the
    flow stacks vertically with rotated arrows. Pure CSS — no inline
    SVG, no JS — keeping the surface XSS-free.
-7. **Examples grid** — paired ✓ "what it looks like when it works"
-   vs ✗ "what must NOT happen" columns. Each entry is a tinted card
-   so the contrast lands visually.
+7. **Examples grid** — paired columns with mode-aware labels.
+   - *Feature mode*: ✓ "What it looks like when it works" vs ✗
+     "What must NOT happen" — happy path vs forbidden behavior.
+   - *Problem mode*: "Recent incidents (the pain we're solving)" vs
+     "Adjacent areas that must not break" — past incidents are
+     evidence; counter-examples are guardrails for the fix.
+
+   The two columns share the same green/red styling regardless of
+   mode (a styling concession; the labels carry the semantic load).
+   Each entry is a tinted card so the contrast lands visually.
 8. **Open questions** (only when non-empty) — loud orange call-to-
    action block with a ⚠ icon, separated visually from the other
    panels so the user can't miss unresolved items before typing
    `confirm merge`.
-9. **Footer** — `Verified by user at <timestamp>` only. The planner
-   handoff sentence that used to live here has been removed; that
-   instruction belongs in the Phase 6 chat output, not in the
-   human verification doc.
+9. **Footer** — `Verified by user at <timestamp>` only.
 
 ### Why the HTML diverges from `intent.<slug>.md`
 
 The two artifacts have different audiences. `intent.<slug>.md` is
-the *machine handoff* — its structure is shaped 1:1 with the
-planner's normalization rubric so ingestion is zero-friction. The
-HTML is the *human verification artifact* — its structure is
+the *machine handoff* — its structure is a flat list of
+named sections so downstream parsers can read it deterministically.
+The HTML is the *human verification artifact* — its structure is
 shaped for fast scanning: hero → boundaries → criteria →
-unresolved. Sharing the same section list across both formats
-would have meant either (a) leaking machine fields into the human
-doc or (b) starving the planner of fields it expects. The two-track
-output resolves the tension by letting each side be optimized for
-its reader.
+unresolved. Sharing the same section ordering across both formats
+would have meant leaking the machine-only Provenance fields into the
+human doc; the two-track output resolves that by letting each side
+be optimized for its reader.
 
 ## Why HTML and not PDF / Markdown-rendered
 
@@ -263,15 +214,15 @@ its reader.
 ## What this schema does NOT include
 
 - **Implementation hints**. The intent is *what* and *why*, not *how*.
-  The planner downstream picks tech stack, structure, packages.
+  Downstream skills pick tech stack, structure, packages.
 - **Acceptance tests**. Success criteria suggest observable outcomes
   but don't enumerate test cases.
-- **Estimates**. Sizing belongs in the planner's triage scoring, not
-  in intent capture.
+- **Estimates**. Sizing belongs in downstream triage, not in intent
+  capture.
 - **Stakeholders**. Persona captures the *user*, not the approving
-  manager. Approvers go in the planner's plan, if anywhere.
+  manager. Approvers go in downstream plans, if anywhere.
 
 If the user pushes any of these into Phase 2 ("just put it in the
-intent for now"), surface it: "that fits better in the planner's
-phase — would you like to capture it as an open question for now so we
-don't lose it?"
+intent for now"), surface it: "that fits better in a downstream
+planning phase — would you like to capture it as an open question
+for now so we don't lose it?"

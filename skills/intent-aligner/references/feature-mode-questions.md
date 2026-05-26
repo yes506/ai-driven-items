@@ -49,11 +49,10 @@ what changes for the persona.
 can't do it?"
 
 **Produces**: `intent.goal` — one sentence in the **"For `<persona>`,
-`<outcome>`" form** (see [output-schema.md](output-schema.md) → "Why
-some content appears in two places"). The persona prefix is what
-makes the goal survive the planner's rubric, which asks "what does
-this project do *for whom*?" — if persona is generic, drop the
-prefix and capture the genericness in Open Questions.
+`<outcome>`" form** (see [output-schema.md](output-schema.md) →
+"Fields"). The persona prefix answers "what is this for whom?" in
+one read. If persona is generic, drop the prefix and capture the
+genericness in Open Questions.
 
 ---
 
@@ -73,19 +72,10 @@ its keep.
 **Drilling**: If the user stays abstract, ask "what would that look
 like *specifically*?" or "give me a real example from last week."
 
-**Produces**:
-- `intent.examples[]` (at least one entry; usually 1–3) — full
-  narrative form, the user's verbatim scenario. Survives in the HTML
-  for human verification.
-- `intent.success_criteria[]` gains a parallel entry rendering the
-  most-concrete example as an **observable scenario** form (e.g. "A
-  support agent searches by customer email and sees 30 days of
-  timestamped actions"). Fold is mandatory because the planner's
-  rubric drops the standalone `## Examples` section from its
-  synthesis — without the fold, the concrete scenario signal is lost
-  at planner normalization (see [output-schema.md](output-schema.md)
-  "Why some content appears in two places"). Skip ONLY if the
-  example is already verbatim a success criterion (rare in practice).
+**Produces**: `intent.examples[]` (at least one entry; usually 1–3)
+— full narrative form, the user's verbatim scenario. Renders in the
+HTML's "What it looks like when it works" column for human
+verification.
 
 ---
 
@@ -103,19 +93,15 @@ not — the boundary.
   thing?"
 
 **Why this matters**: This is the strongest disambiguator. Without
-it, the planner downstream will likely overshoot scope.
+it, downstream planning will likely overshoot scope.
 
-**Produces**:
-- `intent.counter_examples[]` (at least one entry) — full form, the
-  user's verbatim phrasing with the reason intact. Survives in the
-  HTML for human verification.
-- `intent.out_of_scope[]` — same entries reshaped as `<non-goal>
-  (counter-example: <reason>)` so the planner's `Out-of-scope`
-  rubric field captures both the boundary AND the reasoning. The
-  fold is mandatory because the planner's normalization drops the
-  standalone `## Counter-examples` section from its synthesis (see
-  [output-schema.md](output-schema.md) "Why some content appears in
-  two places").
+**Produces**: `intent.counter_examples[]` (at least one entry) —
+full form, the user's verbatim phrasing with the reason intact.
+Renders in the HTML's "What must NOT happen" column. The matching
+non-goals (the items that look adjacent but shouldn't be in scope)
+go in `intent.out_of_scope[]` as plain bullets — keep the boundary
+in Out-of-scope and the reasoning in Counter-examples; downstream
+skills can pair them when needed.
 
 ---
 
