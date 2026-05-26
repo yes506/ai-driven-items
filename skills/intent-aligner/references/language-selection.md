@@ -14,8 +14,9 @@ only through Phases L, 0, 1, 2, 3 (no state file before Phase 4).
 | Gate tokens (`confirm mode`, `confirm intent`, `confirm merge`, `revise`, `keep`, `proceed`) | **always English, verbatim — never translated.** The skill expects to receive these tokens as input; translating would break gate matching and let the user bypass a gate by typing the Korean word instead |
 | `intent.<slug>.md` **field names** (`Goal`, `In-scope`, `Out-of-scope`, `Constraints`, `Success criteria`, `Open questions`, `Examples`, `Counter-examples`, `Root-cause`, `Persona`, `Mode`) | natural form (English) — these are the machine grammar that `codebase-planner`'s Phase 1 parser reads. Translating them would break the handoff |
 | `intent.<slug>.md` **field values** (the user's own words for goal, examples, etc.) | follows `LANGUAGE` — these are the user's verified intent, presented to the planner as-is |
-| `intent.<slug>.html` **section headings, footer text** | natural form (the HTML template is bundled and not regenerated per-run) |
+| `intent.<slug>.html` **section headings, mode pill, `<html lang>` attribute** | follows `LANGUAGE` — the renderer ships a KO/EN string table keyed off `state.language` and chooses chrome strings + the lang attribute accordingly. Fallback chain: `Korean` / `ko` / `kr` → ko; missing, null, or empty → ko (per resume contract below); any other non-empty value (e.g. `English`, `Spanish`) → en |
 | `intent.<slug>.html` **field values** | follows `LANGUAGE` (the renderer escapes whatever's in the state file) |
+| `intent.<slug>.html` **footer** | localized; the planner-handoff sentence that used to live here has been removed — that instruction belongs in Phase 6 chat output, not in the verification doc |
 | Merge commit marker `(intent, human-confirmed)` | natural form (verbatim — the marker is the grep contract for downstream tools / future audits) |
 | Commit subject lines (`feat(intent): synthesize ...`, `feat(intent): merge ... (intent, human-confirmed)`) | natural form (English) — keeps `git log` searchable across language settings |
 | This skill's own SKILL.md / references/ / scripts/ | never translated (agent-facing) |

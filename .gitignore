@@ -48,3 +48,10 @@ Desktop.ini
 *.dump
 core
 core.*
+
+# Python bytecode caches — created when skill scripts are exercised
+# locally (e.g. render_html_report.py). Also keeps these out of the
+# .skill package produced by skill-creator's package_skill.py.
+__pycache__/
+*.pyc
+*.pyo

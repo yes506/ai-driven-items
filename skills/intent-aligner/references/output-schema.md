@@ -174,31 +174,80 @@ This is the contract that makes intent-aligner a faithful seed for
 Rendered from `.intent-state.json` by
 `scripts/render_html_report.py` using the bundled template at
 `assets/intent-html-template.html`. Single self-contained file (no
-CDN, no external JS). Every user-supplied value is HTML-escaped before
-substitution.
+CDN, no external JS, no Mermaid). Every user-supplied value is
+HTML-escaped before substitution; the template uses single-pass
+placeholder substitution to defuse the chained-replace re-substitution
+class.
 
-Sections (in order, all collapsible-by-default in a future iteration —
-for now they're always-expanded):
+The HTML is a **first-class human verification document**, not a
+Markdown-to-HTML conversion of `intent.<slug>.md`. It deliberately
+diverges from the markdown's section list:
 
-1. **Header** — project slug + mode badge + meta bar (language, phase,
-   intent ID).
-2. **Sticky TOC** — anchor links to each section below.
-3. **Goal** — single paragraph.
-4. **Persona** — single paragraph.
-5. **In scope** — bullet list.
-6. **Out of scope** — bullet list.
-7. **Constraints** — bullet list.
-8. **Success criteria** — bullet list.
-9. **Concrete examples (happy paths)** — boxed entries with a green
-   left-bar. Each is rendered as its own block.
-10. **Counter-examples (must NOT happen)** — boxed entries with an
-    amber left-bar.
-11. **Root-cause (problem mode only)** — ordered list. In feature
-    mode this section shows "(not applicable — feature mode)" so the
-    section's purpose is clear.
-12. **Open questions** — bullet list. "(none)" placeholder if empty.
-13. **Footer** — "Verified by user at <timestamp>" + a one-liner
-    pointing at `/codebase-planner` as the next step.
+- **Machine-only fields are not rendered.** `intent_id`,
+  `language` (the knob, not the rendered content), and the
+  planner-handoff invocation text live in `intent.<slug>.md` and in
+  the Phase 6 chat output — they do NOT appear in the HTML. The
+  human verifying the intent doesn't need them and they create
+  noise.
+- **Sections are mode- and content-conditional.** A section
+  renders only when it has something to say. `Root-cause` exists
+  only in problem mode; `Open questions` is rendered only when
+  there are unresolved items; sparse intent fields collapse rather
+  than printing placeholder noise.
+- **Chrome is localized.** `<html lang="…">` and all section
+  labels follow `state.language` (`Korean` → `ko`, otherwise
+  English fallback). Body content already follows `LANGUAGE` per
+  Phase L; the chrome now matches.
+
+Sections (top-to-bottom, all conditional except header/footer):
+
+1. **Header** — project slug + a single mode pill (`Feature` /
+   `Problem`, localized). No intent ID, no language chip.
+2. **Hero card** — the goal as a hero sentence with the persona as
+   a "For: …" tag. This is the one-glance "what we agreed to build"
+   summary; everything below it is supporting detail. Rendered when
+   either `goal` or `persona` is present.
+3. **Scope grid** — side-by-side ✓ in-scope vs ✗ not-in-scope
+   columns. When an out-of-scope entry follows the
+   `<non-goal> (counter-example: <reason>)` form, the reason is
+   split off and rendered as a small italic annotation under the
+   non-goal so the boundary is visually paired with the *why*.
+4. **Success criteria** — checkbox-style checklist (☐ items). One
+   item per row, visually scannable.
+5. **Constraints** — compact list with subtle bullet markers. In
+   problem mode this list includes the folded `Root cause: <X>`
+   bullet (per the schema fold) — that's redundant-with-the-flow,
+   which is deliberate: humans don't always read top to bottom.
+6. **Root-cause flow** (problem mode only) — horizontal chain of
+   colored boxes connected by `→` arrows. First box is labeled
+   `Symptom` (red tint), last is labeled `Root cause` (green tint),
+   intermediates are `Why 1`, `Why 2`, etc. On narrow screens the
+   flow stacks vertically with rotated arrows. Pure CSS — no inline
+   SVG, no JS — keeping the surface XSS-free.
+7. **Examples grid** — paired ✓ "what it looks like when it works"
+   vs ✗ "what must NOT happen" columns. Each entry is a tinted card
+   so the contrast lands visually.
+8. **Open questions** (only when non-empty) — loud orange call-to-
+   action block with a ⚠ icon, separated visually from the other
+   panels so the user can't miss unresolved items before typing
+   `confirm merge`.
+9. **Footer** — `Verified by user at <timestamp>` only. The planner
+   handoff sentence that used to live here has been removed; that
+   instruction belongs in the Phase 6 chat output, not in the
+   human verification doc.
+
+### Why the HTML diverges from `intent.<slug>.md`
+
+The two artifacts have different audiences. `intent.<slug>.md` is
+the *machine handoff* — its structure is shaped 1:1 with the
+planner's normalization rubric so ingestion is zero-friction. The
+HTML is the *human verification artifact* — its structure is
+shaped for fast scanning: hero → boundaries → criteria →
+unresolved. Sharing the same section list across both formats
+would have meant either (a) leaking machine fields into the human
+doc or (b) starving the planner of fields it expects. The two-track
+output resolves the tension by letting each side be optimized for
+its reader.
 
 ## Why HTML and not PDF / Markdown-rendered
 

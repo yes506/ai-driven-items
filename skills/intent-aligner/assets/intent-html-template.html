@@ -1,230 +1,389 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{HTML_LANG}}">
 <head>
   <meta charset="UTF-8">
-  <title>Intent — {{PROJECT_SLUG}}</title>
+  <title>{{T_TITLE_PREFIX}} — {{PROJECT_SLUG}}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     :root {
-      --fg: #1a1a1a;
-      --fg-muted: #555;
-      --bg: #fafafa;
-      --bg-card: #fff;
-      --accent: #2b5fb5;
+      --fg:          #1a1a1a;
+      --fg-muted:    #5a5a5a;
+      --fg-soft:     #888;
+      --bg:          #f7f7f5;
+      --bg-card:     #fff;
+      --accent:      #2b5fb5;
       --accent-soft: #e8f0fb;
-      --border: #d8d8d8;
-      --warn-bg: #fff7e0;
-      --warn-border: #e0b400;
-      --good-bg: #e8f6ec;
-      --good-border: #5aa970;
+      --good:        #2f7c4f;
+      --good-soft:   #e6f4ec;
+      --good-line:   #b6dcc4;
+      --bad:         #b53737;
+      --bad-soft:    #fbeaea;
+      --bad-line:    #e6b8b8;
+      --warn:        #b87900;
+      --warn-soft:   #fff4d6;
+      --warn-line:   #e8c870;
+      --border:      #e0e0dc;
+      --shadow:      0 1px 2px rgba(0,0,0,0.04);
     }
     * { box-sizing: border-box; }
-    body {
+    html, body {
       margin: 0;
-      font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-            "Helvetica Neue", Arial, sans-serif;
+      padding: 0;
+    }
+    body {
+      font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+            "Noto Sans KR", "Malgun Gothic", Roboto, "Helvetica Neue", Arial, sans-serif;
       color: var(--fg);
       background: var(--bg);
     }
     .page {
-      max-width: 880px;
+      max-width: 920px;
       margin: 0 auto;
-      padding: 32px 40px 80px;
+      padding: 36px 32px 60px;
     }
-    header {
-      border-bottom: 2px solid var(--accent);
-      padding-bottom: 16px;
-      margin-bottom: 28px;
-    }
-    h1 { margin: 0 0 6px; font-size: 26px; }
-    h1 small {
-      display: block;
-      font-size: 13px;
-      font-weight: 400;
-      color: var(--fg-muted);
-      margin-top: 4px;
-    }
-    .meta-bar {
+    /* ── HEADER ─────────────────────────────────────────────── */
+    header.doc-head {
       display: flex;
-      gap: 18px;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
       flex-wrap: wrap;
-      font-size: 13px;
-      color: var(--fg-muted);
-      margin-top: 8px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+      margin-bottom: 24px;
     }
-    .meta-bar span { white-space: nowrap; }
-    .badge {
+    header.doc-head h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+    header.doc-head h1 .slug {
+      color: var(--accent);
+    }
+    .mode-pill {
       display: inline-block;
-      padding: 2px 8px;
-      border-radius: 10px;
+      padding: 3px 12px;
+      border-radius: 999px;
       background: var(--accent-soft);
       color: var(--accent);
-      font-weight: 600;
       font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
     }
-    nav.toc {
-      position: sticky;
-      top: 0;
-      background: var(--bg);
-      padding: 10px 0 14px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 24px;
-      font-size: 13px;
-    }
-    nav.toc a {
-      color: var(--accent);
-      text-decoration: none;
-      margin-right: 14px;
-      white-space: nowrap;
-    }
-    nav.toc a:hover { text-decoration: underline; }
-    section {
+    /* ── HERO BLOCK ─────────────────────────────────────────── */
+    .hero {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 18px 22px;
-      margin-bottom: 18px;
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 22px 26px;
+      margin-bottom: 28px;
+      box-shadow: var(--shadow);
     }
-    section h2 {
+    .hero .label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--fg-soft);
+      margin-bottom: 8px;
+    }
+    .hero .goal {
+      font-size: 19px;
+      font-weight: 500;
+      line-height: 1.45;
+      color: var(--fg);
+      margin: 0 0 14px;
+    }
+    .hero .persona {
+      font-size: 14px;
+      color: var(--fg-muted);
+      margin: 0;
+    }
+    .hero .persona strong {
+      color: var(--fg);
+      font-weight: 600;
+    }
+    /* ── SCOPE GRID (✓ in / ✗ out) ──────────────────────────── */
+    .scope-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .scope-col {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+    }
+    .scope-col.in  { border-top: 3px solid var(--good); }
+    .scope-col.out { border-top: 3px solid var(--bad); }
+    .scope-col h2 {
       margin: 0 0 10px;
-      font-size: 17px;
-      color: var(--accent);
-      border-bottom: 1px solid var(--accent-soft);
-      padding-bottom: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
     }
-    section.optional { opacity: 0.95; }
-    section.optional h2 small {
-      font-weight: 400;
+    .scope-col.in  h2 { color: var(--good); }
+    .scope-col.out h2 { color: var(--bad); }
+    .scope-col ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .scope-col li {
+      position: relative;
+      padding: 6px 0 6px 22px;
+      font-size: 14px;
+      line-height: 1.5;
+      border-bottom: 1px dashed var(--border);
+    }
+    .scope-col li:last-child { border-bottom: none; }
+    .scope-col.in  li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      top: 6px;
+      color: var(--good);
+      font-weight: 700;
+    }
+    .scope-col.out li::before {
+      content: "✗";
+      position: absolute;
+      left: 0;
+      top: 6px;
+      color: var(--bad);
+      font-weight: 700;
+    }
+    .scope-col .reason {
+      display: block;
       font-size: 12px;
       color: var(--fg-muted);
-    }
-    ul { margin: 8px 0 0; padding-left: 22px; }
-    li { margin: 4px 0; }
-    p { margin: 6px 0; }
-    code {
-      font-family: "SF Mono", Menlo, Consolas, monospace;
-      background: #f0f0f0;
-      padding: 1px 5px;
-      border-radius: 3px;
-      font-size: 13px;
-    }
-    .placeholder {
-      color: var(--fg-muted);
+      margin-top: 2px;
       font-style: italic;
     }
-    .good {
-      background: var(--good-bg);
-      border-left: 3px solid var(--good-border);
-      padding: 8px 12px;
-      border-radius: 3px;
+    /* ── PANEL (generic card) ───────────────────────────────── */
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 22px;
+      margin-bottom: 22px;
+      box-shadow: var(--shadow);
     }
-    .warn {
-      background: var(--warn-bg);
-      border-left: 3px solid var(--warn-border);
-      padding: 8px 12px;
-      border-radius: 3px;
+    .panel > h2 {
+      margin: 0 0 12px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--fg-soft);
     }
-    footer {
-      margin-top: 40px;
-      padding-top: 16px;
+    /* ── SUCCESS CRITERIA AS CHECKLIST ──────────────────────── */
+    .checklist {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .checklist li {
+      position: relative;
+      padding: 8px 0 8px 28px;
+      font-size: 14.5px;
+      border-bottom: 1px dashed var(--border);
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 11px;
+      width: 14px;
+      height: 14px;
+      border: 1.5px solid var(--accent);
+      border-radius: 3px;
+      background: var(--bg-card);
+    }
+    /* ── CONSTRAINTS AS BARE LIST ───────────────────────────── */
+    .constraint-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .constraint-list li {
+      position: relative;
+      padding: 5px 0 5px 18px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .constraint-list li::before {
+      content: "▸";
+      position: absolute;
+      left: 0;
+      top: 5px;
+      color: var(--accent);
+    }
+    /* ── ROOT-CAUSE FLOW (problem mode) ─────────────────────── */
+    .root-cause-flow {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      gap: 0;
+      margin: 0;
+    }
+    .rc-step {
+      flex: 1 1 140px;
+      min-width: 140px;
+      background: var(--warn-soft);
+      border: 1px solid var(--warn-line);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.4;
+      position: relative;
+    }
+    .rc-step.symptom { background: var(--bad-soft); border-color: var(--bad-line); }
+    .rc-step.root    { background: var(--good-soft); border-color: var(--good-line); }
+    .rc-step .rc-label {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--fg-soft);
+      margin-bottom: 4px;
+    }
+    .rc-step.symptom .rc-label { color: var(--bad); }
+    .rc-step.root    .rc-label { color: var(--good); }
+    .rc-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 8px;
+      color: var(--fg-soft);
+      font-size: 18px;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+    /* ── EXAMPLES (paired ✓ / ✗) ────────────────────────────── */
+    .ex-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .ex-col {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+    }
+    .ex-col h2 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .ex-col.good h2 { color: var(--good); }
+    .ex-col.bad  h2 { color: var(--bad);  }
+    .ex-item {
+      padding: 10px 12px;
+      border-radius: 5px;
+      margin-bottom: 8px;
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+    .ex-item:last-child { margin-bottom: 0; }
+    .ex-col.good .ex-item { background: var(--good-soft); border-left: 3px solid var(--good); }
+    .ex-col.bad  .ex-item { background: var(--bad-soft);  border-left: 3px solid var(--bad);  }
+    /* ── OPEN QUESTIONS (loud call-to-action) ───────────────── */
+    .open-questions {
+      background: var(--warn-soft);
+      border: 1px solid var(--warn-line);
+      border-left: 5px solid var(--warn);
+      border-radius: 8px;
+      padding: 18px 22px;
+      margin-bottom: 28px;
+    }
+    .open-questions > h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--warn);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .open-questions > h2::before {
+      content: "⚠";
+      font-size: 18px;
+    }
+    .open-questions ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .open-questions li {
+      padding: 6px 0;
+      font-size: 14.5px;
+      line-height: 1.5;
+      border-bottom: 1px dashed var(--warn-line);
+    }
+    .open-questions li:last-child { border-bottom: none; }
+    /* ── PLACEHOLDERS (when state is sparse) ────────────────── */
+    .placeholder {
+      color: var(--fg-soft);
+      font-style: italic;
+      font-size: 13.5px;
+    }
+    /* ── FOOTER ─────────────────────────────────────────────── */
+    footer.doc-foot {
+      margin-top: 32px;
+      padding-top: 14px;
       border-top: 1px solid var(--border);
       font-size: 12px;
-      color: var(--fg-muted);
+      color: var(--fg-soft);
       text-align: center;
     }
+    /* ── PRINT ──────────────────────────────────────────────── */
     @media print {
       body { background: #fff; }
-      nav.toc { display: none; }
-      section {
+      .page { padding: 0; max-width: none; }
+      .hero, .panel, .scope-col, .ex-col, .open-questions {
+        box-shadow: none;
         page-break-inside: avoid;
-        border: none;
-        padding-left: 0;
-        padding-right: 0;
       }
+    }
+    /* ── NARROW ─────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .scope-grid, .ex-grid { grid-template-columns: 1fr; }
+      .rc-step { flex: 1 1 100%; }
+      .rc-arrow { transform: rotate(90deg); padding: 4px 0; }
     }
   </style>
 </head>
 <body>
 <div class="page">
 
-<header>
-  <h1>Intent — {{PROJECT_SLUG}}
-    <small>The user's mental model, written down for verification.</small>
-  </h1>
-  <div class="meta-bar">
-    <span>Mode: <span class="badge">{{MODE}}</span></span>
-    <span>Language: <code>{{LANGUAGE}}</code></span>
-    <span>Intent ID: <code>{{INTENT_ID}}</code></span>
-  </div>
+<header class="doc-head">
+  <h1>{{T_TITLE_PREFIX}} — <span class="slug">{{PROJECT_SLUG}}</span></h1>
+  <span class="mode-pill">{{T_MODE_LABEL}}</span>
 </header>
 
-<nav class="toc" aria-label="Sections">
-  <a href="#goal">Goal</a>
-  <a href="#persona">Persona</a>
-  <a href="#in-scope">In scope</a>
-  <a href="#out-of-scope">Out of scope</a>
-  <a href="#constraints">Constraints</a>
-  <a href="#success">Success criteria</a>
-  <a href="#examples">Examples</a>
-  <a href="#counter-examples">Counter-examples</a>
-  <a href="#root-cause">Root-cause</a>
-  <a href="#open-questions">Open questions</a>
-</nav>
+{{HERO_BLOCK}}
+{{SCOPE_BLOCK}}
+{{SUCCESS_BLOCK}}
+{{CONSTRAINTS_BLOCK}}
+{{ROOT_CAUSE_BLOCK}}
+{{EXAMPLES_BLOCK}}
+{{OPEN_QUESTIONS_BLOCK}}
 
-<section id="goal">
-  <h2>Goal</h2>
-  {{GOAL}}
-</section>
-
-<section id="persona">
-  <h2>User persona</h2>
-  {{PERSONA}}
-</section>
-
-<section id="in-scope">
-  <h2>In scope</h2>
-  {{IN_SCOPE}}
-</section>
-
-<section id="out-of-scope">
-  <h2>Out of scope</h2>
-  {{OUT_OF_SCOPE}}
-</section>
-
-<section id="constraints">
-  <h2>Constraints</h2>
-  {{CONSTRAINTS}}
-</section>
-
-<section id="success">
-  <h2>Success criteria</h2>
-  {{SUCCESS_CRITERIA}}
-</section>
-
-<section id="examples">
-  <h2>Concrete examples <small>(happy paths)</small></h2>
-  {{EXAMPLES}}
-</section>
-
-<section id="counter-examples">
-  <h2>Counter-examples <small>(must NOT happen)</small></h2>
-  {{COUNTER_EXAMPLES}}
-</section>
-
-<section id="root-cause" class="optional">
-  <h2>Root-cause <small>(problem mode only)</small></h2>
-  {{ROOT_CAUSE}}
-</section>
-
-<section id="open-questions">
-  <h2>Open questions</h2>
-  {{OPEN_QUESTIONS}}
-</section>
-
-<footer>
-  Verified by user at <code>{{VERIFIED_AT}}</code> — this artifact is the
-  seed for <code>/codebase-planner</code>. To proceed, point the planner
-  at <code>intent.{{PROJECT_SLUG}}.md</code> when it asks for input sources.
+<footer class="doc-foot">
+  {{T_VERIFIED_AT}} <code>{{VERIFIED_AT}}</code>
 </footer>
 
 </div>
