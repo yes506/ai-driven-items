@@ -40,10 +40,10 @@ the *why* underneath it. The "5" is a heuristic, not a quota — stop
 when the chain stops yielding new information.
 
 **Why**: Solving the surface symptom often misses the actual driver,
-which means the planner downstream will plan the wrong thing. Loadbearing
-in `problem` mode; usefully orthogonal in `feature` mode (it
-turns "I want X" into "I want X *because* Y", which tells the planner
-how to weigh trade-offs).
+which means downstream planning will plan the wrong thing.
+Load-bearing in `problem` mode; usefully orthogonal in `feature` mode
+(it turns "I want X" into "I want X *because* Y", which tells the
+downstream how to weigh trade-offs).
 
 **How to apply**:
 
@@ -134,8 +134,8 @@ If after **three full passes** the intent is still ambiguous (the
 user keeps revising the synthesis, or contradictions surface), stop
 and surface the residual ambiguity as `Open questions` in the intent
 rather than guessing. It is correct and useful to say "we converged
-to a sharp intent with these three unknowns left open" — the planner
-downstream can handle that.
+to a sharp intent with these three unknowns left open" — downstream
+skills can handle that.
 
 ## Anti-patterns to avoid
 
@@ -144,8 +144,8 @@ downstream can handle that.
   elicitation.
 - **Don't propose a solution.** Phase 2 is for understanding intent,
   not designing the system. If the user asks "how should we build
-  it?", defer: "let's lock the intent first, then `/codebase-planner`
-  will design the build."
+  it?", defer: "let's lock the intent first, then the downstream
+  planning skills will design the build."
 - **Don't accept the first answer as final.** The first answer is the
   one the user had pre-loaded. The real intent often surfaces in the
   3rd or 4th exchange.

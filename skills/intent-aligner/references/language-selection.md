@@ -12,11 +12,11 @@ only through Phases L, 0, 1, 2, 3 (no state file before Phase 4).
 |---|---|
 | User-facing chat dialog prose (questions, reflections, gate descriptions) | follows `LANGUAGE` |
 | Gate tokens (`confirm mode`, `confirm intent`, `confirm merge`, `revise`, `keep`, `proceed`) | **always English, verbatim — never translated.** The skill expects to receive these tokens as input; translating would break gate matching and let the user bypass a gate by typing the Korean word instead |
-| `intent.<slug>.md` **field names** (`Goal`, `In-scope`, `Out-of-scope`, `Constraints`, `Success criteria`, `Open questions`, `Examples`, `Counter-examples`, `Root-cause`, `Persona`, `Mode`) | natural form (English) — these are the machine grammar that `codebase-planner`'s Phase 1 parser reads. Translating them would break the handoff |
+| `intent.<slug>.md` **field names** (`Goal`, `In-scope features`, `Out-of-scope`, `Constraints`, `Success criteria`, `Open questions`, `Examples`, `Counter-examples`, `Root-cause`, `Persona`, `Mode`) | natural form (English) — these are the machine grammar that downstream parsers read. Translating them would break the handoff |
 | `intent.<slug>.md` **field values** (the user's own words for goal, examples, etc.) | follows `LANGUAGE` — these are the user's verified intent, presented to the planner as-is |
 | `intent.<slug>.html` **section headings, mode pill, `<html lang>` attribute** | follows `LANGUAGE` — the renderer ships a KO/EN string table keyed off `state.language` and chooses chrome strings + the lang attribute accordingly. Fallback chain: `Korean` / `ko` / `kr` → ko; missing, null, or empty → ko (per resume contract below); any other non-empty value (e.g. `English`, `Spanish`) → en |
 | `intent.<slug>.html` **field values** | follows `LANGUAGE` (the renderer escapes whatever's in the state file) |
-| `intent.<slug>.html` **footer** | localized; the planner-handoff sentence that used to live here has been removed — that instruction belongs in Phase 6 chat output, not in the verification doc |
+| `intent.<slug>.html` **footer** | localized; the next-step pointer to `/plan-establisher` lives in the Phase 6 chat output, not in the verification doc |
 | Merge commit marker `(intent, human-confirmed)` | natural form (verbatim — the marker is the grep contract for downstream tools / future audits) |
 | Commit subject lines (`feat(intent): synthesize ...`, `feat(intent): merge ... (intent, human-confirmed)`) | natural form (English) — keeps `git log` searchable across language settings |
 | This skill's own SKILL.md / references/ / scripts/ | never translated (agent-facing) |
@@ -24,7 +24,7 @@ only through Phases L, 0, 1, 2, 3 (no state file before Phase 4).
 The rule of thumb: anything the human reads as **prose** follows
 `LANGUAGE`; anything the human reads as **code or schema** stays in its
 natural form, even when `LANGUAGE=Korean`. Field names in
-`intent.<slug>.md` stay English because they're the planner-skill
+`intent.<slug>.md` stay English because they're the downstream-skill
 contract.
 
 ## Detection rule
@@ -98,8 +98,8 @@ creation; this is intent-aligner's first on-disk mutation). Until then,
   step at step 3 is the safety net.
 - `intent.<slug>.md` field names, commit messages, gate tokens, and the
   `(intent, human-confirmed)` marker intentionally stay in English
-  regardless of `LANGUAGE` — the planner reads `intent.<slug>.md` as
-  a machine spec, and `git log` greps need ASCII for portability.
+  regardless of `LANGUAGE` — downstream skills read `intent.<slug>.md`
+  as a machine spec, and `git log` greps need ASCII for portability.
 - Mid-flow language switches do NOT re-translate intent values already
   captured. The user's own words stay verbatim — only future dialog
   prose switches language.

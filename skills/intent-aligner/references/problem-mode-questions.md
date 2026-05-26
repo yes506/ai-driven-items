@@ -53,20 +53,16 @@ times, what they were trying to do.
 plans. A specific incident ("last Tuesday at 4pm, deploy 1247 hung for
 22 minutes and I rolled back at 4:30") generates a sharp plan.
 
-**Produces**:
-- `intent.examples[]` (called "examples" but in problem mode these
-  are *incident reports* — keep them concrete). Survives in the
-  HTML for human verification.
-- `intent.success_criteria[]` gains an entry stating the **inverse
-  of the incident** as an observable scenario (e.g. incident "deploy
-  1247 hung 22 minutes" → success criterion "deploys complete in
-  &lt;5 minutes p95"). Fold is mandatory because the planner's
-  rubric drops the standalone `## Examples` section from its
-  synthesis — without the fold, the concrete incident signal doesn't
-  reach the planner (see [output-schema.md](output-schema.md) "Why
-  some content appears in two places"). Pass 8 (Success criteria) is
-  where the user finalizes this; Pass 2 just flags the source
-  incident.
+**Produces**: `intent.examples[]` (called "examples" but in problem
+mode these are *incident reports* — keep them concrete). Renders
+in the HTML's problem-mode positive column under the label
+"Recent incidents (the pain we're solving)" / "과거에 발생한 사건"
+— the renderer picks mode-aware labels per
+[output-schema.md](output-schema.md). Pass 8 (Success criteria)
+later turns the concrete incident into an observable scenario
+(e.g. incident "deploy 1247 hung 22 minutes" → success criterion
+"deploys complete in &lt;5 minutes p95"); Pass 2 just flags the
+source incident.
 
 ---
 
@@ -109,15 +105,9 @@ or a success criterion, sometimes both. Often becomes:
 becomes an open question, (b) the next "why" lands on something out
 of scope, or (c) you've hit 5 levels.
 
-**Produces**:
-- `intent.root_cause[]` (the chain of whys, in order, as an ordered
-  list — the HTML renderer shows it as a numbered list).
-- `intent.constraints[]` gains an entry of the form `Root cause: <final
-  step from chain>`. This fold is mandatory because the planner's
-  rubric drops the standalone `## Root-cause` section — the
-  Constraints bullet is what carries the causal signal into the
-  planner's synthesis (see [output-schema.md](output-schema.md) "Why
-  some content appears in two places").
+**Produces**: `intent.root_cause[]` — the chain of whys, in order,
+as an ordered list. The HTML renderer shows it as a horizontal
+Symptom → Why 1 → … → Root cause flow.
 
 If the chain reveals the *root cause* is not what the user originally
 mentioned, surface it: "the surface symptom was `<X>`, but the chain
@@ -142,11 +132,10 @@ articulate before the root cause is named. Pass 4 gives Pass 5 the
 words.
 
 **Produces**: `intent.goal` — one sentence in the **"For `<persona>`,
-`<outcome>`" form** (see [output-schema.md](output-schema.md) → "Why
-some content appears in two places"). The persona prefix is what
-makes the goal survive the planner's rubric ("what does this project
-do *for whom*?"). When persona is generic, drop the prefix and
-capture the genericness in Open Questions.
+`<outcome>`" form** (see [output-schema.md](output-schema.md) →
+"Fields"). The persona prefix answers "what is this for whom?" in
+one read. When persona is generic, drop the prefix and capture the
+genericness in Open Questions.
 
 ---
 
@@ -186,17 +175,15 @@ related systems.
 - "If the fix accidentally also did `<adjacent thing>`, would that be
   a bonus, neutral, or a problem?"
 
-**Produces**:
-- `intent.counter_examples[]` (at least one entry) — full form,
-  the user's verbatim phrasing with the reason intact. Survives in
-  the HTML for human verification.
-- `intent.out_of_scope[]` — same entries reshaped as `<non-goal>
-  (counter-example: <reason>)` so the planner's `Out-of-scope`
-  rubric field captures both the boundary AND the reasoning. Fold
-  is mandatory because the planner's normalization drops the
-  standalone `## Counter-examples` section from its synthesis (see
-  [output-schema.md](output-schema.md) "Why some content appears in
-  two places").
+**Produces**: `intent.counter_examples[]` (at least one entry) —
+full form, the user's verbatim phrasing with the reason intact.
+Renders in the HTML's negative column under the problem-mode label
+"Adjacent areas that must not break" / "절대 깨지면 안 되는 인접
+영역" (mode-aware — see [output-schema.md](output-schema.md)). The
+matching non-goals (things that look adjacent but shouldn't be in
+scope) go in `intent.out_of_scope[]` as plain bullets — keep the
+boundary in Out-of-scope and the reasoning in Counter-examples;
+downstream skills can pair them when needed.
 
 ---
 

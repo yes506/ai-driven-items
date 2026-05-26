@@ -97,7 +97,7 @@ successful checkpoint, which is the right thing to resume from.
 - It is NOT version-controlled. It's gitignored deliberately — the
   worktree commit is the canonical record, the state file is local
   working state.
-- It is NOT shared with the planner. The planner reads
+- It is NOT shared with downstream skills. They read
   `intent.<slug>.md`, not `.intent-state.json`. The handoff contract
   is the markdown file.
 
