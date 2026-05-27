@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="{{HTML_LANG}}">
+<head>
+  <meta charset="UTF-8">
+  <title>{{T_TITLE_PREFIX}} — {{INTENT_SLUG}} / {{RESOURCE_SLUG}}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --fg:          #1a1a1a;
+      --fg-muted:    #5a5a5a;
+      --fg-soft:     #888;
+      --bg:          #f7f7f5;
+      --bg-card:     #fff;
+      --accent:      #2b5fb5;
+      --accent-soft: #e8f0fb;
+      --good:        #2f7c4f;
+      --good-soft:   #e6f4ec;
+      --good-line:   #b6dcc4;
+      --warn:        #b87900;
+      --warn-soft:   #fff4d6;
+      --warn-line:   #e8c870;
+      --border:      #e0e0dc;
+      --shadow:      0 1px 2px rgba(0,0,0,0.04);
+      --code-bg:     #f0f0ec;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+            "Noto Sans KR", "Malgun Gothic", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+    }
+    .page {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 36px 32px 60px;
+    }
+    /* ── HEADER ─────────────────────────────────────────────── */
+    header.doc-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+      margin-bottom: 24px;
+    }
+    header.doc-head h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+    header.doc-head h1 .crumb-sep {
+      color: var(--fg-soft);
+      margin: 0 6px;
+      font-weight: 400;
+    }
+    header.doc-head h1 .crumb-intent {
+      color: var(--fg-muted);
+      font-weight: 500;
+    }
+    header.doc-head h1 .crumb-resource {
+      color: var(--accent);
+    }
+    .type-pill {
+      display: inline-block;
+      padding: 3px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    /* ── SOURCE CARD ────────────────────────────────────────── */
+    .source-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+    .source-card .label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--fg-soft);
+      margin-bottom: 8px;
+    }
+    .source-card .source-value {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 13.5px;
+      color: var(--fg);
+      word-break: break-all;
+      line-height: 1.4;
+    }
+    .source-card a.source-value {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px dashed var(--accent);
+    }
+    .source-card a.source-value:hover {
+      border-bottom-style: solid;
+    }
+    /* ── PANEL (extracted content + rationale) ──────────────── */
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 22px;
+      box-shadow: var(--shadow);
+    }
+    .panel > h2 {
+      margin: 0 0 14px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--fg-soft);
+    }
+    .panel .body p {
+      margin: 0 0 12px;
+      font-size: 14.5px;
+      line-height: 1.6;
+    }
+    .panel .body p:last-child { margin-bottom: 0; }
+    .panel .body blockquote {
+      margin: 0 0 14px;
+      padding: 10px 16px;
+      border-left: 3px solid var(--accent);
+      background: var(--accent-soft);
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--fg);
+      font-style: normal;
+    }
+    .panel .body blockquote p { margin: 0; }
+    .panel .body code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.92em;
+      background: var(--code-bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    .panel .body ul, .panel .body ol {
+      margin: 0 0 12px 22px;
+      padding: 0;
+    }
+    .panel .body li {
+      font-size: 14.5px;
+      line-height: 1.55;
+      margin-bottom: 4px;
+    }
+    /* ── RATIONALE (tinted variant) ─────────────────────────── */
+    .panel.rationale {
+      background: var(--good-soft);
+      border-color: var(--good-line);
+      border-left: 4px solid var(--good);
+    }
+    .panel.rationale > h2 {
+      color: var(--good);
+    }
+    /* ── EMPTY-CONTENT PLACEHOLDER ──────────────────────────── */
+    .placeholder {
+      color: var(--fg-soft);
+      font-style: italic;
+      font-size: 13.5px;
+    }
+    /* ── FOOTER ─────────────────────────────────────────────── */
+    footer.doc-foot {
+      margin-top: 32px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--fg-soft);
+      text-align: center;
+    }
+    footer.doc-foot code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      background: var(--code-bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    /* ── PRINT ──────────────────────────────────────────────── */
+    @media print {
+      body { background: #fff; }
+      .page { padding: 0; max-width: none; }
+      .source-card, .panel { box-shadow: none; page-break-inside: avoid; }
+    }
+    /* ── NARROW ─────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      header.doc-head h1 { font-size: 17px; }
+      .page { padding: 20px 16px 40px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+<header class="doc-head">
+  <h1>
+    <span class="crumb-intent">{{INTENT_SLUG}}</span>
+    <span class="crumb-sep">/</span>
+    <span class="crumb-resource">{{RESOURCE_SLUG}}</span>
+  </h1>
+  <span class="type-pill">{{T_TYPE_LABEL}}</span>
+</header>
+
+<section class="source-card">
+  <div class="label">{{T_SOURCE_LABEL}}</div>
+  {{SOURCE_BLOCK}}
+</section>
+
+<section class="panel">
+  <h2>{{T_EXTRACTED_LABEL}}</h2>
+  <div class="body">{{EXTRACTED_BLOCK}}</div>
+</section>
+
+<section class="panel rationale">
+  <h2>{{T_RATIONALE_LABEL}}</h2>
+  <div class="body">{{RATIONALE_BLOCK}}</div>
+</section>
+
+<footer class="doc-foot">
+  {{T_EXTRACTED_AT_LABEL}} <code>{{EXTRACTED_AT}}</code>
+  &nbsp;·&nbsp;
+  {{T_SEED_RUN_LABEL}} <code>{{SEED_RUN_ID}}</code>
+</footer>
+
+</div>
+</body>
+</html>
