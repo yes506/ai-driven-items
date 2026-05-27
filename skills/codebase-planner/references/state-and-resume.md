@@ -37,8 +37,11 @@ contract)" for the summary table.
     "success_criteria": ["..."],
     "open_questions": ["..."],
     "sources": [
-      {"kind": "file|url|inline", "ref": "...", "fetched_at": "ISO-8601"}
-    ]
+      {"kind": "file|url|inline|plan-establisher", "ref": "...", "fetched_at": "ISO-8601",
+       "intent_slug": "(only for kind=plan-establisher; matches the chosen intent.<slug>.md)",
+       "plan_version": "(only for kind=plan-establisher; integer N from plan.<slug>.v<N>.md)"}
+    ],
+    "lane_override_reason": "(string|null; only set when codebase-planner overrides plan-establisher's `## Proposed scale lane` at Phase 0.5 step 3 AND the resolved lane is feature/system; null/absent when the proposed lane was accepted as-is, no plan-establisher source exists, OR the resolved lane is micro/local (which are stateless — for those, override rationale lands in chat history via the classification output + lightweight-lane plan reflection, per plan-ingestion.md). Evidence inventory and Resolved ambiguities are re-readable from `plan.sources[*].ref` and not duplicated here.)"
   },
   "packages": ["string (package paths, e.g. 'com.acme.order.intake')"],
   "interfaces": [

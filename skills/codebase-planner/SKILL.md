@@ -38,8 +38,7 @@ for the downstream gate.
 local) and side-effect (feature, system) lanes; uniform manual
 invocation prevents mode confusion. Never auto-trigger.
 
-**Thought publishing** — each meaningful checkpoint writes to canvas-terminal's
-collab-memory for peer agents (silent no-op when no session resolves; spec, table, heredoc form: [thought-publishing.md](references/thought-publishing.md)).
+**Thought publishing** — each meaningful checkpoint writes to canvas-terminal's collab-memory for peer agents (silent no-op when no session resolves; see [thought-publishing.md](references/thought-publishing.md)).
 
 ## Workflow Decision Tree
 
@@ -147,12 +146,13 @@ picks a lane (only feature/system need them).
 See [triage-and-readiness.md](references/triage-and-readiness.md) for
 full rubric, discovery rule, and worked examples.
 
-1. **Discovery first** (no user questions yet): read CLAUDE.md /
-   AGENTS.md / README.md, every file the user named, grep call sites +
-   tests, `git log -n 20 --oneline -- <path>`. Surface what you found.
+1. **Discovery first** (no user questions yet): scan for plan-establisher
+   `plan.<slug>.v<N>.md` per [plan-ingestion.md](references/plan-ingestion.md);
+   then read CLAUDE.md / AGENTS.md / README.md, named files, grep call
+   sites + tests, `git log -n 20 --oneline -- <path>`. Surface what you found.
 2. **Score** `(scope, risk, ambiguity)` each 0–3, with reasoning shown.
-3. **Resolve lane**: `final_scale = max(scope, risk)` →
-   `micro` (0) / `local` (1) / `feature` (2) / `system` (3).
+3. **Resolve lane**: `final_scale = max(scope, risk)`; accepted plan's
+   `Proposed scale lane` is the default → `micro|local|feature|system`.
 4. **Block if `ambiguity >= 2` AND `final_scale <= 1`**: one
    consolidated question round; re-score with answers. No silent
    upgrades.
@@ -177,8 +177,8 @@ Persist `SCALE` and the three scores to `.planner-state.json`
 Read-only. No worktree, no commits, no skeleton, no state file. Chat is
 the entire artifact. The 9-field docstring schema does NOT apply.
 
-1. **Verbal-only ingestion** — chat request is the plan; don't ask for
-   files/URLs (see [plan-ingestion.md](references/plan-ingestion.md)).
+1. **Verbal-or-plan ingestion** — if Phase 0.5 accepted a plan-establisher
+   plan, that's canonical; else the chat request is the plan. Don't ask for files/URLs.
 2. **3–7 bullet plan reflection** — touched files, logical steps,
    validation/test plan, risks. No Mermaid DAG.
 3. **Prompt** `confirm plan` / `revise` / `escalate`. On each prompt publish
@@ -205,9 +205,9 @@ so each can be normalized in isolation before synthesis:
 - **URLs** — Notion / wiki / GitHub issue / spec page
 - **Inline pasted text** — user pastes plan content directly in chat
 
-Read [plan-ingestion.md](references/plan-ingestion.md) for the
-normalization rubric (extract goal, in-scope features, out-of-scope,
-constraints, success criteria, open questions).
+Read [plan-ingestion.md](references/plan-ingestion.md) for
+plan-establisher auto-discovery + normalization rubric (goal, in-scope,
+out-of-scope, constraints, success criteria, open questions).
 
 Reflect the normalized synthesis back to the user as a single fenced
 block. Wait for `confirm plan` before Phase 2. Silence is not yes.
