@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="{{HTML_LANG}}">
+<head>
+  <meta charset="UTF-8">
+  <title>{{T_TITLE_PREFIX}} — {{INTENT_SLUG}} · v{{PLAN_VERSION}}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --fg:          #1a1a1a;
+      --fg-muted:    #5a5a5a;
+      --fg-soft:     #888;
+      --bg:          #f7f7f5;
+      --bg-card:     #fff;
+      --accent:      #2b5fb5;
+      --accent-soft: #e8f0fb;
+      --good:        #2f7c4f;
+      --good-soft:   #e6f4ec;
+      --good-line:   #b6dcc4;
+      --bad:         #b53737;
+      --bad-soft:    #fbeaea;
+      --bad-line:    #e6b8b8;
+      --warn:        #b87900;
+      --warn-soft:   #fff4d6;
+      --warn-line:   #e8c870;
+      --info:        #5a4ec0;
+      --info-soft:   #ede9fa;
+      --info-line:   #c8c0ea;
+      --border:      #e0e0dc;
+      --shadow:      0 1px 2px rgba(0,0,0,0.04);
+      --code-bg:     #f0f0ec;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+            "Noto Sans KR", "Malgun Gothic", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+    }
+    .page { max-width: 920px; margin: 0 auto; padding: 36px 32px 60px; }
+
+    /* ── HEADER ──────────────────────────────────────────────── */
+    header.doc-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+      margin-bottom: 24px;
+    }
+    header.doc-head h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+    header.doc-head h1 .slug { color: var(--accent); }
+    .pill {
+      display: inline-block;
+      padding: 3px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      margin-left: 8px;
+    }
+    .pill.version { background: var(--info-soft); color: var(--info); }
+    .pill.lane    { background: var(--accent-soft); color: var(--accent); }
+
+    /* ── HERO ────────────────────────────────────────────────── */
+    .hero {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 22px 26px;
+      margin-bottom: 28px;
+      box-shadow: var(--shadow);
+    }
+    .hero .label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--fg-soft);
+      margin-bottom: 8px;
+    }
+    .hero .goal {
+      font-size: 19px;
+      font-weight: 500;
+      line-height: 1.45;
+      color: var(--fg);
+      margin: 0;
+    }
+
+    /* ── SCOPE GRID ──────────────────────────────────────────── */
+    .scope-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .scope-col {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+    }
+    .scope-col.in  { border-top: 3px solid var(--good); }
+    .scope-col.out { border-top: 3px solid var(--bad); }
+    .scope-col h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .scope-col.in  h2 { color: var(--good); }
+    .scope-col.out h2 { color: var(--bad); }
+    .scope-col ul { list-style: none; padding: 0; margin: 0; }
+    .scope-col li {
+      position: relative;
+      padding: 6px 0 6px 22px;
+      font-size: 14px;
+      line-height: 1.5;
+      border-bottom: 1px dashed var(--border);
+    }
+    .scope-col li:last-child { border-bottom: none; }
+    .scope-col.in  li::before {
+      content: "✓"; position: absolute; left: 0; top: 6px;
+      color: var(--good); font-weight: 700;
+    }
+    .scope-col.out li::before {
+      content: "✗"; position: absolute; left: 0; top: 6px;
+      color: var(--bad); font-weight: 700;
+    }
+
+    /* ── PANEL (generic) ─────────────────────────────────────── */
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 22px;
+      margin-bottom: 22px;
+      box-shadow: var(--shadow);
+    }
+    .panel > h2 {
+      margin: 0 0 12px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--fg-soft);
+    }
+
+    /* ── SUCCESS CHECKLIST ───────────────────────────────────── */
+    .checklist { list-style: none; padding: 0; margin: 0; }
+    .checklist li {
+      position: relative;
+      padding: 8px 0 8px 28px;
+      font-size: 14.5px;
+      border-bottom: 1px dashed var(--border);
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist li::before {
+      content: ""; position: absolute; left: 0; top: 11px;
+      width: 14px; height: 14px;
+      border: 1.5px solid var(--accent);
+      border-radius: 3px;
+      background: var(--bg-card);
+    }
+
+    /* ── CONSTRAINTS ─────────────────────────────────────────── */
+    .constraint-list { list-style: none; padding: 0; margin: 0; }
+    .constraint-list li {
+      position: relative;
+      padding: 5px 0 5px 18px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .constraint-list li::before {
+      content: "▸"; position: absolute; left: 0; top: 5px;
+      color: var(--accent);
+    }
+
+    /* ── LANE REASONING CALLOUT ──────────────────────────────── */
+    .lane-callout {
+      background: var(--info-soft);
+      border: 1px solid var(--info-line);
+      border-left: 5px solid var(--info);
+      border-radius: 8px;
+      padding: 16px 22px;
+      margin-bottom: 22px;
+    }
+    .lane-callout h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--info);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .lane-callout p {
+      margin: 0;
+      font-size: 14.5px;
+      line-height: 1.6;
+      color: var(--fg);
+    }
+
+    /* ── EVIDENCE INVENTORY TABLE ────────────────────────────── */
+    .evidence-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+    .evidence-table th, .evidence-table td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .evidence-table th {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--fg-soft);
+      background: var(--bg);
+    }
+    .evidence-table td.field {
+      font-weight: 600;
+      color: var(--fg);
+      white-space: nowrap;
+      width: 32%;
+    }
+    .evidence-table td.seeds .seed-row {
+      padding: 2px 0;
+      line-height: 1.5;
+    }
+    .evidence-table td.seeds .seed-row + .seed-row {
+      border-top: 1px dashed var(--border);
+      margin-top: 2px;
+      padding-top: 4px;
+    }
+    .evidence-table td.seeds code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.92em;
+      background: var(--code-bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    .evidence-table td.seeds .relevance {
+      color: var(--fg-muted);
+      font-size: 0.95em;
+    }
+    .evidence-table td.seeds .relevance.placeholder {
+      font-style: italic;
+      color: var(--fg-soft);
+    }
+    .evidence-table td.intent-only {
+      color: var(--fg-soft);
+      font-style: italic;
+    }
+    .evidence-empty {
+      padding: 16px;
+      text-align: center;
+      color: var(--fg-soft);
+      font-style: italic;
+      font-size: 13.5px;
+    }
+
+    /* ── RESOLVED AMBIGUITIES ────────────────────────────────── */
+    .resolved-list { list-style: none; padding: 0; margin: 0; }
+    .resolved-list li {
+      padding: 8px 0;
+      font-size: 14px;
+      line-height: 1.55;
+      border-bottom: 1px dashed var(--border);
+    }
+    .resolved-list li:last-child { border-bottom: none; }
+    .resolved-list .finding {
+      color: var(--fg-muted);
+    }
+    .resolved-list .resolution {
+      color: var(--fg);
+      font-weight: 500;
+    }
+    .resolved-list .resolution::before {
+      content: " → ";
+      color: var(--good);
+      font-weight: 700;
+    }
+    .resolved-list li.auto::before {
+      content: "(auto) ";
+      color: var(--fg-soft);
+      font-style: italic;
+      font-size: 12px;
+    }
+
+    /* ── OPEN QUESTIONS (loud) ───────────────────────────────── */
+    .open-questions {
+      background: var(--warn-soft);
+      border: 1px solid var(--warn-line);
+      border-left: 5px solid var(--warn);
+      border-radius: 8px;
+      padding: 18px 22px;
+      margin-bottom: 28px;
+    }
+    .open-questions > h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--warn);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .open-questions > h2::before { content: "⚠"; font-size: 18px; }
+    .open-questions ul { list-style: none; padding: 0; margin: 0; }
+    .open-questions li {
+      padding: 6px 0;
+      font-size: 14.5px;
+      line-height: 1.5;
+      border-bottom: 1px dashed var(--warn-line);
+    }
+    .open-questions li:last-child { border-bottom: none; }
+
+    /* ── PROVENANCE FOOTER ───────────────────────────────────── */
+    footer.doc-foot {
+      margin-top: 32px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--fg-soft);
+    }
+    footer.doc-foot dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 4px 16px;
+    }
+    footer.doc-foot dt {
+      font-weight: 600;
+      color: var(--fg-muted);
+    }
+    footer.doc-foot dd {
+      margin: 0;
+      color: var(--fg);
+    }
+    footer.doc-foot code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      background: var(--code-bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    /* ── PLACEHOLDERS ────────────────────────────────────────── */
+    .placeholder {
+      color: var(--fg-soft);
+      font-style: italic;
+      font-size: 13.5px;
+    }
+
+    /* ── PRINT ───────────────────────────────────────────────── */
+    @media print {
+      body { background: #fff; }
+      .page { padding: 0; max-width: none; }
+      .hero, .panel, .scope-col, .lane-callout, .open-questions {
+        box-shadow: none;
+        page-break-inside: avoid;
+      }
+    }
+    /* ── NARROW ──────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .scope-grid { grid-template-columns: 1fr; }
+      footer.doc-foot dl { grid-template-columns: 1fr; gap: 8px; }
+      footer.doc-foot dt { margin-top: 4px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+<header class="doc-head">
+  <h1>
+    {{T_TITLE_PREFIX}} — <span class="slug">{{INTENT_SLUG}}</span>
+    <span class="pill version">v{{PLAN_VERSION}}</span>
+    <span class="pill lane">{{T_LANE_LABEL}}</span>
+  </h1>
+</header>
+
+{{HERO_BLOCK}}
+{{SCOPE_BLOCK}}
+{{CONSTRAINTS_BLOCK}}
+{{SUCCESS_BLOCK}}
+{{LANE_REASONING_BLOCK}}
+{{EVIDENCE_BLOCK}}
+{{RESOLVED_BLOCK}}
+{{OPEN_QUESTIONS_BLOCK}}
+
+<footer class="doc-foot">
+  <dl>
+    <dt>{{T_INTENT_LABEL}}</dt>     <dd><code>{{INTENT_SLUG}}</code></dd>
+    <dt>{{T_VERSION_LABEL}}</dt>    <dd><code>v{{PLAN_VERSION}}</code></dd>
+    <dt>{{T_RUN_ID_LABEL}}</dt>     <dd><code>{{PLAN_RUN_ID}}</code></dd>
+    <dt>{{T_CONFIRMED_LABEL}}</dt>  <dd><code>{{VERIFIED_AT}}</code></dd>
+    <dt>{{T_FORMAT_LABEL}}</dt>     <dd><code>{{FORMAT_VERSION}}</code></dd>
+  </dl>
+</footer>
+
+</div>
+</body>
+</html>
