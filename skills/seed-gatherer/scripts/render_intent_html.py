@@ -301,7 +301,7 @@ def _mode_label(mode: str, t: dict) -> str:
 
 def main() -> int:
     if len(sys.argv) != 2:
-        sys.stderr.write("usage: render_intent_html.py <path-to-state.json>\n")
+        sys.stderr.write(f"usage: {Path(__file__).name} <path-to-state.json>\n")
         return 2
 
     state_path = Path(sys.argv[1])
@@ -317,11 +317,16 @@ def main() -> int:
 
     # Dual-schema read — intent-aligner stores `mode` and `project_slug` at
     # the top level; seed-gatherer bootstrap stores them at `intent.mode`
-    # and `intent_slug`. Same for verified_at vs bootstrap_verified_at.
+    # and `intent_slug`. For the confirmation timestamp the seed-state has
+    # TWO candidates: `bootstrap_verified_at` (Phase 1b.4 confirm-intent)
+    # and `verified_at` (Phase 3 confirm-seeds). The intent HTML must show
+    # the intent-confirmation moment, so `bootstrap_verified_at` takes
+    # precedence when present; intent-aligner state lacks that key and
+    # falls through to its own `verified_at`.
     intent = state.get("intent") or {}
     mode = state.get("mode") or intent.get("mode") or "feature"
     project_slug = state.get("project_slug") or state.get("intent_slug") or "(unnamed)"
-    verified_at = state.get("verified_at") or state.get("bootstrap_verified_at")
+    verified_at = state.get("bootstrap_verified_at") or state.get("verified_at")
     t = _strings_for(state.get("language"))
 
     replacements = {

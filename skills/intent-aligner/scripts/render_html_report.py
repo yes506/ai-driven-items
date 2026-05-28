@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-"""Render a self-contained HTML verification doc from .intent-state.json.
+"""Render a self-contained HTML verification doc from an intent state file.
 
-Reads the state file (path arg) plus the bundled HTML template
+Reads `.intent-state.json` (intent-aligner) OR `.seed-state.json`
+(seed-gatherer bootstrap path) plus the bundled HTML template
 (assets/intent-html-template.html), populates placeholders, emits HTML
-to stdout. The HTML is fully self-contained — no CDN, no external JS.
-Every user-supplied value is HTML-escaped before substitution.
+to stdout. The two state schemas differ — intent-aligner stores `mode`
+and `project_slug` at the top level; seed-gatherer stores them at
+`intent.mode` and `intent_slug` respectively. The renderer reads both
+forms (intent-aligner keys first, seed-state fallbacks second) so a
+single script handles both invocations without drift. The HTML is
+fully self-contained — no CDN, no external JS. Every user-supplied
+value is HTML-escaped before substitution.
 
 The HTML is designed as a *first-class human verification document*, not
 an MD→HTML conversion: a hero card with the goal, a side-by-side scope
@@ -295,7 +301,7 @@ def _mode_label(mode: str, t: dict) -> str:
 
 def main() -> int:
     if len(sys.argv) != 2:
-        sys.stderr.write("usage: render_html_report.py <path-to-.intent-state.json>\n")
+        sys.stderr.write(f"usage: {Path(__file__).name} <path-to-state.json>\n")
         return 2
 
     state_path = Path(sys.argv[1])
@@ -309,8 +315,18 @@ def main() -> int:
     state = json.loads(state_path.read_text(encoding="utf-8"))
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
 
+    # Dual-schema read — intent-aligner stores `mode` and `project_slug` at
+    # the top level; seed-gatherer bootstrap stores them at `intent.mode`
+    # and `intent_slug`. For the confirmation timestamp the seed-state has
+    # TWO candidates: `bootstrap_verified_at` (Phase 1b.4 confirm-intent)
+    # and `verified_at` (Phase 3 confirm-seeds). The intent HTML must show
+    # the intent-confirmation moment, so `bootstrap_verified_at` takes
+    # precedence when present; intent-aligner state lacks that key and
+    # falls through to its own `verified_at`.
     intent = state.get("intent") or {}
-    mode = state.get("mode") or "feature"
+    mode = state.get("mode") or intent.get("mode") or "feature"
+    project_slug = state.get("project_slug") or state.get("intent_slug") or "(unnamed)"
+    verified_at = state.get("bootstrap_verified_at") or state.get("verified_at")
     t = _strings_for(state.get("language"))
 
     replacements = {
@@ -318,8 +334,8 @@ def main() -> int:
         "T_TITLE_PREFIX":       _esc(t["title_prefix"]),
         "T_MODE_LABEL":         _esc(_mode_label(mode, t)),
         "T_VERIFIED_AT":        _esc(t["verified_at"]),
-        "PROJECT_SLUG":         _esc(state.get("project_slug") or "(unnamed)"),
-        "VERIFIED_AT":          _esc(state.get("verified_at", t["not_recorded"])),
+        "PROJECT_SLUG":         _esc(project_slug),
+        "VERIFIED_AT":          _esc(verified_at or t["not_recorded"]),
         "HERO_BLOCK":           _hero_block(intent, t),
         "SCOPE_BLOCK":          _scope_block(intent, t),
         "SUCCESS_BLOCK":        _success_block(intent, t),

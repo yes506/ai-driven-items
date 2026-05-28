@@ -363,23 +363,19 @@ if ! git diff --cached --quiet; then
 fi
 ```
 
-The state file is gitignored (Phase 4 step 3) so it does not appear in
-the commit.
-
-Update state: `phase_completed: artifacts_emitted`.
+The state file is gitignored (Phase 4 step 3). Update state:
+`phase_completed: artifacts_emitted`.
 
 ---
 
 ## Phase 6 — Human gate + merge
 
-The agent's cwd may be inside the worktree. Use `git -C "${MAIN_CHECKOUT}"`
-so subsequent commands are cwd-independent.
+The agent's cwd may be inside the worktree; use `git -C "${MAIN_CHECKOUT}"`.
 
 Print:
 
-1. Paths to `intent.${PROJECT_SLUG}.md` and
-   `intent.${PROJECT_SLUG}.html` (absolute, so the user can open the
-   HTML in a browser without computing the path themselves).
+1. Absolute paths to `intent.${PROJECT_SLUG}.{md,html}` (so the user
+   can open the HTML in a browser).
 2. The next-step pointer (transition-safe):
    ```
    Next step: run `/seed-gatherer` to grow an evidence corpus from
@@ -413,10 +409,14 @@ Behavior per response:
     echo "BLOCKER: ${MAIN_CHECKOUT} has uncommitted changes — refusing to merge."
     git -C "${MAIN_CHECKOUT}" status --porcelain; exit 1
   fi
-  # BRANCH was composed in Phase 4 step 1 (same RUN_MODE-keyed derivation).
-  [ "${RUN_MODE}" = "update" ] \
-    && MERGE_MSG="feat(intent): merge ${PROJECT_SLUG} refinement (intent, updated-from-seeds, human-confirmed)" \
-    || MERGE_MSG="feat(intent): merge ${PROJECT_SLUG} (intent, human-confirmed)"
+  # Re-derive BRANCH from persisted state (Phase 4 step 1 rule) for resume safety:
+  if [ "${RUN_MODE}" = "update" ]; then
+    BRANCH="intent/update-${PROJECT_SLUG}-${INTENT_ID}"
+    MERGE_MSG="feat(intent): merge ${PROJECT_SLUG} refinement (intent, updated-from-seeds, human-confirmed)"
+  else
+    BRANCH="intent/${PROJECT_SLUG}-${INTENT_ID}"
+    MERGE_MSG="feat(intent): merge ${PROJECT_SLUG} (intent, human-confirmed)"
+  fi
   git -C "${MAIN_CHECKOUT}" checkout "${BASE_BRANCH}"
   git -C "${MAIN_CHECKOUT}" merge --no-ff "${BRANCH}" -m "${MERGE_MSG}"
   ```
