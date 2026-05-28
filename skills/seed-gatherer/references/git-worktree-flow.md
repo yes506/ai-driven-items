@@ -1,4 +1,4 @@
-# Git worktree flow for seed-gather-for-plan
+# Git worktree flow for seed-gatherer
 
 Mirrors `intent-aligner`, `codebase-planner`, and `codebase-implementer`
 exactly to keep mental overhead low for maintainers familiar with those
@@ -70,7 +70,7 @@ commits/stashes/discards. Show the dirty paths so the user can decide.
 
 ### Nested invocation
 
-The user re-runs `/seed-gather-for-plan` while already inside a seed
+The user re-runs `/seed-gatherer` while already inside a seed
 worktree. Phase 0 detects this as `inside-seed-worktree`. If
 `.seed-state.json` is present → resume per
 [state-and-resume.md](state-and-resume.md). Otherwise refuse and ask

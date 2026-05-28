@@ -1,7 +1,7 @@
 # Loading seeds/seed.<intent-slug>.*.md
 
 Phase 1 (after loading the intent) discovers and loads all seeds
-emitted by `/seed-gather-for-plan` for the chosen `INTENT_SLUG`. The
+emitted by `/seed-gatherer` for the chosen `INTENT_SLUG`. The
 loaded seeds become `SEEDS` in memory and feed Phase 2 verification
 dimensions 2 and 3 (seeds-vs-intent and seeds-vs-seeds).
 
@@ -15,18 +15,18 @@ Three cases:
 
 | Match count | Action |
 |---|---|
-| 0 | warn the user: *"No seeds found for intent `<slug>`. Planning will be intent-only (Dim 1 + Dim 4 verification only; Dim 2 + Dim 3 skipped). Type `proceed` to continue, or `abort` to run `/seed-gather-for-plan` first."* If the user proceeds, `SEEDS = []` and Phase 2 skips Dim 2/3. |
+| 0 | warn the user: *"No seeds found for intent `<slug>`. Planning will be intent-only (Dim 1 + Dim 4 verification only; Dim 2 + Dim 3 skipped). Type `proceed` to continue, or `abort` to run `/seed-gatherer` first."* If the user proceeds, `SEEDS = []` and Phase 2 skips Dim 2/3. |
 | ≥1 | echo: *"Loaded N seeds for intent `<slug>`: \<resource_slug\>, \<resource_slug\>, ... Proceeding to verification."* (No confirmation gate needed — loading is read-only.) |
 
 The optional-seeds path is a real use case: the user may want to plan
 from intent alone (no external research material) or may have run
-`/intent-aligner` without `/seed-gather-for-plan` yet. Don't refuse —
+`/intent-aligner` without `/seed-gatherer` yet. Don't refuse —
 warn and proceed.
 
 ## Field parsing per seed
 
 Each `seeds/seed.<intent-slug>.<resource-slug>.md` follows the schema
-documented in `seed-gather-for-plan/references/output-schema.md`. The
+documented in `seed-gatherer/references/output-schema.md`. The
 relevant fields for verification are:
 
 | Markdown heading | Parsed into `seed.<field>` | Used by |
@@ -66,13 +66,13 @@ the whole verification run:
 
 | Defect | Action |
 |---|---|
-| Required heading absent (missing `## Source` or `## Extracted content (intent-filtered)`) | Skip; warn: *"Seed `<resource_slug>` is missing the `## <Field>` section — skipping. Re-run `/seed-gather-for-plan` to regenerate."* Continue loading remaining seeds. |
+| Required heading absent (missing `## Source` or `## Extracted content (intent-filtered)`) | Skip; warn: *"Seed `<resource_slug>` is missing the `## <Field>` section — skipping. Re-run `/seed-gatherer` to regenerate."* Continue loading remaining seeds. |
 | `## Intent slug` mismatch (seed claims a different intent slug) | Skip; warn: *"Seed `<resource_slug>` claims intent `<other-slug>` but we're planning for `<INTENT_SLUG>` — skipping. (This usually means the seed file was renamed or moved between intents.)"* |
 | File can't be read (permissions, IO error) | Skip; warn with raw error. |
 | Body of `Extracted content (intent-filtered)` is empty or only whitespace | Load with `extracted_content=""`; flag as a Dim 2 finding (dead-weight seed) in Phase 2 — don't skip at load time. |
-| Source is missing or doesn't look like a URL/path (per seed-gather's strict awk) | Load with `source=""`; flag as a Dim 3 attribution gap in Phase 2 (without source we can't attribute conflicts). |
+| Source is missing or doesn't look like a URL/path (per seed-gatherer's strict awk) | Load with `source=""`; flag as a Dim 3 attribution gap in Phase 2 (without source we can't attribute conflicts). |
 
-Do NOT modify any seed file. Repair is the seed-gather skill's job
+Do NOT modify any seed file. Repair is the seed-gatherer skill's job
 (via its Phase 6 `revise` path, or by re-running the skill for that
 resource). Editing a seed in-place from here would break the
 upstream contract.
@@ -105,7 +105,7 @@ the inventory).
 - Seeds may be stale relative to their source — the seed file
   captures a point-in-time extract. This skill doesn't re-fetch; it
   trusts the extract. If the user knows a seed is stale, they should
-  re-run `/seed-gather-for-plan` for that resource before re-running
+  re-run `/seed-gatherer` for that resource before re-running
   `/plan-establisher`.
 - Cross-intent seeds (seeds with a different `## Intent slug`) are
   skipped, not auto-recovered. If the user genuinely wants a seed

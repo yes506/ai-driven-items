@@ -113,7 +113,7 @@ Three reasons:
    changed and roll back the planning decision without re-running
    the whole chain.
 
-3. **Consistency with seed-gather-for-plan's append-only contract**:
+3. **Consistency with seed-gatherer's append-only contract**:
    the seed accumulation model is "preserve, don't replace". Plans
    follow the same pattern, so the chain's storage model is
    consistent — every skill in the chain accumulates rather than

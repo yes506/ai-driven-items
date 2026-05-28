@@ -1,8 +1,8 @@
 ---
 name: plan-establisher
 description: |
-  Sits between `seed-gather-for-plan` and `codebase-planner` in the
-  chain (intent-aligner → seed-gather-for-plan → plan-establisher →
+  Sits between `seed-gatherer` and `codebase-planner` in the
+  chain (intent-aligner → seed-gatherer → plan-establisher →
   codebase-planner → codebase-implementer). Reads `intent.<slug>.md`
   (required) and `seeds/seed.<intent-slug>.*.md` (optional), runs 4
   verification dimensions (intent self-consistency, seeds-vs-intent,
@@ -148,7 +148,7 @@ ls -1 "${MAIN_CHECKOUT}"/seeds/seed."${INTENT_SLUG}".*.md 2>/dev/null
 
 | Match count | Action |
 |---|---|
-| 0 | warn: *"No seeds for intent `<slug>`. Planning will be intent-only (Dim 2 + Dim 3 verification skipped). Type `proceed` to continue, or `abort` to run `/seed-gather-for-plan` first."* |
+| 0 | warn: *"No seeds for intent `<slug>`. Planning will be intent-only (Dim 2 + Dim 3 verification skipped). Type `proceed` to continue, or `abort` to run `/seed-gatherer` first."* |
 | ≥1 | echo count + slugs; load all (read-only — no gate) |
 
 Load each seed per [references/seed-loading.md](references/seed-loading.md).

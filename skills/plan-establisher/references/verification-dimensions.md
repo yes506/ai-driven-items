@@ -127,7 +127,7 @@ If `SEEDS == []`, Phase 2 runs **only Dim 1 + Dim 4**. Dim 2 and Dim
 3 record no findings. The synthesis at Phase 3 fills `Evidence
 inventory` with the placeholder `(intent-only — no seeds available)`
 and codebase-planner reads that and adjusts (likely asks the user
-more questions itself, or recommends running `/seed-gather-for-plan`).
+more questions itself, or recommends running `/seed-gatherer`).
 
 This is a documented mode, not an error path — the user may want
 intent-only planning for small or quickly-shaped tasks.
@@ -149,7 +149,7 @@ Run dimensions in order: 1 → 2 → 3 → 4. Reasons:
 - **Code-level verification** (does the proposed plan compile / pass
   tests?) — that's `codebase-implementer`'s job, not plan-establisher.
 - **Schema validation** of intent.md / seeds/ — that's
-  intent-aligner / seed-gather-for-plan's job (their loaders refuse
+  intent-aligner / seed-gatherer's job (their loaders refuse
   malformed inputs).
 - **External truth-checking** (is the cited fact actually true?) —
   plan-establisher can only check internal consistency. The

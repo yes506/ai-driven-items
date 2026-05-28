@@ -8,9 +8,10 @@ description: |
   format artifact: `intent.<slug>.md` (structured AI-parseable seed) and
   `intent.<slug>.html` (static, self-contained, human-verifiable).
   Slug-scoped filenames let multiple intents coexist at the repo root
-  after merge. Upstream of `plan-establisher` in the chain:
-  intent-aligner → plan-establisher → codebase-planner →
-  codebase-implementer. Manual invocation only — `/intent-aligner`.
+  after merge. Upstream of `seed-gatherer` and `plan-establisher` in
+  the chain: intent-aligner → seed-gatherer → plan-establisher →
+  codebase-planner → codebase-implementer. Manual invocation only —
+  `/intent-aligner`.
 disable-model-invocation: true
 ---
 
@@ -26,7 +27,7 @@ then emits two artifacts:
 
 | Output | Audience | Purpose |
 |---|---|---|
-| `intent.<slug>.md` | AI (next-hop is `plan-establisher`) | Structured seed listing the user's goal, scope, constraints, and reasoning |
+| `intent.<slug>.md` | AI (next-hop is `seed-gatherer`, then `plan-establisher`) | Structured seed listing the user's goal, scope, constraints, and reasoning |
 | `intent.<slug>.html` | Human | Static, self-contained, print-friendly verification doc — the user reads it and confirms "yes, that's what I meant" |
 
 Artifact names are **slug-scoped** so multiple intents can coexist at
@@ -34,18 +35,21 @@ the repo root after merge — running `/intent-aligner` for two different
 projects produces `intent.foo.md` and `intent.bar.md` without
 overwriting each other.
 
-The skill sits **upstream** of `plan-establisher`. Chain position:
+The skill sits **upstream** of the planning chain. Chain position:
 
 ```
-[/intent-aligner] → /plan-establisher → /codebase-planner → /codebase-implementer
-       │                    │                     │                    │
-intent.<slug>.md     (planner-ready          plan.md /             impl + report
-intent.<slug>.html    handoff artifacts)     architecture.html
+[/intent-aligner] → /seed-gatherer → /plan-establisher → /codebase-planner → /codebase-implementer
+       │                  │                  │                     │                    │
+intent.<slug>.md    seeds/seed.        (planner-ready          plan.md /             impl + report
+intent.<slug>.html  <slug>.*.md+html    handoff artifacts)     architecture.html
+                    (optional)
 ```
 
-`plan-establisher` re-shapes `intent.<slug>.md` into whatever the
-next-hop planner needs. Intent-aligner is **stack-, planner-, and
-lane-agnostic** — it just captures intent.
+`seed-gatherer` (optional) grows an intent-filtered evidence corpus
+from external research material; `plan-establisher` then re-shapes
+`intent.<slug>.md` (+ any gathered seeds) into whatever the next-hop
+planner needs. Intent-aligner is **stack-, planner-, and lane-
+agnostic** — it just captures intent.
 
 `disable-model-invocation: true` — the skill has side effects (writes
 files, creates a git worktree, merges branches). Never auto-trigger.
@@ -360,16 +364,20 @@ Print:
 1. Paths to `intent.${PROJECT_SLUG}.md` and
    `intent.${PROJECT_SLUG}.html` (absolute, so the user can open the
    HTML in a browser without computing the path themselves).
-2. The next-step pointer (transition-safe — `plan-establisher` is
-   the intended next hop but may not be installed yet):
+2. The next-step pointer (transition-safe — `seed-gatherer` and
+   `plan-establisher` are the intended next hops but may not be
+   installed yet):
    ```
-   Next step: run `/plan-establisher` to shape this for the planner.
-   It reads ${MAIN_CHECKOUT}/intent.${PROJECT_SLUG}.md and produces a
-   planner-ready handoff. If `/plan-establisher` isn't installed
-   yet, you can also pass intent.${PROJECT_SLUG}.md directly to
-   `/codebase-planner` — the 6 rubric fields (Goal, In-scope features,
-   etc.) are readable as-is, you'll just lose the planner-rubric folds
-   that plan-establisher will eventually add.
+   Next step: run `/seed-gatherer` to grow an evidence corpus from
+   external research material (URLs, PDFs, etc.) filtered through
+   this intent, then `/plan-establisher` to fold intent + seeds
+   into a planner-ready handoff. Skip `/seed-gatherer` and go
+   straight to `/plan-establisher` if you have no external material
+   to seed from. If neither is installed yet, you can also pass
+   intent.${PROJECT_SLUG}.md directly to `/codebase-planner` — the
+   6 rubric fields (Goal, In-scope features, etc.) are readable
+   as-is, you'll just lose the planner-rubric folds that
+   plan-establisher would add.
    ```
 3. The exact prompt:
 
@@ -428,9 +436,10 @@ contract, not cryptographic; the goal is catching accidental misuse and
 making deliberate bypass visible in git history.
 
 The intent-aligner does NOT auto-launch any downstream skill. The user
-runs `/plan-establisher` (and any further planners) explicitly when
-ready. Intent-aligner's job ends at the merged `intent.<slug>.md` —
-shaping for the planner's rubric is `plan-establisher`'s concern.
+runs `/seed-gatherer`, `/plan-establisher`, and any further planners
+explicitly when ready. Intent-aligner's job ends at the merged
+`intent.<slug>.md` — gathering seeds and shaping for the planner's
+rubric are seed-gatherer's and plan-establisher's concerns.
 
 ---
 

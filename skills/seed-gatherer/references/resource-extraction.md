@@ -56,8 +56,8 @@ When `yt-dlp` is not on `$PATH`:
 
 1. Set `resources[i].status="skipped-no-ytdlp"`.
 2. Surface a message in chat (language follows `LANGUAGE`):
-   - English: *"Couldn't extract YouTube content from `<url>` — `yt-dlp` is not installed. Install it with `pip install yt-dlp` or `brew install yt-dlp`, then re-run `/seed-gather-for-plan` to include this resource. Continuing with the remaining resources."*
-   - Korean: *"`<url>`의 YouTube 콘텐츠를 추출할 수 없습니다 — `yt-dlp`가 설치되어 있지 않습니다. `pip install yt-dlp` 또는 `brew install yt-dlp`로 설치한 후 `/seed-gather-for-plan`을 다시 실행하면 이 리소스를 포함할 수 있습니다. 남은 리소스로 계속 진행합니다."*
+   - English: *"Couldn't extract YouTube content from `<url>` — `yt-dlp` is not installed. Install it with `pip install yt-dlp` or `brew install yt-dlp`, then re-run `/seed-gatherer` to include this resource. Continuing with the remaining resources."*
+   - Korean: *"`<url>`의 YouTube 콘텐츠를 추출할 수 없습니다 — `yt-dlp`가 설치되어 있지 않습니다. `pip install yt-dlp` 또는 `brew install yt-dlp`로 설치한 후 `/seed-gatherer`를 다시 실행하면 이 리소스를 포함할 수 있습니다. 남은 리소스로 계속 진행합니다."*
 3. Continue with the other resources. The skipped resource is recorded
    in the state file but no `seed.*.md` is emitted for it.
 
