@@ -1,6 +1,6 @@
 # Git worktree flow for plan-establisher
 
-Mirrors `intent-aligner`, `seed-gather-for-plan`, `codebase-planner`,
+Mirrors `intent-aligner`, `seed-gatherer`, `codebase-planner`,
 and `codebase-implementer` exactly to keep mental overhead low for
 maintainers familiar with those skills.
 

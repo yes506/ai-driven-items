@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # inspect_repo_state.sh — read-only repo state inspector for
-# seed-gather-for-plan. Mirrors intent-aligner's inspector exactly,
+# seed-gatherer. Mirrors intent-aligner's inspector exactly,
 # except the worktree classification looks for `.worktrees/seed-*`
 # instead of `.worktrees/intent-*`. Never mutates anything.
 #

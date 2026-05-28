@@ -35,7 +35,7 @@ prose (the "relevance rationale", any summarizing intro) follows
 
 ## Detection rule
 
-1. Inspect the invocation utterance (the user's `/seed-gather-for-plan ...`
+1. Inspect the invocation utterance (the user's `/seed-gatherer ...`
    message plus any same-turn follow-up text).
 2. Classify:
 

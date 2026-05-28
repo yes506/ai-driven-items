@@ -1,7 +1,7 @@
 # State and resume — `.seed-state.json`
 
 The state file is the durable representation of an in-flight
-seed-gather-for-plan run. It lives at the worktree root, is gitignored
+seed-gatherer run. It lives at the worktree root, is gitignored
 (written to the worktree's `.gitignore` at Phase 4 step 3), and exists
 only inside the worktree — never on `MAIN_CHECKOUT` / `${BASE_BRANCH}`.
 

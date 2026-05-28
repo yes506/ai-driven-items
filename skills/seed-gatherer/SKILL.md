@@ -1,18 +1,18 @@
 ---
-name: seed-gather-for-plan
+name: seed-gatherer
 description: |
   Downstream of `intent-aligner` in the chain (intent-aligner →
-  seed-gather-for-plan → plan-establisher → codebase-planner →
+  seed-gatherer → plan-establisher → codebase-planner →
   codebase-implementer). Reads `intent.<slug>.md` and extracts
   intent-filtered content from user-supplied web/youtube URLs and
   local file paths (PDF, image, doc, code), emitting one md+html
   seed pair per resource under `seeds/`. Iteratively re-runnable —
   each invocation appends seeds across its own worktree+merge cycle.
-  Manual invocation only — `/seed-gather-for-plan`.
+  Manual invocation only — `/seed-gatherer`.
 disable-model-invocation: true
 ---
 
-# Seed Gather (for Plan)
+# Seed Gatherer
 
 ## Overview
 
@@ -379,7 +379,7 @@ Print:
    ${MAIN_CHECKOUT}/seeds/seed.${INTENT_SLUG}.*.md alongside
    intent.${INTENT_SLUG}.md to shape a planner-ready handoff. If
    `/plan-establisher` isn't installed yet, you can run
-   `/seed-gather-for-plan` again to add more seeds, or pass the
+   `/seed-gatherer` again to add more seeds, or pass the
    seeds directory directly to `/codebase-planner` as supporting
    material.
    ```
@@ -426,7 +426,7 @@ cryptographic; the goal is catching accidental misuse and making
 deliberate bypass visible in git history.
 
 The skill does NOT auto-launch any downstream skill. The user runs
-`/plan-establisher` (or repeats `/seed-gather-for-plan` to grow the
+`/plan-establisher` (or repeats `/seed-gatherer` to grow the
 corpus) explicitly when ready. This skill's job ends at the merged
 `seeds/seed.<intent-slug>.*.md` files — shaping for the planner's
 rubric is `plan-establisher`'s concern.

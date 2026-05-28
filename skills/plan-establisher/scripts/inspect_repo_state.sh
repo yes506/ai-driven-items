@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # inspect_repo_state.sh — read-only repo state inspector for
-# plan-establisher. Mirrors seed-gather-for-plan's inspector exactly,
+# plan-establisher. Mirrors seed-gatherer's inspector exactly,
 # except the worktree classification looks for `.worktrees/plan-*`
 # instead of `.worktrees/seed-*`. Never mutates anything.
 #
