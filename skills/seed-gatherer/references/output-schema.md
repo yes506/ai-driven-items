@@ -24,11 +24,11 @@ slug.
 
 ## Source
 
-<URL or absolute file path>
+<URL or absolute file path; or `ideation:<idea-slug>` for ideation type>
 
 ## Resource type
 
-<web | youtube | pdf | image | local-doc | local-code>
+<web | youtube | pdf | image | local-doc | local-code | ideation>
 
 ## Extracted at
 
@@ -43,7 +43,19 @@ slug.
 <the relevant excerpts and/or summary, with irrelevant material dropped;
 verbatim quotes use markdown blockquote (> ); paraphrased context is
 plain prose; section labels (Quote / Paraphrase / Key claim /
-Section dropped: ...) are encouraged but not required>
+Section dropped: ...) are encouraged but not required.
+For ideation: the refined idea description from the Phase 2i dialogue.>
+
+## Feasibility check
+
+(ideation type only — omit this section entirely for resource-derived seeds)
+
+<the feasibility-check summary from Phase 2i — what tools were used,
+what was found, what the verdict was. Format suggested in
+[ideation-mode.md](ideation-mode.md):
+  - Tool: <name> — <invocation summary>
+    Finding: <quote or paraphrase>
+  Verdict: <feasible | contested | needs more digging>>
 
 ## Relevance rationale
 
@@ -57,6 +69,7 @@ seeds inform which planning decisions>
 - Seed run ID: <seed_run_id>
 - Language used during extraction: <Korean | English>
 - Status: <confirmed | skipped-* — but skipped resources don't get seed files; this field is for symmetry with the state file and is always `confirmed` in the emitted markdown>
+- Run mode: <standard | bootstrap | ideation>   # optional — useful for chain reviewers
 ```
 
 ## Field rules
@@ -64,8 +77,15 @@ seeds inform which planning decisions>
 - **Source** — the canonical URL or absolute file path. For YouTube,
   use the full canonical `https://www.youtube.com/watch?v=<ID>` form
   even if the user pasted `youtu.be/<ID>`, so the source line is
-  copy-paste-able into any browser.
-- **Resource type** — one of the six values, lowercased, hyphenated.
+  copy-paste-able into any browser. For `ideation` type, use
+  `ideation:<idea-slug>` — the slug is the same one used in the
+  resource_slug (`idea-<idea-slug>`).
+- **Resource type** — one of the seven values, lowercased, hyphenated.
+- **Feasibility check** — present only for `ideation` type;
+  omitted entirely for resource-derived seeds. The section title is
+  the literal field name and must stay English; the body follows
+  `LANGUAGE`. See [ideation-mode.md](ideation-mode.md) for the
+  format and the tool-palette rules.
 - **Extracted at** — ISO-8601 with user's local timezone offset.
   Matches the format used in `intent.<slug>.md`'s Provenance.
 - **Intent slug** — the chosen slug from Phase 1; redundant with the

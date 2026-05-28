@@ -78,8 +78,12 @@ For <persona-short>, <outcome / relief>. (single sentence)
 ## Provenance
 
 - Intent ID: <intent_id>
+- Revision: <integer, 1 for the initial capture>
 - Confirmed at: <ISO-8601 timestamp>
 - Language used during elicitation: <Korean | English>
+- Bootstrapped by: <skill-name>           # optional — present when seed-gatherer authored the initial draft
+- Refined from seeds: <slug-1>, <slug-2>  # optional — present on update-mode revisions; lists seeds that shaped THIS revision
+- Prior revision intent ID: <intent_id>   # optional — present on update-mode revisions; links to the prior run
 ```
 
 ## Fields
@@ -98,6 +102,23 @@ user's words":
   symptom as the user first stated it; each subsequent step is the
   next "why" deeper. In feature mode the markdown omits the section
   entirely.
+- **Revision** — integer starting at `1` for the initial capture.
+  Update mode (`/intent-aligner update <slug>`) increments by 1 on
+  each refinement landing. The git history is the cumulative audit
+  trail; only the current revision number is encoded in the artifact.
+  See [update-mode.md](update-mode.md) for the full update flow.
+- **Bootstrapped by** — present only when `/seed-gatherer` authored
+  the initial revision via its no-intent bootstrap path. Dropped on
+  the first `/intent-aligner update` refinement (the intent is no
+  longer a fresh bootstrap once a human-confirmed refinement lands).
+- **Refined from seeds** — present only on update-mode revisions
+  (revision ≥ 2 written by `/intent-aligner update`). Comma-separated
+  list of seed slugs that materially shaped THIS revision (not the
+  cumulative set). Drops when the intent is re-bootstrapped or moves
+  back to a clean create-mode rewrite.
+- **Prior revision intent ID** — present only on update-mode
+  revisions. The `Intent ID` of the prior run, preserved so reviewers
+  can grep the run lineage backwards in `git log`.
 
 All other fields (In-scope features, Out-of-scope, Constraints,
 Success criteria, Examples, Counter-examples, Open questions) are

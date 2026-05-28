@@ -17,7 +17,12 @@ echoing back:
 | Absolute path ending in `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp` (case-insensitive) | `image` |
 | Absolute path ending in `.md`, `.txt`, `.rst`, `.adoc`, `.org` | `local-doc` |
 | Absolute path ending in a recognized source-code extension (`.py`, `.js`, `.ts`, `.jsx`, `.tsx`, `.java`, `.kt`, `.go`, `.rs`, `.rb`, `.cs`, `.cpp`, `.c`, `.h`, `.swift`, `.scala`, `.sh`, etc.) | `local-code` |
-| Anything else | refuse with "I'm not sure how to handle `<input>` — please provide a URL or absolute file path with a recognized extension. Supported types: web URL, YouTube URL, PDF, image, local doc (md/txt/rst), local code." |
+| `ideation:<idea-slug>` (no fetch — synthesized from Phase 2i dialogue) | `ideation` — see [ideation-mode.md](ideation-mode.md) |
+| Anything else | refuse with "I'm not sure how to handle `<input>` — please provide a URL or absolute file path with a recognized extension. Supported types: web URL, YouTube URL, PDF, image, local doc (md/txt/rst), local code. If you have no external material, type `ideate` or `done` (with 0 resources) for the ideation prompt." |
+
+`ideation` is the only type that doesn't come from user paste — it's
+the output of Phase 2i's crystallization step. Users can also
+explicitly type `ideate` mid-intake to switch into the ideation loop.
 
 Relative paths are explicitly refused — they're ambiguous depending
 on the agent's cwd. Ask the user to provide an absolute path.
@@ -49,6 +54,7 @@ another, or type `done` when finished."*
 | `image` | `Read` (vision) | Read the image and describe what's in it through the lens of the intent. Treat it as a fact source (e.g., a screenshot of an error message, a hand-drawn diagram, a UI mockup). The "extracted content" is the agent's vision-based description, not the binary itself. |
 | `local-doc` | `Read` | Standard text read. For large files, accept the default 2000-line cap unless the user specified an offset/range in Phase 2. |
 | `local-code` | `Read` | Same as `local-doc`. The "extracted content" should be a structural summary + the few specific snippets that bear on the intent, not the whole file. |
+| `ideation` | (no fetch) | Source is the Phase 2i dialogue + feasibility check captured in the resource entry already. Phase 3's preview re-renders the captured content; no `WebFetch`/`Read` runs. See [ideation-mode.md](ideation-mode.md) for the dialogue mechanics and feasibility-check tool palette. |
 
 ## Soft-dependency handling (`yt-dlp` missing)
 

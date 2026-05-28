@@ -8,10 +8,13 @@ description: |
   format artifact: `intent.<slug>.md` (structured AI-parseable seed) and
   `intent.<slug>.html` (static, self-contained, human-verifiable).
   Slug-scoped filenames let multiple intents coexist at the repo root
-  after merge. Upstream of `seed-gatherer` and `plan-establisher` in
-  the chain: intent-aligner → seed-gatherer → plan-establisher →
-  codebase-planner → codebase-implementer. Manual invocation only —
-  `/intent-aligner`.
+  after merge. Bidirectional with `seed-gatherer`: the initial intent is
+  not immutable — `/intent-aligner update <slug>` refines an existing
+  intent from accumulated seeds, bumping its revision until the intent
+  is solid enough to plan against. Chain: intent-aligner ⇄ seed-gatherer
+  → plan-establisher → codebase-planner → codebase-implementer. Manual
+  invocation only — `/intent-aligner` (create) or `/intent-aligner
+  update <slug>` (refine).
 disable-model-invocation: true
 ---
 
@@ -35,21 +38,26 @@ the repo root after merge — running `/intent-aligner` for two different
 projects produces `intent.foo.md` and `intent.bar.md` without
 overwriting each other.
 
-The skill sits **upstream** of the planning chain. Chain position:
+The skill sits at the head of the chain and is **bidirectional** with
+`seed-gatherer`:
 
 ```
-[/intent-aligner] → /seed-gatherer → /plan-establisher → /codebase-planner → /codebase-implementer
-       │                  │                  │                     │                    │
-intent.<slug>.md    seeds/seed.        (planner-ready          plan.md /             impl + report
-intent.<slug>.html  <slug>.*.md+html    handoff artifacts)     architecture.html
-                    (optional)
+[/intent-aligner] ⇄ /seed-gatherer → /plan-establisher → /codebase-planner → /codebase-implementer
+       ▲                  │
+       └── update mode ───┘  (refine intent from accumulated seeds)
 ```
 
-`seed-gatherer` (optional) grows an intent-filtered evidence corpus
-from external research material; `plan-establisher` then re-shapes
-`intent.<slug>.md` (+ any gathered seeds) into whatever the next-hop
-planner needs. Intent-aligner is **stack-, planner-, and lane-
-agnostic** — it just captures intent.
+Two invocations:
+
+| Invocation | `RUN_MODE` | Result |
+|---|---|---|
+| `/intent-aligner` | `create` | New `intent.<slug>.md` at revision 1 |
+| `/intent-aligner update <slug>` | `update` | Refines existing intent from seeds; revision bumps by 1. Full spec: [references/update-mode.md](references/update-mode.md) |
+
+`seed-gatherer` (optional) also has a **bootstrap path** that creates
+the initial `intent.<slug>.md` when none exists. Either origin yields
+the same artifact format; update mode reads provenance to detect
+bootstrap intents. Intent-aligner is stack-, planner-, and lane-agnostic.
 
 `disable-model-invocation: true` — the skill has side effects (writes
 files, creates a git worktree, merges branches). Never auto-trigger.
@@ -57,20 +65,21 @@ files, creates a git worktree, merges branches). Never auto-trigger.
 ## Workflow Decision Tree
 
 ```
-Phase L: Dialog language (preamble) — see references/language-selection.md
-Phase 0: Detect repo state ──┬─ on-dev ────────────────────── proceed
-                             ├─ on-default-needs-dev ──────── create-dev dialog
-                             ├─ on-nonbase-main-checkout ──── refuse, ask user to switch to dev
-                             ├─ inside-intent-worktree ────── resume from .intent-state.json
-                             ├─ inside-other-worktree ─────── refuse, run from MAIN_CHECKOUT
-                             └─ unrelated ─────────────────── refuse, surface reason
+Phase L: Dialog language (preamble) — references/language-selection.md
+Phase 0: Arg-parse (RUN_MODE=update if `update <slug>`, else `create`)
+         + Repo state detection — full table in Phase 0 section below
 Phase 1: Mode detection (feature-shape vs problem-shape) — echo + confirm
 Phase 2: Elicitation loop (Socratic + 5 Whys + example/counter-example)
 Phase 3: Synthesis + `confirm intent` gate (no mutations yet)
 Phase 4: Worktree creation (FIRST mutation) — .worktrees/intent-<slug>-<id>/
 Phase 5: Emit intent.<slug>.md + intent.<slug>.html + commit
-Phase 6: Human gate + merge (`confirm merge` → marker `(intent, human-confirmed)`)
+Phase 6: Human gate + merge (marker `(intent, human-confirmed)`)
 ```
+
+Update flow (`/intent-aligner update <slug>`) — Phases 1u-6u: load existing
+intent + glob seeds; per-field refinement; worktree at `intent-update-<slug>-<id>/`;
+revision bump; marker `(intent, updated-from-seeds, human-confirmed)`.
+Full spec: [references/update-mode.md](references/update-mode.md).
 
 State variables captured during Phases L–4 and threaded through later phases:
 
@@ -88,6 +97,9 @@ State variables captured during Phases L–4 and threaded through later phases:
   In-scope features, Out-of-scope, Constraints, Success criteria,
   Open questions, plus mode-specific extras); persisted to
   `.intent-state.json` at Phase 4.
+- `RUN_MODE` — `create` or `update`; set in Phase 0 from invocation arg.
+  Update-mode adds `BASE_REVISION`, `TARGET_REVISION`, `BASE_INTENT_ID`,
+  `REFINING_SEED_SLUGS` — [references/update-mode.md](references/update-mode.md).
 
 All persisted per
 [references/state-and-resume.md](references/state-and-resume.md).
@@ -107,10 +119,15 @@ planner's parser reads them; field VALUES follow `LANGUAGE`; merge marker
 
 ---
 
-## Phase 0 — Repo state detection
+## Phase 0 — Arg-parse + repo state detection
 
-Run the read-only inspector via the skill-directory variable (the bundled
-script is **not** at the user's project root):
+**Arg-parse**: `/intent-aligner` ⇒ `RUN_MODE=create`. `/intent-aligner
+update <slug>` or `--update <slug>` ⇒ `RUN_MODE=update` (verify
+`intent.<slug>.md` exists after repo-state check; if not, refuse with
+list of existing intents). Bare `update` with no slug ⇒ refuse. Update-
+mode specifics: [references/update-mode.md](references/update-mode.md).
+
+Then run the read-only inspector:
 
 ```bash
 bash "${CLAUDE_SKILL_DIR}/scripts/inspect_repo_state.sh"
@@ -120,19 +137,19 @@ Parse the JSON. The `state` field classifies into:
 
 | State | Meaning | Action |
 |---|---|---|
-| `on-dev` | on `dev` branch in `MAIN_CHECKOUT` | proceed to Phase 1 |
-| `on-default-needs-dev` | on `main`/`master`, no local `dev` | run the "create dev from `<default_branch>`?" dialog from [references/git-worktree-flow.md](references/git-worktree-flow.md) |
-| `on-nonbase-main-checkout` | on a non-`dev` non-default branch (e.g. a feature branch) in the main checkout | refuse and ask user to switch to `dev` (or run with explicit `BASE_BRANCH` override via the dialog) |
-| `inside-intent-worktree` | cwd is inside an `*/.worktrees/intent-*` worktree | resume from `.intent-state.json` if present, else refuse |
-| `inside-other-worktree` | inside a non-intent linked worktree (planner / implementer / scaffold / unknown) | refuse, instruct user to run from `MAIN_CHECKOUT` — those are downstream or unrelated runs |
-| `unrelated` | not in a git repo, detached HEAD, repo with no commits, or otherwise unclassifiable | refuse, surface the `reason` field from the JSON to the user |
+| `on-dev` | on `dev` branch in `MAIN_CHECKOUT` | proceed (Phase 1 / 1u) |
+| `on-default-needs-dev` | on `main`/`master`, no local `dev` | run create-dev dialog — [references/git-worktree-flow.md](references/git-worktree-flow.md) |
+| `on-nonbase-main-checkout` | non-`dev` non-default branch in main checkout | refuse, ask user to switch to `dev` |
+| `inside-intent-worktree` | cwd inside `*/.worktrees/intent-*` (covers create AND update worktrees) | resume per `.intent-state.json`, honor `run_mode`. Refuse if state missing or `run_mode` mismatches the invocation arg. |
+| `inside-other-worktree` | inside non-intent linked worktree | refuse, run from `MAIN_CHECKOUT` |
+| `unrelated` | not in a git repo / detached HEAD / no commits | refuse, surface `reason` field |
 
-Capture from JSON: `MAIN_CHECKOUT`, `default_branch`. Set `BASE_BRANCH=dev`
-by default (configurable via dialog if the user objects). The skill does
-NOT detect a language stack — that's the planner's concern downstream;
-intent-aligner is stack-agnostic.
+Capture from JSON: `MAIN_CHECKOUT`, `default_branch`. Default
+`BASE_BRANCH=dev`. Stack-agnostic.
 
-**Gate**: capture `MAIN_CHECKOUT` + `BASE_BRANCH` before Phase 1.
+**Gate**: capture `RUN_MODE` + `MAIN_CHECKOUT` + `BASE_BRANCH` before
+Phase 1 / 1u. In update mode, also verify `intent.<slug>.md` exists at
+`MAIN_CHECKOUT` and parse `BASE_REVISION` from its Provenance (default `1`).
 
 ---
 
@@ -255,43 +272,36 @@ sanitization, and edge cases:
 Summary:
 
 ```bash
-# Step 0 — local exclude so .worktrees/ doesn't dirty status. CRITICAL:
-# --git-common-dir returns a RELATIVE path on older git; use
-# --path-format=absolute (git >= 2.31) with fallback, otherwise the exclude
-# lands at "<cwd>/.git/info/exclude" not MAIN_CHECKOUT's.
+# Step 0 — local exclude so .worktrees/ doesn't dirty status.
 COMMON_DIR="$(git -C "${MAIN_CHECKOUT}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null \
               || git -C "${MAIN_CHECKOUT}" rev-parse --git-common-dir)"
 case "${COMMON_DIR}" in /*) ;; *) COMMON_DIR="${MAIN_CHECKOUT}/${COMMON_DIR}" ;; esac
 grep -qxF '.worktrees/' "${COMMON_DIR}/info/exclude" \
   || echo '.worktrees/' >> "${COMMON_DIR}/info/exclude"
 
-# Step 1 — reuse INTENT_ID from Phase 1. Sanitize PROJECT_SLUG defensively.
-raw_slug="<from-user-at-Phase-3>"
-PROJECT_SLUG="$(printf '%s' "${raw_slug}" \
-  | tr 'A-Z' 'a-z' \
-  | tr -cd 'a-z0-9-' \
-  | sed -e 's/^-*//' -e 's/-\{2,\}/-/g' -e 's/-*$//' \
-  | cut -c1-40)"
-[ -z "${PROJECT_SLUG}" ] && { echo "empty slug after sanitization — ask user for an ASCII slug"; exit 1; }
-
+# Step 1 — sanitize PROJECT_SLUG, branch + add worktree.
+# (Create mode: intent-<slug>-<id>; update mode: intent-update-<slug>-<id> —
+# the rest of the snippet uses ${WORKTREE_PREFIX} for the variant.)
+PROJECT_SLUG="$(printf '%s' "${raw_slug}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' \
+  | sed -e 's/^-*//' -e 's/-\{2,\}/-/g' -e 's/-*$//' | cut -c1-40)"
+[ -z "${PROJECT_SLUG}" ] && { echo "empty slug after sanitization"; exit 1; }
+WORKTREE_PREFIX="intent"; [ "${RUN_MODE}" = "update" ] && WORKTREE_PREFIX="intent-update"
+BRANCH_PREFIX="intent";   [ "${RUN_MODE}" = "update" ] && BRANCH_PREFIX="intent/update"
 git -C "${MAIN_CHECKOUT}" worktree add \
-  ".worktrees/intent-${PROJECT_SLUG}-${INTENT_ID}" \
-  -b "intent/${PROJECT_SLUG}-${INTENT_ID}" "${BASE_BRANCH}"
+  ".worktrees/${WORKTREE_PREFIX}-${PROJECT_SLUG}-${INTENT_ID}" \
+  -b "${BRANCH_PREFIX}/${PROJECT_SLUG}-${INTENT_ID}" "${BASE_BRANCH}"
 
-# Step 2 — cd into the new worktree for all subsequent file ops
-cd "${MAIN_CHECKOUT}/.worktrees/intent-${PROJECT_SLUG}-${INTENT_ID}"
+# Step 2 — cd into the new worktree.
+cd "${MAIN_CHECKOUT}/.worktrees/${WORKTREE_PREFIX}-${PROJECT_SLUG}-${INTENT_ID}"
 
-# Step 3 — committed gitignore so .worktrees/ + .intent-state.json
-# stay hidden after the merge to ${BASE_BRANCH}
+# Step 3 — committed gitignore so worktree state stays hidden post-merge.
 for entry in '.worktrees/' '.intent-state.json'; do
-  grep -qxF "${entry}" .gitignore 2>/dev/null \
-    || echo "${entry}" >> .gitignore
+  grep -qxF "${entry}" .gitignore 2>/dev/null || echo "${entry}" >> .gitignore
 done
 
-# Step 4 — initial commit on the intent branch (explicit -m form — a bare
-# `git commit` would drop into $EDITOR and hang in non-interactive runs)
+# Step 4 — initial commit on the intent branch (explicit -m to avoid $EDITOR).
 git add .gitignore
-git commit -m "chore(intent): initialize ${PROJECT_SLUG} worktree"
+git commit -m "chore(intent): initialize ${PROJECT_SLUG} ${RUN_MODE} worktree"
 ```
 
 Then **write the initial `.intent-state.json`** at the worktree root with
@@ -333,17 +343,18 @@ repo root after merge without overwriting each other.
    `${CLAUDE_SKILL_DIR}/assets/intent-html-template.html` — the renderer
    resolves it relative to its own path; no need to pass.
 
-Commit on the intent branch (explicit `-m` form). The `git diff
---cached --quiet` guard handles the Phase 5 resume edge case: if the
-agent crashed between a prior commit and this state update, the
-re-rendered (identical) artifacts won't stage anything; commit-skip
-prevents the bare `git commit` from failing with "nothing to commit"
-and trapping resume:
+Provenance MUST include `- Revision: ${REVISION}` (1 in create, else
+`TARGET_REVISION`). Update mode also emits `Refined from seeds` +
+`Prior revision intent ID` — [references/output-schema.md](references/output-schema.md).
+Commit with `--cached --quiet` guard (resume-safe):
 
 ```bash
 git add "intent.${PROJECT_SLUG}.md" "intent.${PROJECT_SLUG}.html"
 if ! git diff --cached --quiet; then
-  git commit -m "feat(intent): synthesize ${PROJECT_SLUG} intent (mode=${MODE})"
+  [ "${RUN_MODE}" = "update" ] \
+    && SUBJECT="feat(intent): refine ${PROJECT_SLUG} rev ${BASE_REVISION}→${TARGET_REVISION}" \
+    || SUBJECT="feat(intent): synthesize ${PROJECT_SLUG} intent (mode=${MODE})"
+  git commit -m "${SUBJECT}"
 fi
 ```
 
@@ -364,26 +375,24 @@ Print:
 1. Paths to `intent.${PROJECT_SLUG}.md` and
    `intent.${PROJECT_SLUG}.html` (absolute, so the user can open the
    HTML in a browser without computing the path themselves).
-2. The next-step pointer (transition-safe — `seed-gatherer` and
-   `plan-establisher` are the intended next hops but may not be
-   installed yet):
+2. The next-step pointer (transition-safe):
    ```
    Next step: run `/seed-gatherer` to grow an evidence corpus from
-   external research material (URLs, PDFs, etc.) filtered through
-   this intent, then `/plan-establisher` to fold intent + seeds
-   into a planner-ready handoff. Skip `/seed-gatherer` and go
-   straight to `/plan-establisher` if you have no external material
-   to seed from. If neither is installed yet, you can also pass
-   intent.${PROJECT_SLUG}.md directly to `/codebase-planner` — the
-   6 rubric fields (Goal, In-scope features, etc.) are readable
-   as-is, you'll just lose the planner-rubric folds that
-   plan-establisher would add.
+   external research material (or to ideate/feasibility-check seeds
+   when there's no external material), then `/plan-establisher` to
+   fold intent + seeds into a planner-ready handoff. To refine THIS
+   intent later from accumulated seeds, run `/intent-aligner update
+   ${PROJECT_SLUG}` — that bumps the revision. If downstream skills
+   aren't installed, you can also pass intent.${PROJECT_SLUG}.md
+   directly to `/codebase-planner` (the 6 rubric fields are readable
+   as-is; you lose the plan-establisher folds).
    ```
 3. The exact prompt:
 
 ```
-Type `confirm merge` to merge intent/<slug>-<id> into <BASE_BRANCH>
-with marker (intent, human-confirmed),
+Type `confirm merge` to merge into <BASE_BRANCH>
+   (create marker: (intent, human-confirmed)
+    update marker: (intent, updated-from-seeds, human-confirmed)),
 or `keep` to leave the worktree intact for further iteration,
 or `revise` to address something before merging.
 ```
@@ -392,30 +401,28 @@ Behavior per response:
 
 - `confirm merge` →
   Before checkout, refuse if `MAIN_CHECKOUT`'s current branch has any
-  uncommitted changes (a long-running intent session can be overtaken
-  by the user editing `MAIN_CHECKOUT` in another shell — `git checkout
-  "${BASE_BRANCH}"` would either fail mid-way on conflicting files, or
-  silently carry the unrelated dirty edits onto `${BASE_BRANCH}` if they
-  don't conflict, then pull them into the merge change-set):
+  uncommitted changes. Marker + branch differ by `RUN_MODE`:
 
   ```bash
   if [ -n "$(git -C "${MAIN_CHECKOUT}" status --porcelain)" ]; then
-    echo "BLOCKER: ${MAIN_CHECKOUT} has uncommitted changes on its current branch — refusing to merge. Commit/stash/discard first."
+    echo "BLOCKER: ${MAIN_CHECKOUT} has uncommitted changes — refusing to merge."
     git -C "${MAIN_CHECKOUT}" status --porcelain
     exit 1
   fi
+  if [ "${RUN_MODE}" = "update" ]; then
+    BRANCH="intent/update-${PROJECT_SLUG}-${INTENT_ID}"
+    MERGE_MSG="feat(intent): merge ${PROJECT_SLUG} refinement (intent, updated-from-seeds, human-confirmed)"
+  else
+    BRANCH="intent/${PROJECT_SLUG}-${INTENT_ID}"
+    MERGE_MSG="feat(intent): merge ${PROJECT_SLUG} (intent, human-confirmed)"
+  fi
   git -C "${MAIN_CHECKOUT}" checkout "${BASE_BRANCH}"
-  git -C "${MAIN_CHECKOUT}" merge --no-ff "intent/${PROJECT_SLUG}-${INTENT_ID}" \
-    -m "feat(intent): merge ${PROJECT_SLUG} (intent, human-confirmed)"
+  git -C "${MAIN_CHECKOUT}" merge --no-ff "${BRANCH}" -m "${MERGE_MSG}"
   ```
-  The explicit `-m` is mandatory — without it git drops into `$EDITOR`
-  and hangs in non-interactive use. **Do not** `git push` — that's the
-  user's call.
+  The explicit `-m` is mandatory. **Do not** `git push` — user's call.
 
-  After successful merge, ask: "Remove the worktree at
-  `.worktrees/intent-${PROJECT_SLUG}-${INTENT_ID}`?" On yes: `git -C
-  "${MAIN_CHECKOUT}" worktree remove <path>` (no `--force`). On no:
-  leave it.
+  After successful merge, ask: "Remove the worktree?" On yes: `git -C
+  "${MAIN_CHECKOUT}" worktree remove <path>` (no `--force`).
 
 - `keep` → leave worktree intact, no merge, exit cleanly.
 - `revise` → leave worktree intact, ask the user **which** phase to
@@ -467,6 +474,11 @@ confirmation to deviate, but default to refusal):
   (that's a downstream concern; intent-aligner is stack-agnostic)
 - Auto-launching `/plan-establisher` or `/codebase-planner` from
   Phase 6 (the user runs the next-hop explicitly when ready)
+- In update mode: changing `Mode` (feature ↔ problem), `PROJECT_SLUG`,
+  or wholesale-rewriting the intent (those are new-intent operations,
+  not refinements — refuse and ask user to run plain `/intent-aligner`)
+- In update mode: rolling back a revision (use `git revert` or a manual
+  edit, not a refinement step)
 - Creating `README.md`, `INSTALLATION_GUIDE.md`, or similar docs inside
   this skill folder
 
@@ -476,13 +488,12 @@ confirmation to deviate, but default to refusal):
 
 If re-invoked from inside an existing intent worktree
 (`inside-intent-worktree`), read `.intent-state.json` and resume from
-the next phase after `phase_completed`. See
-[references/state-and-resume.md](references/state-and-resume.md) for
-the full mapping.
+the next phase after `phase_completed`, honoring `run_mode` (`create`
+or `update`). Full create + update resume map:
+[references/state-and-resume.md](references/state-and-resume.md).
 
-If `inside-intent-worktree` but no state file → refuse and ask the user
-to either delete the worktree or supply a state file.
-
-If the state file's `language` field is missing (predates Phase L on
-older builds): default `LANGUAGE` to Korean (matching Phase L's default)
-and continue without prompting.
+- No state file → refuse, ask user to delete the worktree or supply state.
+- `run_mode` mismatches invocation arg → refuse, ask user to resume the
+  original mode or remove the worktree.
+- `language` missing (predates Phase L) → default `LANGUAGE` to Korean.
+- `run_mode` missing (predates update mode) → default to `create`.
