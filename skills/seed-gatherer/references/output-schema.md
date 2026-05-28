@@ -129,7 +129,8 @@ intent-aligner).
 Sections (top-to-bottom):
 
 1. **Header** — intent slug + resource slug + a type pill (`Web`,
-   `YouTube`, `PDF`, `Image`, `Local doc`, `Local code`, localized).
+   `YouTube`, `PDF`, `Image`, `Local doc`, `Local code`, `Ideation`,
+   localized).
 2. **Source card** — the source URL/path as a large monospace block.
    For web/youtube types whose value begins with `http://` or
    `https://` (lowercase), the URL is rendered as a clickable
@@ -145,16 +146,20 @@ Sections (top-to-bottom):
    Bold (`**text**`) and italic (`*text*`) supported. Lists supported
    if present. No HTML in the input is honored — everything is
    escaped.
-4. **Relevance rationale panel** — single paragraph, soft-tinted
+4. **Feasibility check panel** (ideation type only — omitted entirely
+   for resource-derived seeds) — muted-amber tinted panel rendering the
+   `feasibility_check` field (same markdown subset as the extracted
+   panel: blockquotes, inline `<code>`, bold/italic, lists).
+5. **Relevance rationale panel** — single paragraph, soft-tinted
    background to visually distinguish from the extract content.
-5. **Footer** — `Extracted at <timestamp> · seed run <seed_run_id>`.
+6. **Footer** — `Extracted at <timestamp> · seed run <seed_run_id>`.
 
 ### Chrome localization
 
 `<html lang="…">` and the type-pill label follow `state.language`
 (`Korean` / `ko` / `kr` → ko; missing/empty → ko; anything else → en).
-Body content (the extract and rationale) follows `LANGUAGE` for prose
-and the source's own language for verbatim quotes.
+Body content (extract, feasibility check, rationale) follows `LANGUAGE`
+for prose and the source's own language for verbatim quotes.
 
 ## What this schema does NOT include
 

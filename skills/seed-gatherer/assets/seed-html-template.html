@@ -171,6 +171,15 @@
     .panel.rationale > h2 {
       color: var(--good);
     }
+    /* ── FEASIBILITY (ideation-only tinted variant) ─────────── */
+    .panel.feasibility {
+      background: var(--muted-soft, #f4f0e6);
+      border-color: var(--muted-line, #d9caa1);
+      border-left: 4px solid var(--muted, #b08a25);
+    }
+    .panel.feasibility > h2 {
+      color: var(--muted, #b08a25);
+    }
     /* ── EMPTY-CONTENT PLACEHOLDER ──────────────────────────── */
     .placeholder {
       color: var(--fg-soft);
@@ -226,6 +235,8 @@
   <h2>{{T_EXTRACTED_LABEL}}</h2>
   <div class="body">{{EXTRACTED_BLOCK}}</div>
 </section>
+
+{{FEASIBILITY_SECTION}}
 
 <section class="panel rationale">
   <h2>{{T_RATIONALE_LABEL}}</h2>

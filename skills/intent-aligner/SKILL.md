@@ -279,29 +279,34 @@ case "${COMMON_DIR}" in /*) ;; *) COMMON_DIR="${MAIN_CHECKOUT}/${COMMON_DIR}" ;;
 grep -qxF '.worktrees/' "${COMMON_DIR}/info/exclude" \
   || echo '.worktrees/' >> "${COMMON_DIR}/info/exclude"
 
-# Step 1 — sanitize PROJECT_SLUG, branch + add worktree.
-# (Create mode: intent-<slug>-<id>; update mode: intent-update-<slug>-<id> —
-# the rest of the snippet uses ${WORKTREE_PREFIX} for the variant.)
+# Step 1 — compose WORKTREE_PATH + BRANCH from RUN_MODE atomically. Phase 4
+# creation + Phase 6 merge must agree on these strings.
+#   Create:  .worktrees/intent-<slug>-<id>/         + branch intent/<slug>-<id>
+#   Update:  .worktrees/intent-update-<slug>-<id>/  + branch intent/update-<slug>-<id>
 PROJECT_SLUG="$(printf '%s' "${raw_slug}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' \
   | sed -e 's/^-*//' -e 's/-\{2,\}/-/g' -e 's/-*$//' | cut -c1-40)"
 [ -z "${PROJECT_SLUG}" ] && { echo "empty slug after sanitization"; exit 1; }
-WORKTREE_PREFIX="intent"; [ "${RUN_MODE}" = "update" ] && WORKTREE_PREFIX="intent-update"
-BRANCH_PREFIX="intent";   [ "${RUN_MODE}" = "update" ] && BRANCH_PREFIX="intent/update"
-git -C "${MAIN_CHECKOUT}" worktree add \
-  ".worktrees/${WORKTREE_PREFIX}-${PROJECT_SLUG}-${INTENT_ID}" \
-  -b "${BRANCH_PREFIX}/${PROJECT_SLUG}-${INTENT_ID}" "${BASE_BRANCH}"
+[ "${RUN_MODE}" = "update" ] \
+  && SLUG_TAIL="update-${PROJECT_SLUG}-${INTENT_ID}" \
+  || SLUG_TAIL="${PROJECT_SLUG}-${INTENT_ID}"
+WORKTREE_PATH=".worktrees/intent-${SLUG_TAIL}"
+BRANCH="intent/${SLUG_TAIL}"
+git -C "${MAIN_CHECKOUT}" worktree add "${WORKTREE_PATH}" -b "${BRANCH}" "${BASE_BRANCH}"
 
 # Step 2 — cd into the new worktree.
-cd "${MAIN_CHECKOUT}/.worktrees/${WORKTREE_PREFIX}-${PROJECT_SLUG}-${INTENT_ID}"
+cd "${MAIN_CHECKOUT}/${WORKTREE_PATH}"
 
 # Step 3 — committed gitignore so worktree state stays hidden post-merge.
 for entry in '.worktrees/' '.intent-state.json'; do
   grep -qxF "${entry}" .gitignore 2>/dev/null || echo "${entry}" >> .gitignore
 done
 
-# Step 4 — initial commit on the intent branch (explicit -m to avoid $EDITOR).
+# Step 4 — initial commit. Update mode encodes the revision bump in the subject.
+[ "${RUN_MODE}" = "update" ] \
+  && INIT_SUBJECT="chore(intent): initialize ${PROJECT_SLUG} update worktree (rev ${BASE_REVISION}→${TARGET_REVISION})" \
+  || INIT_SUBJECT="chore(intent): initialize ${PROJECT_SLUG} worktree"
 git add .gitignore
-git commit -m "chore(intent): initialize ${PROJECT_SLUG} ${RUN_MODE} worktree"
+git commit -m "${INIT_SUBJECT}"
 ```
 
 Then **write the initial `.intent-state.json`** at the worktree root with
@@ -406,16 +411,12 @@ Behavior per response:
   ```bash
   if [ -n "$(git -C "${MAIN_CHECKOUT}" status --porcelain)" ]; then
     echo "BLOCKER: ${MAIN_CHECKOUT} has uncommitted changes — refusing to merge."
-    git -C "${MAIN_CHECKOUT}" status --porcelain
-    exit 1
+    git -C "${MAIN_CHECKOUT}" status --porcelain; exit 1
   fi
-  if [ "${RUN_MODE}" = "update" ]; then
-    BRANCH="intent/update-${PROJECT_SLUG}-${INTENT_ID}"
-    MERGE_MSG="feat(intent): merge ${PROJECT_SLUG} refinement (intent, updated-from-seeds, human-confirmed)"
-  else
-    BRANCH="intent/${PROJECT_SLUG}-${INTENT_ID}"
-    MERGE_MSG="feat(intent): merge ${PROJECT_SLUG} (intent, human-confirmed)"
-  fi
+  # BRANCH was composed in Phase 4 step 1 (same RUN_MODE-keyed derivation).
+  [ "${RUN_MODE}" = "update" ] \
+    && MERGE_MSG="feat(intent): merge ${PROJECT_SLUG} refinement (intent, updated-from-seeds, human-confirmed)" \
+    || MERGE_MSG="feat(intent): merge ${PROJECT_SLUG} (intent, human-confirmed)"
   git -C "${MAIN_CHECKOUT}" checkout "${BASE_BRANCH}"
   git -C "${MAIN_CHECKOUT}" merge --no-ff "${BRANCH}" -m "${MERGE_MSG}"
   ```

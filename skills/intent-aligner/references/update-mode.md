@@ -330,7 +330,9 @@ the user to remove the worktree.
   intent fields. A seed with an empty rationale gets surfaced
   ("seed.<X>.md has no rationale — skipping in refinement; consider
   re-running /seed-gatherer for it") and excluded.
-- **No partial seed exclusion.** All seeds matching the glob are
-  surfaced in Phase 1u; the user can drop a seed from the refinement
-  via `drop <n>` at the Phase 1u confirmation gate, but every retained
-  seed contributes equally. There is no per-seed weighting.
+- **No partial seed exclusion at Phase 1u.** All seeds matching the
+  glob are surfaced and contribute equally to the per-field proposals.
+  To exclude a seed's signal, use the per-field controls in Phase 2u
+  (reject / edit / skip-field on any proposal whose only support is
+  that seed). There is no `drop <n>` at the Phase 1u confirmation
+  gate, and no per-seed weighting.

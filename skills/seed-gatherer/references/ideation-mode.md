@@ -163,15 +163,16 @@ human-confirmed)`:
 | Upstream mode | Phase 2 termination | Merge marker |
 |---|---|---|
 | `standard` (existing intent) | resources only | `(seeds, human-confirmed)` |
-| `standard` | ideation only | `(seeds, ideation, human-confirmed)` |
-| `standard` | mixed (resources + ideation) | `(seeds, human-confirmed, with-ideation)` |
+| `standard` | ideation only OR mixed | `(seeds, ideation, human-confirmed)` |
 | `bootstrap` | resources only | `(intent+seeds, bootstrap, human-confirmed)` |
-| `bootstrap` | ideation only | `(intent+seeds, bootstrap, ideation, human-confirmed)` |
-| `bootstrap` | mixed | `(intent+seeds, bootstrap, human-confirmed, with-ideation)` |
+| `bootstrap` | ideation only OR mixed | `(intent+seeds, bootstrap, ideation, human-confirmed)` |
 
 The audit-trail layering — `bootstrap` first (intent origin), then
-`ideation` (seed origin), then `with-ideation` (mixed batch) — is
-grepable in `git log` for chain reviewers.
+`ideation` (seed origin) — is grepable in `git log` for chain reviewers.
+**Mixed batches** (some resources + some ideated seeds) share the
+ideation marker; the resource/ideation split is recorded in the
+per-seed `Resource type` field, not in the merge subject. Source of
+truth for marker strings: [git-worktree-flow.md](git-worktree-flow.md).
 
 ## Forbidden actions (ideation-specific)
 

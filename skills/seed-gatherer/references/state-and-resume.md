@@ -13,7 +13,7 @@ next phase after `phase_completed`.
 
 ```json
 {
-  "run_mode": "standard | bootstrap | ideation",
+  "run_mode": "standard | bootstrap | ideation | bootstrap, ideation",
   "language": "Korean | English",
   "intent_slug": "<the chosen intent.<slug>.md slug>",
   "seed_run_id": "<5-digit-epoch>-<pid>-<random>",
@@ -59,21 +59,22 @@ next phase after `phase_completed`.
 
 ### Field notes
 
-- **`run_mode`** — discriminator for the three Phase 1 / 2 branches:
-  - `standard` — existing `intent.<slug>.md` loaded; resources or
-    ideation produce seeds (no intent emit)
+- **`run_mode`** — discriminator for the three Phase 1 / 2 branches.
+  Encoded as a single string; combo runs use a comma:
+  - `standard` — existing `intent.<slug>.md` loaded; resources produce
+    seeds (no intent emit).
   - `bootstrap` — no existing intent; Phase 1b captures ad-hoc intent
     AND emits `intent.<slug>.{md,html}` alongside seeds. See
     [intent-bootstrap.md](intent-bootstrap.md).
-  - `ideation` — Phase 2 terminated with zero external resources;
-    seeds come from AI/user ideation + feasibility checks. See
-    [ideation-mode.md](ideation-mode.md). Compatible with both
-    `standard` and `bootstrap` upstream — `ideation` is set when
-    Phase 2 chooses it; the upstream choice (existing intent vs
-    bootstrap) is preserved in a sub-field.
-  - Combined modes — `bootstrap + ideation` is encoded by setting
-    `run_mode: "bootstrap"` plus `phase_2_terminated_into: "ideation"`
-    (see below).
+  - `ideation` — Phase 2 chose ideation (zero resources or user typed
+    `ideate`); seeds come from AI/user dialogue + feasibility checks.
+    See [ideation-mode.md](ideation-mode.md).
+  - `bootstrap, ideation` — both branches taken in one run (Phase 1
+    bootstrap captured intent, Phase 2 terminated into ideation). This
+    is the only combined-mode string encoded; standard+ideation runs
+    set `run_mode: "ideation"` (the upstream choice was "existing intent",
+    which is the default — no extra discriminator needed beyond the
+    presence/absence of `bootstrap_sources` in state).
 - **`bootstrap_sources` / `bootstrap_intent_id` /
   `bootstrap_verified_at`** — populated only in bootstrap. Hold the
   user's starting inputs (prompt + URLs + files) and the Phase 1b.4
