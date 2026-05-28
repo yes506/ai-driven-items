@@ -70,9 +70,9 @@ the whole verification run:
 | `## Intent slug` mismatch (seed claims a different intent slug) | Skip; warn: *"Seed `<resource_slug>` claims intent `<other-slug>` but we're planning for `<INTENT_SLUG>` — skipping. (This usually means the seed file was renamed or moved between intents.)"* |
 | File can't be read (permissions, IO error) | Skip; warn with raw error. |
 | Body of `Extracted content (intent-filtered)` is empty or only whitespace | Load with `extracted_content=""`; flag as a Dim 2 finding (dead-weight seed) in Phase 2 — don't skip at load time. |
-| Source is missing or doesn't look like a URL/path (per seed-gather's strict awk) | Load with `source=""`; flag as a Dim 3 attribution gap in Phase 2 (without source we can't attribute conflicts). |
+| Source is missing or doesn't look like a URL/path (per seed-gatherer's strict awk) | Load with `source=""`; flag as a Dim 3 attribution gap in Phase 2 (without source we can't attribute conflicts). |
 
-Do NOT modify any seed file. Repair is the seed-gather skill's job
+Do NOT modify any seed file. Repair is the seed-gatherer skill's job
 (via its Phase 6 `revise` path, or by re-running the skill for that
 resource). Editing a seed in-place from here would break the
 upstream contract.
