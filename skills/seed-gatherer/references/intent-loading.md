@@ -12,18 +12,34 @@ against.
    ls -1 "${MAIN_CHECKOUT}"/intent.*.md 2>/dev/null
    ```
 2. Cases:
-   - **Zero matches** → refuse with: *"No `intent.<slug>.md` found at
-     `${MAIN_CHECKOUT}`. Run `/intent-aligner` first to capture your
-     intent."* Exit cleanly — do NOT proceed without an intent.
+   - **Zero matches** → offer the **bootstrap path** OR abort. The
+     bootstrap path captures intent ad-hoc within this seed-gatherer
+     run; full spec: [intent-bootstrap.md](intent-bootstrap.md). The
+     Phase 1 dialog is:
+     ```
+     No `intent.<slug>.md` found at <MAIN_CHECKOUT>. Choose:
+       1) Bootstrap intent here — paste prompt / URL / file path
+       2) Abort — run `/intent-aligner` first
+     ```
+     `bootstrap` / `1` → enter bootstrap path; `abort` / `2` → exit
+     cleanly. Silence is not yes.
    - **One match** → auto-pick. Echo the slug and the goal line back to
      the user as confirmation; wait for `confirm intent` (or
-     `revise` to abort and let user manually specify a slug).
+     `revise` to abort and let user manually specify a slug). The user
+     can also type `bootstrap` to ignore the existing intent and
+     capture a new one ad-hoc — but this is rare; warn first
+     (*"`intent.<existing>.md` is at the repo root. Bootstrap will
+     create a sibling intent; the two will coexist. Continue?"*).
    - **Multiple matches** → list all slugs with their `Goal:` lines as a
      numbered menu. Prompt: *"Which intent should these seeds serve?
-     Type the number, or `abort` to exit."*
+     Type the number, `bootstrap` for a new ad-hoc intent, or `abort`."*
 
 The chosen slug becomes `INTENT_SLUG` in memory and persists to
-`.seed-state.json` at Phase 4 as `intent_slug`.
+`.seed-state.json` at Phase 4 as `intent_slug`. The choice path also
+sets `RUN_MODE`: `standard` (existing intent loaded), `bootstrap` (new
+intent captured ad-hoc), or `ideation` (no resources, dialogue-driven —
+see [ideation-mode.md](ideation-mode.md); set when Phase 2 termination
+chooses ideation, not at Phase 1).
 
 ## Field parsing
 
@@ -86,9 +102,16 @@ before proceeding** — do NOT silently fill in:
 | `intent.<slug>.md` exists but the slug doesn't match `^[a-z0-9-]+$` | This shouldn't happen — intent-aligner sanitizes slugs. But if it does, refuse and ask the user to rename the file. |
 
 Do NOT attempt to repair a malformed intent file from within this
-skill. Repair is the intent-aligner's job (via its Phase 6 `revise`
-path). Fixing it here would create two skills both claiming ownership
-of intent structure.
+skill. Repair is the intent-aligner's job — either re-running
+`/intent-aligner` (create mode) for a wholesale fix or
+`/intent-aligner update <slug>` for incremental refinement. Fixing
+malformed intent inside seed-gatherer would create two skills both
+claiming ownership of intent structure.
+
+**Exception**: when the user opts into the **bootstrap path** at the
+zero-match branch, seed-gatherer DOES author a fresh intent — but
+that's a complete capture from scratch, not a repair of an existing
+file. The two operations stay distinct.
 
 ## What "intent-filtered" means downstream
 

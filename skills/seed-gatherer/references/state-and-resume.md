@@ -13,30 +13,42 @@ next phase after `phase_completed`.
 
 ```json
 {
+  "run_mode": "standard | bootstrap | ideation | bootstrap, ideation",
   "language": "Korean | English",
   "intent_slug": "<the chosen intent.<slug>.md slug>",
   "seed_run_id": "<5-digit-epoch>-<pid>-<random>",
   "main_checkout": "<absolute-path>",
   "base_branch": "dev",
   "intent": {
+    "mode":              "<bootstrap only — feature | problem>",
+    "persona":           "<bootstrap only — single sentence>",
     "goal":              "<single sentence>",
     "in_scope":          ["...", "..."],
     "out_of_scope":      ["...", "..."],
     "constraints":       ["...", "..."],
     "success_criteria":  ["...", "..."],
+    "examples":          ["bootstrap only — bullet list"],
+    "counter_examples":  ["bootstrap only — bullet list"],
+    "root_cause":        ["bootstrap problem-mode only — symptom + why-chain"],
     "open_questions":    ["...", "..."]
   },
+  "bootstrap_sources": [
+    {"type": "web | pdf | image | local-doc | prompt", "location": "<url/path or '(inline)'>", "content": "<prompt text — present only for type=prompt>", "extracted_at": "<iso>"}
+  ],
+  "bootstrap_intent_id":   "<bootstrap only — Intent ID for the emitted intent.md>",
+  "bootstrap_verified_at": "<bootstrap only — when user typed confirm intent at Phase 1b.4>",
   "resources": [
     {
-      "type":          "web | youtube | pdf | image | local-doc | local-code",
-      "location":      "<URL or absolute file path>",
+      "type":          "web | youtube | pdf | image | local-doc | local-code | ideation",
+      "location":      "<URL or absolute file path OR 'ideation:<idea-slug>' for ideation type>",
       "resource_slug": "<sanitized slug used in seed.<intent-slug>.<resource-slug>.{md,html}>",
       "status":        "pending | extracted | confirmed | emitted | skipped-no-ytdlp | skipped-fetch-failed",
       "extracted_at":  "<ISO-8601 — written when status transitions to extracted>",
       "output_md":     "<relative path under seeds/, populated at emit time>",
       "output_html":   "<relative path under seeds/, populated at emit time>",
       "extracted_content":   "<intent-filtered excerpts / summary — populated at Phase 3>",
-      "relevance_rationale": "<one paragraph linking to specific INTENT fields — populated at Phase 3>"
+      "relevance_rationale": "<one paragraph linking to specific INTENT fields — populated at Phase 3>",
+      "feasibility_check":   "<ideation-only — summary of web/code/file checks the agent ran>"
     }
   ],
   "phase_completed": "synthesis_confirmed | worktree_created | artifacts_emitted | human_confirmed",
@@ -47,6 +59,33 @@ next phase after `phase_completed`.
 
 ### Field notes
 
+- **`run_mode`** — discriminator for the three Phase 1 / 2 branches.
+  Encoded as a single string; combo runs use a comma:
+  - `standard` — existing `intent.<slug>.md` loaded; resources produce
+    seeds (no intent emit).
+  - `bootstrap` — no existing intent; Phase 1b captures ad-hoc intent
+    AND emits `intent.<slug>.{md,html}` alongside seeds. See
+    [intent-bootstrap.md](intent-bootstrap.md).
+  - `ideation` — Phase 2 chose ideation (zero resources or user typed
+    `ideate`); seeds come from AI/user dialogue + feasibility checks.
+    See [ideation-mode.md](ideation-mode.md).
+  - `bootstrap, ideation` — both branches taken in one run (Phase 1
+    bootstrap captured intent, Phase 2 terminated into ideation). This
+    is the only combined-mode string encoded; standard+ideation runs
+    set `run_mode: "ideation"` (the upstream choice was "existing intent",
+    which is the default — no extra discriminator needed beyond the
+    presence/absence of `bootstrap_sources` in state).
+- **`bootstrap_sources` / `bootstrap_intent_id` /
+  `bootstrap_verified_at`** — populated only in bootstrap. Hold the
+  user's starting inputs (prompt + URLs + files) and the Phase 1b.4
+  confirmation timestamp. Schema and capture rules:
+  [intent-bootstrap.md](intent-bootstrap.md).
+- **`intent.mode` / `intent.persona` / `intent.examples` /
+  `intent.counter_examples` / `intent.root_cause`** — bootstrap-only
+  extensions of the parsed-from-file intent (which carries only 6
+  rubric fields). Bootstrap captures the full intent-aligner shape so
+  the bundled `render_intent_html.py` can produce the HTML the same
+  way intent-aligner does.
 - **`language`** — written for the first time at Phase 4 (worktree
   creation). Before that, `LANGUAGE` lives only in memory. See
   [language-selection.md](language-selection.md).

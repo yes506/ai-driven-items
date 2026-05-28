@@ -6,9 +6,18 @@ mental overhead low for maintainers familiar with those skills.
 ## Worktree path + branch name
 
 ```
-.worktrees/intent-<project-slug>-<id>/   ← physical path
-intent/<project-slug>-<id>                 ← branch name
+Create mode:
+  .worktrees/intent-<project-slug>-<id>/         ← physical path
+  intent/<project-slug>-<id>                      ← branch name
+
+Update mode:
+  .worktrees/intent-update-<project-slug>-<id>/  ← physical path
+  intent/update-<project-slug>-<id>               ← branch name
 ```
+
+The `intent-update-` prefix keeps `git worktree list` legible — at a
+glance the maintainer sees which worktrees are create vs. update runs.
+See [update-mode.md](update-mode.md) for the update-mode flow.
 
 `<id>` is `date +%s | tail -c 6`-`$$`-`${RANDOM}` — short epoch suffix +
 shell PID + RANDOM. The PID distinguishes host-shell runs; `$RANDOM`
@@ -73,7 +82,7 @@ the state file. Refuse, list the unexpected files, and ask the user to
 either delete them or commit them as a separate concern before
 proceeding.
 
-### Merge conflicts at Phase 6
+### Merge conflicts at Phase 6 / 6u
 
 Intent branch can't fast-forward or 3-way merge cleanly into
 `${BASE_BRANCH}`. Refuse to merge. Surface the conflicts. Ask the user
@@ -81,6 +90,11 @@ to either: (a) update the intent branch with `git pull --rebase` from
 a fresh checkout of `${BASE_BRANCH}` and re-run Phase 6, or (b) abort
 the merge and decide manually. Do NOT use `--strategy=ours` or any
 conflict-skipping flag.
+
+In update mode the most likely conflict is a parallel update run for
+the same intent slug — two refinements landing concurrently. Refuse
+and ask the user to re-run update mode from a clean `${BASE_BRANCH}`
+checkout that includes the other refinement.
 
 ### Default branch is `master`, not `main`
 
@@ -91,12 +105,18 @@ from `dev` when present.
 ### Sibling intent run for the same slug
 
 User has an in-flight intent worktree at
-`.worktrees/intent-<slug>-<id-A>/` and tries to start a new run with
-the same slug. The new `<id-B>` differs so the path doesn't collide,
-but two intent runs for the same project at once is usually a mistake.
-Surface the existing path and ask explicitly: "There's already an
-in-flight intent run for `<slug>` at `<path>`. Resume that one, or
-start fresh under a different slug?"
+`.worktrees/intent-<slug>-<id-A>/` (create) or
+`.worktrees/intent-update-<slug>-<id-A>/` (update) and tries to start
+a new run for the same slug. The new `<id-B>` differs so the path
+doesn't collide, but two intent runs for the same project at once is
+usually a mistake. Surface the existing path and ask explicitly:
+"There's already an in-flight intent run for `<slug>` at `<path>`.
+Resume that one, or start fresh under a different slug?"
+
+When the existing run is create-mode and the new invocation is update-
+mode (or vice versa), the situation is more clearly a coordination
+error — the create run hasn't merged yet, so there's no intent.md to
+update. Surface this explicitly and refuse.
 
 ## Worktree creation command sequence
 

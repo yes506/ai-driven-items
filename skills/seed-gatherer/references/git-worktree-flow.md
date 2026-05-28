@@ -171,17 +171,32 @@ fi
 Run from a clean `MAIN_CHECKOUT`. Refuse if MAIN_CHECKOUT is dirty —
 a long-running seed session can be overtaken by the user editing
 `MAIN_CHECKOUT` in another shell, and a mid-merge checkout would
-either fail or silently pull unrelated edits onto `${BASE_BRANCH}`:
+either fail or silently pull unrelated edits onto `${BASE_BRANCH}`.
+
+The merge subject + marker varies by `RUN_MODE`. Compose them before
+the checkout:
+
+| `RUN_MODE` | Merge subject template | Marker |
+|---|---|---|
+| `standard` | `feat(seeds): merge ${INTENT_SLUG} batch ${SEED_RUN_ID}` | `(seeds, human-confirmed)` |
+| `bootstrap` | `feat(seeds+intent): merge ${INTENT_SLUG} bootstrap (rev 1 + ${SEED_COUNT} seeds)` | `(intent+seeds, bootstrap, human-confirmed)` |
+| `ideation` | `feat(seeds): merge ${INTENT_SLUG} ideation batch ${SEED_RUN_ID}` | `(seeds, ideation, human-confirmed)` |
+| `bootstrap` + ideation (Phase 2 chose ideation) | `feat(seeds+intent): merge ${INTENT_SLUG} bootstrap ideation (rev 1 + ${SEED_COUNT} ideas)` | `(intent+seeds, bootstrap, ideation, human-confirmed)` |
+
+The marker is a grepable audit-trail signal — distinct markers per
+mode let reviewers trace at a glance which chain step this commit
+landed.
 
 ```bash
 if [ -n "$(git -C "${MAIN_CHECKOUT}" status --porcelain)" ]; then
-  echo "BLOCKER: ${MAIN_CHECKOUT} has uncommitted changes on its current branch — refusing to merge. Commit/stash/discard first."
+  echo "BLOCKER: ${MAIN_CHECKOUT} has uncommitted changes — refusing to merge. Commit/stash/discard first."
   git -C "${MAIN_CHECKOUT}" status --porcelain
   exit 1
 fi
 git -C "${MAIN_CHECKOUT}" checkout "${BASE_BRANCH}"
+# Compose ${MERGE_SUBJECT} + ${MERGE_MARKER} per the table above, then:
 git -C "${MAIN_CHECKOUT}" merge --no-ff "seed/${INTENT_SLUG}-${SEED_RUN_ID}" \
-  -m "feat(seeds): merge ${INTENT_SLUG} batch ${SEED_RUN_ID} (seeds, human-confirmed)"
+  -m "${MERGE_SUBJECT} ${MERGE_MARKER}"
 ```
 
 Explicit `-m` is mandatory — without it git drops into `$EDITOR` and

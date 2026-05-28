@@ -24,11 +24,11 @@ slug.
 
 ## Source
 
-<URL or absolute file path>
+<URL or absolute file path; or `ideation:<idea-slug>` for ideation type>
 
 ## Resource type
 
-<web | youtube | pdf | image | local-doc | local-code>
+<web | youtube | pdf | image | local-doc | local-code | ideation>
 
 ## Extracted at
 
@@ -43,7 +43,19 @@ slug.
 <the relevant excerpts and/or summary, with irrelevant material dropped;
 verbatim quotes use markdown blockquote (> ); paraphrased context is
 plain prose; section labels (Quote / Paraphrase / Key claim /
-Section dropped: ...) are encouraged but not required>
+Section dropped: ...) are encouraged but not required.
+For ideation: the refined idea description from the Phase 2i dialogue.>
+
+## Feasibility check
+
+(ideation type only — omit this section entirely for resource-derived seeds)
+
+<the feasibility-check summary from Phase 2i — what tools were used,
+what was found, what the verdict was. Format suggested in
+[ideation-mode.md](ideation-mode.md):
+  - Tool: <name> — <invocation summary>
+    Finding: <quote or paraphrase>
+  Verdict: <feasible | contested | needs more digging>>
 
 ## Relevance rationale
 
@@ -57,6 +69,7 @@ seeds inform which planning decisions>
 - Seed run ID: <seed_run_id>
 - Language used during extraction: <Korean | English>
 - Status: <confirmed | skipped-* — but skipped resources don't get seed files; this field is for symmetry with the state file and is always `confirmed` in the emitted markdown>
+- Run mode: <standard | bootstrap | ideation>   # optional — useful for chain reviewers
 ```
 
 ## Field rules
@@ -64,8 +77,15 @@ seeds inform which planning decisions>
 - **Source** — the canonical URL or absolute file path. For YouTube,
   use the full canonical `https://www.youtube.com/watch?v=<ID>` form
   even if the user pasted `youtu.be/<ID>`, so the source line is
-  copy-paste-able into any browser.
-- **Resource type** — one of the six values, lowercased, hyphenated.
+  copy-paste-able into any browser. For `ideation` type, use
+  `ideation:<idea-slug>` — the slug is the same one used in the
+  resource_slug (`idea-<idea-slug>`).
+- **Resource type** — one of the seven values, lowercased, hyphenated.
+- **Feasibility check** — present only for `ideation` type;
+  omitted entirely for resource-derived seeds. The section title is
+  the literal field name and must stay English; the body follows
+  `LANGUAGE`. See [ideation-mode.md](ideation-mode.md) for the
+  format and the tool-palette rules.
 - **Extracted at** — ISO-8601 with user's local timezone offset.
   Matches the format used in `intent.<slug>.md`'s Provenance.
 - **Intent slug** — the chosen slug from Phase 1; redundant with the
@@ -109,7 +129,8 @@ intent-aligner).
 Sections (top-to-bottom):
 
 1. **Header** — intent slug + resource slug + a type pill (`Web`,
-   `YouTube`, `PDF`, `Image`, `Local doc`, `Local code`, localized).
+   `YouTube`, `PDF`, `Image`, `Local doc`, `Local code`, `Ideation`,
+   localized).
 2. **Source card** — the source URL/path as a large monospace block.
    For web/youtube types whose value begins with `http://` or
    `https://` (lowercase), the URL is rendered as a clickable
@@ -125,16 +146,20 @@ Sections (top-to-bottom):
    Bold (`**text**`) and italic (`*text*`) supported. Lists supported
    if present. No HTML in the input is honored — everything is
    escaped.
-4. **Relevance rationale panel** — single paragraph, soft-tinted
+4. **Feasibility check panel** (ideation type only — omitted entirely
+   for resource-derived seeds) — muted-amber tinted panel rendering the
+   `feasibility_check` field (same markdown subset as the extracted
+   panel: blockquotes, inline `<code>`, bold/italic, lists).
+5. **Relevance rationale panel** — single paragraph, soft-tinted
    background to visually distinguish from the extract content.
-5. **Footer** — `Extracted at <timestamp> · seed run <seed_run_id>`.
+6. **Footer** — `Extracted at <timestamp> · seed run <seed_run_id>`.
 
 ### Chrome localization
 
 `<html lang="…">` and the type-pill label follow `state.language`
 (`Korean` / `ko` / `kr` → ko; missing/empty → ko; anything else → en).
-Body content (the extract and rationale) follows `LANGUAGE` for prose
-and the source's own language for verbatim quotes.
+Body content (extract, feasibility check, rationale) follows `LANGUAGE`
+for prose and the source's own language for verbatim quotes.
 
 ## What this schema does NOT include
 

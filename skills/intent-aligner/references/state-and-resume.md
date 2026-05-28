@@ -14,12 +14,19 @@ the next phase after `phase_completed`.
 
 ```json
 {
+  "run_mode": "create | update",
   "language": "Korean | English",
   "mode": "feature | problem",
   "project_slug": "<sanitized-ascii-slug>",
   "main_checkout": "<absolute-path>",
   "base_branch": "dev",
   "intent_id": "<5-digit-epoch>-<pid>-<random>",
+  "revision": <integer; 1 for create, base+1 for update>,
+  "base_revision": <integer; update mode only — the revision being refined>,
+  "base_intent_id": "<update mode only — Intent ID of the file being refined>",
+  "refining_seed_slugs": ["update mode only — seeds that informed Phase 2u"],
+  "skipped_fields": ["update mode only — fields the user skipped during Phase 2u"],
+  "bootstrapped_by": "<optional — set when authored by seed-gatherer; dropped on first update>",
   "phase_completed": "worktree_created | artifacts_emitted | human_confirmed",
   "intent": {
     "goal": "<single sentence>",
@@ -33,20 +40,37 @@ the next phase after `phase_completed`.
     "root_cause": ["symptom", "why1", "why2", "..."],
     "open_questions": ["...", "..."]
   },
-  "verified_at": "<ISO-8601 — written at Phase 3 confirm-intent>",
-  "merged_at": "<ISO-8601 — written at Phase 6 confirm-merge>"
+  "verified_at": "<ISO-8601 — written at Phase 3 / 3u confirm gate>",
+  "merged_at": "<ISO-8601 — written at Phase 6 / 6u confirm-merge>"
 }
 ```
 
 ### Field notes
 
+- **`run_mode`** — `create` (plain `/intent-aligner`) or `update`
+  (`/intent-aligner update <slug>` or `--update <slug>`). Set at
+  Phase 0 from the invocation arg. Discriminator for the resume map
+  below — a worktree at `.worktrees/intent-update-<slug>-<id>/` whose
+  state says `run_mode: create` is corrupted (refuse to resume). See
+  [update-mode.md](update-mode.md) for the full update-mode flow.
+- **`revision`** / **`base_revision`** / **`base_intent_id`** /
+  **`refining_seed_slugs`** / **`skipped_fields`** — populated only
+  when `run_mode == "update"`. The base fields capture what the
+  current refinement diffs against. See
+  [update-mode.md](update-mode.md).
+- **`bootstrapped_by`** — populated only when the state was
+  initialized by `/seed-gatherer`'s no-intent bootstrap path
+  (intent-aligner's create mode never sets this). Dropped on first
+  update-mode refinement.
 - **`language`** — written for the first time at Phase 4 (worktree
   creation). Before that, `LANGUAGE` lives only in memory. See
   [language-selection.md](language-selection.md).
 - **`mode`** — captured at Phase 1; persisted at Phase 4. If the user
   triggers a mid-flow re-classification (per
   [mode-detection.md](mode-detection.md)), update both the in-memory
-  value and the state file's `mode` field.
+  value and the state file's `mode` field. **Update mode does not
+  change `mode`** — changing feature ↔ problem is a new-intent
+  operation, not a refinement.
 - **`intent`** — the normalized representation built up during Phase 2.
   Each field is a single string or list of strings. Use the user's
   verbatim phrasing; do not paraphrase.
@@ -61,11 +85,16 @@ the next phase after `phase_completed`.
 
 ## Resume map
 
-| `phase_completed` value | Resume at |
-|---|---|
-| `worktree_created` | Phase 5 (emit intent.<slug>.md + intent.<slug>.html + commit) |
-| `artifacts_emitted` | Phase 6 (human gate + merge) |
-| `human_confirmed` | nothing — the run is complete; offer to remove the worktree if it still exists |
+Keyed off `phase_completed` AND `run_mode`:
+
+| `run_mode` | `phase_completed` value | Resume at |
+|---|---|---|
+| `create` | `worktree_created` | Phase 5 (emit intent.<slug>.md + intent.<slug>.html + commit) |
+| `create` | `artifacts_emitted` | Phase 6 (human gate + merge) |
+| `create` | `human_confirmed` | nothing — run complete; offer to remove worktree if it still exists |
+| `update` | `worktree_created` | Phase 5u (emit refined artifacts) |
+| `update` | `artifacts_emitted` | Phase 6u (human gate + merge with update marker) |
+| `update` | `human_confirmed` | nothing — run complete; offer to remove worktree if it still exists |
 
 If the user is `inside-intent-worktree` but the state file is missing
 → refuse and ask the user to either remove the worktree (`git -C

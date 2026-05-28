@@ -41,13 +41,16 @@ STRINGS = {
         "type_image":        "Image",
         "type_local-doc":    "Local doc",
         "type_local-code":   "Local code",
+        "type_ideation":     "Ideation",
         "source_label":      "Source",
         "extracted_label":   "Extracted content (intent-filtered)",
+        "feasibility_label": "Feasibility check",
         "rationale_label":   "Relevance rationale",
         "extracted_at_label": "Extracted at:",
         "seed_run_label":    "Seed run:",
         "empty_extract":     "(no content extracted)",
         "empty_rationale":   "(no rationale recorded)",
+        "empty_feasibility": "(no feasibility check recorded)",
         "not_recorded":      "(not recorded)",
     },
     "ko": {
@@ -59,13 +62,16 @@ STRINGS = {
         "type_image":        "이미지",
         "type_local-doc":    "로컬 문서",
         "type_local-code":   "로컬 코드",
+        "type_ideation":     "아이디에이션",
         "source_label":      "출처",
         "extracted_label":   "추출 내용 (의도 기반 필터링)",
+        "feasibility_label": "타당성 검증",
         "rationale_label":   "관련성 설명",
         "extracted_at_label": "추출 시각:",
         "seed_run_label":    "시드 런:",
         "empty_extract":     "(추출된 내용 없음)",
         "empty_rationale":   "(설명이 기록되지 않음)",
+        "empty_feasibility": "(타당성 검증 기록 없음)",
         "not_recorded":      "(기록 없음)",
     },
 }
@@ -250,6 +256,29 @@ def _rationale_block(resource: dict, t: dict) -> str:
     return rendered
 
 
+def _feasibility_section(resource: dict, t: dict) -> str:
+    """Emit the Feasibility check panel for ideation resources only.
+
+    Resource-derived seeds (web/pdf/etc) omit the section entirely —
+    returning an empty string collapses the placeholder slot to a no-op.
+    Per references/output-schema.md the markdown schema gates the section
+    on `type == "ideation"`; the HTML mirrors that gate.
+    """
+    rtype = (resource.get("type") or "").lower()
+    if rtype != "ideation":
+        return ""
+    body = resource.get("feasibility_check")
+    rendered = _md_to_html(body)
+    if not rendered:
+        rendered = f'<p class="placeholder">{_esc(t["empty_feasibility"])}</p>'
+    return (
+        '<section class="panel feasibility">'
+        f'<h2>{_esc(t["feasibility_label"])}</h2>'
+        f'<div class="body">{rendered}</div>'
+        '</section>'
+    )
+
+
 def _type_label(rtype: str, t: dict) -> str:
     return t.get(f"type_{rtype}", rtype or "?")
 
@@ -296,6 +325,7 @@ def main() -> int:
         "SEED_RUN_ID":           _esc(state.get("seed_run_id") or t["not_recorded"]),
         "SOURCE_BLOCK":          _source_block(match),
         "EXTRACTED_BLOCK":       _extracted_block(match, t),
+        "FEASIBILITY_SECTION":   _feasibility_section(match, t),
         "RATIONALE_BLOCK":       _rationale_block(match, t),
     }
     out = _render_template(template, replacements)

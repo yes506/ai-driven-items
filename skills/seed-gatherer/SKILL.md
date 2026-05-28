@@ -1,14 +1,19 @@
 ---
 name: seed-gatherer
 description: |
-  Downstream of `intent-aligner` in the chain (intent-aligner →
+  Bidirectional with `intent-aligner` in the chain (intent-aligner ⇄
   seed-gatherer → plan-establisher → codebase-planner →
-  codebase-implementer). Reads `intent.<slug>.md` and extracts
-  intent-filtered content from user-supplied web/youtube URLs and
-  local file paths (PDF, image, doc, code), emitting one md+html
-  seed pair per resource under `seeds/`. Iteratively re-runnable —
-  each invocation appends seeds across its own worktree+merge cycle.
-  Manual invocation only — `/seed-gatherer`.
+  codebase-implementer). Default path reads an existing
+  `intent.<slug>.md` and extracts intent-filtered content from user-
+  supplied web/youtube URLs and local file paths (PDF, image, doc,
+  code), emitting one md+html seed pair per resource under `seeds/`.
+  When no intent exists, the **bootstrap path** captures intent ad-hoc
+  (prompt / URL / file) and emits `intent.<slug>.{md,html}` alongside
+  seeds in the same commit. When the user has no external resources,
+  **ideation mode** crystallizes ideas through AI/user dialogue plus
+  feasibility checks — each idea becomes its own seed. Iteratively
+  re-runnable; each invocation appends seeds across its own
+  worktree+merge cycle. Manual invocation only — `/seed-gatherer`.
 disable-model-invocation: true
 ---
 
@@ -16,12 +21,13 @@ disable-model-invocation: true
 
 ## Overview
 
-Take the intent captured by `/intent-aligner` and grow a corpus of
-intent-filtered evidence from the user's external research material.
-The user pastes URLs and/or absolute local file paths; the skill
-fetches each resource, filters the content through the intent's
-rubric (Goal, In-scope features, Out-of-scope, Constraints, Success
-criteria, Open questions), and emits two artifacts per resource:
+Take the intent captured by `/intent-aligner` (or bootstrap it ad-hoc
+within this run) and grow a corpus of intent-filtered evidence. The
+user pastes URLs and/or absolute local file paths, OR provides no
+external material and lets ideation+feasibility-checks crystallize
+ideas. The skill filters content through the intent's rubric (Goal,
+In-scope features, Out-of-scope, Constraints, Success criteria, Open
+questions) and emits two artifacts per resource:
 
 | Output | Audience | Purpose |
 |---|---|---|
@@ -29,52 +35,65 @@ criteria, Open questions), and emits two artifacts per resource:
 | `seeds/seed.<intent-slug>.<resource-slug>.html` | Human (browser-openable) | Self-contained verification doc, no CDN, HTML-escaped |
 
 The skill is **iteratively re-runnable**: each invocation runs in its
-own worktree+merge cycle but the seeds it emits accumulate alongside
-seeds from prior runs in `seeds/`. The downstream `plan-establisher`
-will glob `seeds/seed.<intent-slug>.*.md` to find everything for one
-intent.
+own worktree+merge cycle and seeds accumulate in `seeds/`.
+`plan-establisher` globs `seeds/seed.<intent-slug>.*.md` for one intent.
 
-`disable-model-invocation: true` — the skill has side effects (writes
-files, creates a git worktree, merges branches). Never auto-trigger.
+Three Phase 1 / 2 branches encode bidirectionality with intent-aligner:
+
+- **`standard`** — existing `intent.<slug>.md`; user provides
+  URLs/files; seeds only.
+- **`bootstrap`** — no intent file; user supplies prompt/URL/file ad-hoc;
+  emits `intent.<slug>.{md,html}` (rev 1) **plus** seeds in one merge.
+  Spec: [references/intent-bootstrap.md](references/intent-bootstrap.md).
+- **`ideation`** — Phase 2 ends with 0 resources (or user types `ideate`);
+  AI/user dialogue + feasibility checks crystallize one seed per idea.
+  Spec: [references/ideation-mode.md](references/ideation-mode.md).
+
+`bootstrap` + `ideation` compose — bootstrap captures intent, Phase 2
+ideation produces seeds, all in one merge.
+
+`disable-model-invocation: true` — the skill has side effects. Never auto-trigger.
 
 ## Workflow Decision Tree
 
 ```
-Phase L: Dialog language (preamble) — see references/language-selection.md
-Phase 0: Detect repo state ──┬─ on-dev ──────────────────── proceed
-                             ├─ on-default-needs-dev ────── create-dev dialog
-                             ├─ on-nonbase-main-checkout ── refuse, ask user to switch to dev
-                             ├─ inside-seed-worktree ────── resume from .seed-state.json
-                             ├─ inside-other-worktree ───── refuse, run from MAIN_CHECKOUT
-                             └─ unrelated ────────────────── refuse, surface reason
-Phase 1: Intent selection (auto-pick if single intent.<slug>.md, else prompt) + load 6 rubric fields
-Phase 2: Resource intake loop (paste URL or absolute path; echo + classify; `done` to finish)
-Phase 3: Per-resource extraction + synthesis preview + `confirm seeds` gate (no mutations yet)
+Phase L: Dialog language — references/language-selection.md
+Phase 0: Detect repo state (on-dev | on-default-needs-dev |
+         on-nonbase-main-checkout | inside-seed-worktree [resume] |
+         inside-other-worktree | unrelated)
+Phase 1: Intent selection ──┬─ ≥1 intent.<slug>.md exists ─── auto-pick / menu → RUN_MODE=standard
+                            ├─ 0 found, user opts bootstrap ── Phase 1b (intent-bootstrap.md) → RUN_MODE=bootstrap
+                            └─ 0 found, user opts abort ────── exit cleanly
+Phase 2: Resource intake loop ──┬─ user pastes URL/path ─── classify + append
+                                ├─ user types `done` w/ 0 resources ── offer ideation (ideation-mode.md)
+                                ├─ user types `ideate` mid-intake ──── enter Phase 2i
+                                └─ user types `done` w/ ≥1 resource ── proceed to Phase 3
+Phase 2i: Ideation dialogue + feasibility checks (one seed per idea) — references/ideation-mode.md
+Phase 3: Per-resource extraction + synthesis preview + `confirm seeds` gate
 Phase 4: Worktree creation (FIRST mutation) — .worktrees/seed-<intent-slug>-<id>/
-Phase 5: Emit seeds/seed.<intent-slug>.<resource-slug>.{md,html} (mkdir seeds/ on first emit) + commit
-Phase 6: Human gate + merge (`confirm merge` → marker `(seeds, human-confirmed)`)
+Phase 5: Emit seeds (+intent in bootstrap) + commit
+Phase 6: Human gate + merge — markers per RUN_MODE; see references/git-worktree-flow.md
 ```
 
 ## State variables
 
-Captured during Phases L–4 and threaded through later phases:
+Captured during Phases L–4, threaded through later phases, all
+persisted per [references/state-and-resume.md](references/state-and-resume.md):
 
-- `LANGUAGE` — dialog language (`Korean` default | `English`); captured
-  at Phase L per [references/language-selection.md](references/language-selection.md);
-  held in memory through Phases 0–3, persisted at Phase 4.
-- `MAIN_CHECKOUT` — absolute path to the parent main worktree.
-- `BASE_BRANCH` — branch the seed worktree branches from (default `dev`).
-- `INTENT_SLUG` — chosen at Phase 1 (auto if single `intent.*.md`,
-  prompt if multiple).
-- `INTENT` — parsed 6 rubric fields from `intent.<INTENT_SLUG>.md`
-  per [references/intent-loading.md](references/intent-loading.md).
-- `SEED_RUN_ID` — stable run handle; computed at end of Phase 1,
-  reused as worktree/branch suffix in Phase 4.
-- `RESOURCES` — in-memory list of `{type, location, resource_slug,
-  status, extracted_content, relevance_rationale, extracted_at}`
-  entries; populated at Phases 2–3, persisted at Phase 4.
-
-All persisted per [references/state-and-resume.md](references/state-and-resume.md).
+- `LANGUAGE` — dialog language (`Korean` default | `English`); see
+  [references/language-selection.md](references/language-selection.md).
+- `MAIN_CHECKOUT`, `BASE_BRANCH` (default `dev`).
+- `RUN_MODE` — `standard` | `bootstrap` | `ideation` | combos like
+  `bootstrap, ideation`. Set during Phase 1 / Phase 2 branching.
+- `INTENT_SLUG` — at Phase 1 from existing intent OR Phase 1b.4 (bootstrap).
+- `INTENT` — parsed 6 rubric fields (standard) or freshly-synthesized
+  intent object (bootstrap) per [references/intent-loading.md](references/intent-loading.md).
+- `SEED_RUN_ID` — stable run handle; end of Phase 1; reused as worktree suffix.
+- `RESOURCES` — in-memory list (extracted_content, rationale, plus
+  `feasibility_check` for ideation entries); populated at Phases 2–3,
+  persisted at Phase 4.
+- `BOOTSTRAP_SOURCES` — bootstrap-only; ad-hoc inputs (prompt/URL/file)
+  from Phase 1b.1.
 
 ---
 
@@ -120,31 +139,30 @@ objects).
 
 ---
 
-## Phase 1 — Intent selection
+## Phase 1 — Intent selection (or bootstrap)
 
-Discover available intents at the repo root:
-
-```bash
-ls -1 "${MAIN_CHECKOUT}"/intent.*.md 2>/dev/null
-```
+Discover intents: `ls -1 "${MAIN_CHECKOUT}"/intent.*.md 2>/dev/null`.
 
 | Match count | Action |
 |---|---|
-| 0 | refuse: *"No `intent.<slug>.md` found at `${MAIN_CHECKOUT}`. Run `/intent-aligner` first to capture your intent."* exit cleanly |
-| 1 | auto-pick; echo slug + goal line; wait for `confirm intent` (or `revise` to abort) |
-| ≥2 | list all slugs with their `Goal:` lines as a numbered menu; prompt: *"Which intent should these seeds serve? Type the number, or `abort`."* |
+| 0 | Offer bootstrap or abort — see Phase 1b below |
+| 1 | auto-pick; echo slug + Goal; wait for `confirm intent` (or `revise` / `bootstrap` to override — bootstrap creates a sibling intent) |
+| ≥2 | numbered menu of slugs + Goal; prompt: *"Type the number, `bootstrap`, or `abort`."* |
 
-Parse the chosen `intent.<INTENT_SLUG>.md` per
-[references/intent-loading.md](references/intent-loading.md) — load
-the 6 rubric fields (`goal`, `in_scope`, `out_of_scope`, `constraints`,
-`success_criteria`, `open_questions`) into the in-memory `INTENT`
-representation. Surface any parse defects (missing required section,
-empty Goal, etc.) and ask the user before proceeding — do NOT silently
-fill in.
+**Standard branch** — parse the chosen intent per
+[references/intent-loading.md](references/intent-loading.md) into the
+6-rubric `INTENT` representation. Surface parse defects; never
+silently fill in. Set `RUN_MODE=standard`.
 
-Compute `SEED_RUN_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"` at the
-end of this phase (stable for the rest of the run, reused in worktree
-path/branch at Phase 4).
+**Phase 1b — Bootstrap branch**: capture intent ad-hoc from
+prompt/URL/file, run focused gap-filling, capture `PROJECT_SLUG`,
+gate on `confirm intent`. Full flow:
+[references/intent-bootstrap.md](references/intent-bootstrap.md). Set
+`RUN_MODE=bootstrap`.
+
+Compute `SEED_RUN_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"` at end of
+phase (reused as worktree suffix). In bootstrap, also derive
+`bootstrap_intent_id` from `SEED_RUN_ID` for the intent's Intent ID.
 
 ---
 
@@ -169,9 +187,19 @@ For each input:
 5. Append `{type, location, resource_slug, status: "pending"}` to
    `RESOURCES`.
 
-Termination: user types `done`. If `RESOURCES` is empty when the user
-types `done`, ask: *"No resources gathered — exit without doing
-anything?"* Silence is not yes.
+**Mid-intake `ideate`** — user can type `ideate` (or `ideation`) at any
+round to switch into Phase 2i (ideation dialogue + feasibility checks).
+Full flow: [references/ideation-mode.md](references/ideation-mode.md).
+
+**Termination on `done`**:
+
+| State | Action |
+|---|---|
+| `RESOURCES` non-empty | proceed to Phase 3 |
+| `RESOURCES` empty | offer ideation: *"No external resources. Enter ideation mode (`1`/`ideate`) or exit (`2`/`exit`)?"* Silence is not yes. |
+
+Phase 2i sets `RUN_MODE` to `ideation` (or appends `, ideation` if
+upstream Phase 1 chose `bootstrap`).
 
 No mutations in this phase. Everything lives in memory.
 
@@ -242,48 +270,36 @@ sequence, sanitization, and edge cases:
 Summary:
 
 ```bash
-# Step 0 — local exclude so .worktrees/ doesn't dirty status. CRITICAL:
-# --git-common-dir returns a RELATIVE path on older git; use
-# --path-format=absolute (git >= 2.31) with fallback, otherwise the
-# exclude lands at "<cwd>/.git/info/exclude" not MAIN_CHECKOUT's.
+# Step 0 — local exclude so .worktrees/ doesn't dirty status.
 COMMON_DIR="$(git -C "${MAIN_CHECKOUT}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null \
               || git -C "${MAIN_CHECKOUT}" rev-parse --git-common-dir)"
 case "${COMMON_DIR}" in /*) ;; *) COMMON_DIR="${MAIN_CHECKOUT}/${COMMON_DIR}" ;; esac
 grep -qxF '.worktrees/' "${COMMON_DIR}/info/exclude" \
   || echo '.worktrees/' >> "${COMMON_DIR}/info/exclude"
 
-# Step 1 — INTENT_SLUG already sanitized by intent-aligner; defensive
-# positive whitelist (intent-aligner's output is [a-z0-9-]+, so accepting
-# only that closes the loop in case intent-aligner ever loosens its rule)
+# Step 1 — INTENT_SLUG defensively whitelisted to [a-z0-9-]+.
+# In bootstrap RUN_MODE, INTENT_SLUG was sanitized at Phase 1b.4 from
+# the user-supplied PROJECT_SLUG (same rule as intent-aligner Phase 4).
 case "${INTENT_SLUG}" in
   ""|*[!a-z0-9-]*|-*) echo "BLOCKER: intent slug failed [a-z0-9-]+ whitelist: '${INTENT_SLUG}'"; exit 1 ;;
 esac
-
 git -C "${MAIN_CHECKOUT}" worktree add \
   ".worktrees/seed-${INTENT_SLUG}-${SEED_RUN_ID}" \
   -b "seed/${INTENT_SLUG}-${SEED_RUN_ID}" "${BASE_BRANCH}"
 
-# Step 2 — cd into the new worktree
+# Step 2 — cd into the new worktree.
 cd "${MAIN_CHECKOUT}/.worktrees/seed-${INTENT_SLUG}-${SEED_RUN_ID}"
 
-# Step 3 — committed gitignore so .worktrees/ + .seed-state.json
-# stay hidden after the merge to ${BASE_BRANCH}
+# Step 3 — committed gitignore so worktree state stays hidden post-merge.
 for entry in '.worktrees/' '.seed-state.json'; do
-  grep -qxF "${entry}" .gitignore 2>/dev/null \
-    || echo "${entry}" >> .gitignore
+  grep -qxF "${entry}" .gitignore 2>/dev/null || echo "${entry}" >> .gitignore
 done
 
-# Step 4 — initial commit on the seed branch. Guard with diff-cached
-# because on re-invocation after a prior seed merge, `.worktrees/` and
-# `.seed-state.json` are already in the committed `.gitignore`. Step 3
-# correctly no-ops in that case, so `git add` stages nothing and a bare
-# `git commit` would fail with "nothing to commit" and abort the run.
-# Phase 5's `feat(seeds): emit ...` commit becomes the first commit on
-# the branch in that resumed-after-merge case; `git merge --no-ff` still
-# proceeds normally.
+# Step 4 — initial commit; diff-cached guard handles re-invocation
+# after prior merge (gitignore entries already committed).
 git add .gitignore
 if ! git diff --cached --quiet; then
-  git commit -m "chore(seeds): initialize ${INTENT_SLUG} worktree"
+  git commit -m "chore(seeds): initialize ${INTENT_SLUG} ${RUN_MODE} worktree"
 fi
 ```
 
@@ -302,59 +318,51 @@ Stop and ask the user — never auto-resolve.
 
 ---
 
-## Phase 5 — Emit seeds + commit
+## Phase 5 — Emit seeds (+ intent in bootstrap) + commit
 
-`mkdir -p seeds`. For each `RESOURCES[i]`, in order:
-
-0. **Skip non-emit cases** — `skipped-no-ytdlp` / `skipped-fetch-failed`
-   (failure path), or already `emitted` (the latter handles resume
-   where the resource finished in a prior attempt). Process only
-   `confirmed`.
-1. **Collision check + 3-case disambiguation** — if the target file
-   exists, classify by git-trackedness AND Source field:
-   (a) **tracked in HEAD** = inherited from a prior merged seed run
-   (the iteratively-re-runnable happy path) → auto-suffix `-N`,
-   notify, update state slug;
-   (b) **untracked + `## Source` matches `RESOURCES[i].location`** =
-   mine from a prior crashed attempt → overwrite silently (recovery);
-   (c) **untracked + Source differs** = true intra-run collision →
-   auto-suffix, notify, update state slug.
-   Full algorithm, awk snippets, and notification strings:
-   [references/seed-naming.md#collision-policy-3-case-disambiguation](references/seed-naming.md).
-2. **Persist state with the settled slug** *before* the file write — a
-   crash mid-write leaves state pointing at the exact filename to
-   re-check on resume.
-3. **Write `.md`** via `Write` per [references/output-schema.md](references/output-schema.md).
-   Field NAMES English; VALUES follow `LANGUAGE`; verbatim source
-   quotes stay in the source's own language.
-4. **Render `.html`**:
-
-   ```bash
-   python3 "${CLAUDE_SKILL_DIR}/scripts/render_seed_html.py" \
-     .seed-state.json "${RESOURCE_SLUG}" > "seeds/seed.${INTENT_SLUG}.${RESOURCE_SLUG}.html"
-   ```
-
-   Renderer is self-contained (no CDN, HTML-escapes all user content,
-   only emits `<a href="...">` for `http(s)://` URLs). Template at
-   `${CLAUDE_SKILL_DIR}/assets/seed-html-template.html`.
-5. **Persist state** with `status="emitted"`, `output_md`,
-   `output_html`. A crash after this means resume skips at step 0.
-
-After the per-resource loop, commit with a single batch commit. The
-`diff --cached --quiet` guard handles resume — re-rendered identical
-artifacts stage nothing; the skip prevents a "nothing to commit"
-abort:
+**Bootstrap prelude** (only when `RUN_MODE` is `bootstrap` or
+`bootstrap, ideation`): write `intent.${INTENT_SLUG}.md` at the
+worktree root per [references/intent-bootstrap.md](references/intent-bootstrap.md)
+(Provenance must include `Revision: 1` and `Bootstrapped by: seed-gatherer`).
+Then render the HTML via the bundled renderer:
 
 ```bash
+python3 "${CLAUDE_SKILL_DIR}/scripts/render_intent_html.py" \
+  .seed-state.json > "intent.${INTENT_SLUG}.html"
+```
+
+Then `mkdir -p seeds`. For each `RESOURCES[i]`, in order:
+
+0. **Skip non-emit cases** — `skipped-*` or already `emitted` (resume).
+   Process only `confirmed` and `extracted` (ideation arrives at Phase 3
+   already extracted).
+1. **Collision check + 3-case disambiguation** — see
+   [references/seed-naming.md](references/seed-naming.md) for full
+   algorithm. Auto-suffix `-N` for cases (a)+(c); silent overwrite for case (b).
+2. **Persist state with the settled slug** before the write (crash-safe).
+3. **Write `.md`** per [references/output-schema.md](references/output-schema.md).
+   For `ideation` type, include the `## Feasibility check` section.
+4. **Render `.html`** via `${CLAUDE_SKILL_DIR}/scripts/render_seed_html.py`.
+5. **Persist state** with `status="emitted"`, `output_md`, `output_html`.
+
+After the loop, batch-commit with a `RUN_MODE`-conditional subject:
+
+```bash
+[ "${RUN_MODE%,*}" = "bootstrap" ] \
+  && git add "intent.${INTENT_SLUG}.md" "intent.${INTENT_SLUG}.html"
 git add seeds/
 if ! git diff --cached --quiet; then
-  git commit -m "feat(seeds): emit ${INTENT_SLUG} batch ${SEED_RUN_ID}"
+  case "${RUN_MODE}" in
+    bootstrap)            SUBJECT="feat(seeds+intent): bootstrap ${INTENT_SLUG} (rev 1 + ${SEED_COUNT} seeds)" ;;
+    bootstrap,*ideation*) SUBJECT="feat(seeds+intent): bootstrap ${INTENT_SLUG} ideation (rev 1 + ${SEED_COUNT} ideas)" ;;
+    *ideation*)           SUBJECT="feat(seeds): emit ${INTENT_SLUG} ideation batch ${SEED_RUN_ID}" ;;
+    *)                    SUBJECT="feat(seeds): emit ${INTENT_SLUG} batch ${SEED_RUN_ID}" ;;
+  esac
+  git commit -m "${SUBJECT}"
 fi
 ```
 
-State file is gitignored (Phase 4 step 3) so it doesn't appear in the
-commit. Finally set `phase_completed: artifacts_emitted` and persist —
-a crash after this leaves the resume target as Phase 6.
+Set `phase_completed: artifacts_emitted`.
 
 ---
 
@@ -371,45 +379,34 @@ Print:
    resources with the reason — these contributed nothing to the
    emit but the user should know they were attempted.
 
-2. Next-step pointer (transition-safe — `plan-establisher` is the
-   intended next hop but may not be installed yet):
-
+2. Next-step pointer (transition-safe):
    ```
-   Next step: run `/plan-establisher` when ready. It reads
-   ${MAIN_CHECKOUT}/seeds/seed.${INTENT_SLUG}.*.md alongside
-   intent.${INTENT_SLUG}.md to shape a planner-ready handoff. If
-   `/plan-establisher` isn't installed yet, you can run
-   `/seed-gatherer` again to add more seeds, or pass the
-   seeds directory directly to `/codebase-planner` as supporting
-   material.
+   Next: `/plan-establisher` (reads seeds/seed.${INTENT_SLUG}.*.md +
+   intent.${INTENT_SLUG}.md) — or run `/seed-gatherer` again to grow
+   the corpus, or `/intent-aligner update ${INTENT_SLUG}` to refine
+   intent from the seeds just landed.
    ```
 
 3. The exact prompt:
 
 ```
-Type `confirm merge` to merge seed/<intent-slug>-<id> into <BASE_BRANCH>
-with marker (seeds, human-confirmed),
-or `keep` to leave the worktree intact for further iteration,
-or `revise` to address something before merging.
+Type `confirm merge` to merge into <BASE_BRANCH> (marker varies by
+RUN_MODE — see references/git-worktree-flow.md), or `keep`, or `revise`.
 ```
 
 Behavior per response:
 
-- `confirm merge` → run the dirty-MAIN_CHECKOUT guard + `git checkout
-  "${BASE_BRANCH}"` + `git merge --no-ff -m "feat(seeds): merge
-  ${INTENT_SLUG} batch ${SEED_RUN_ID} (seeds, human-confirmed)"` per
-  the exact sequence in [references/git-worktree-flow.md#merge-command-sequence-phase-6](references/git-worktree-flow.md).
-  After the merge, ask: *"Remove the worktree at
-  `.worktrees/seed-${INTENT_SLUG}-${SEED_RUN_ID}`?"* On yes: **first
-  `cd "${MAIN_CHECKOUT}"`** (the agent's cwd may still be inside the
-  worktree from Phase 4 step 2; removing it without `cd` out leaves
-  the shell with a deleted cwd). Then `git -C "${MAIN_CHECKOUT}"
-  worktree remove <path>` (no `--force`). On no: leave it.
+- `confirm merge` → run the dirty-MAIN_CHECKOUT guard, checkout
+  `${BASE_BRANCH}`, and `git merge --no-ff` with a `RUN_MODE`-keyed
+  subject + marker (full table:
+  [references/git-worktree-flow.md#merge-command-sequence-phase-6](references/git-worktree-flow.md)).
+  After the merge, ask *"Remove the worktree?"* — on yes, `cd
+  "${MAIN_CHECKOUT}"` FIRST (Phase 4 left cwd inside the worktree),
+  then `git -C "${MAIN_CHECKOUT}" worktree remove <path>` (no `--force`).
 
 - `keep` → leave worktree intact, no merge, exit cleanly.
-- `revise` → leave worktree intact, ask the user **which** phase to
-  re-enter (Phase 2 to add/remove resources, Phase 3 to re-extract,
-  Phase 5 to re-render). Do not guess.
+- `revise` → leave worktree intact, ask which phase to re-enter
+  (Phase 2 / 2i / 3 / 5). Do not guess.
 - Anything else → re-ask. Silence is not yes.
 
 Update state: `phase_completed: human_confirmed`, record `merged_at`.
@@ -418,12 +415,13 @@ Update state: `phase_completed: human_confirmed`, record `merged_at`.
 
 ## Downstream contract
 
-The merge commit message `feat(seeds): merge <intent-slug> batch
-<seed-run-id> (seeds, human-confirmed)` makes the seed landing
-visible in `git log` — the same pattern the intent / planner /
-implementer chain uses. The marker is a social contract, not
-cryptographic; the goal is catching accidental misuse and making
-deliberate bypass visible in git history.
+The merge commit message + marker varies by `RUN_MODE` (see
+[references/git-worktree-flow.md](references/git-worktree-flow.md)):
+`(seeds, human-confirmed)`, `(seeds, ideation, human-confirmed)`,
+`(intent+seeds, bootstrap, human-confirmed)`, or the bootstrap+ideation
+combo. Each variant makes the chain step visible in `git log`. The
+markers are social contracts, not cryptographic; they catch accidental
+misuse and make deliberate bypass visible in history.
 
 The skill does NOT auto-launch any downstream skill. The user runs
 `/plan-establisher` (or repeats `/seed-gatherer` to grow the
@@ -440,45 +438,36 @@ overwriting each other. The downstream planner globs by intent slug.
 
 ## Forbidden actions
 
-The skill must refuse to execute any of these even if the user
-requests them mid-flow (politely surface the forbidden item and ask
-for confirmation to deviate, but default to refusal):
+Refuse even on mid-flow request (surface + ask for explicit override; default refusal):
 
 - `git push`, `git push --force`
-- `git merge` without the `--no-ff` flag for the seed branch
-- `git merge` or `git commit` without the `-m` flag (would hang on
-  `$EDITOR`)
-- `git reset --hard`, `git clean -f`, `git worktree remove --force`
-- `git commit --amend` once a commit has landed on the seed branch
-  (create a new commit instead — amend rewrites history that
-  `--no-ff` was meant to preserve)
-- `--no-verify` on commits (pre-commit hooks must run)
-- Treating user silence as confirmation at any gate (intent
-  selection, resource intake termination, `confirm seeds`, `confirm
-  merge`, "remove worktree?")
+- `git merge` without `--no-ff`; `git merge`/`git commit` without `-m`
+- `git reset --hard`, `git clean -f`, `git worktree remove --force`,
+  `git commit --amend` once a commit landed, `--no-verify`
+- Treating user silence as confirmation at any gate (intent select,
+  Phase 2 done, `confirm seeds`, `confirm merge`, "remove worktree?")
 - Fetching a resource before Phase 3's pre-fetch `proceed` gate
-  (resources accepted into `RESOURCES` at Phase 2 are pending only;
-  no `WebFetch` / `yt-dlp` / `Read` may run until the user explicitly
-  types `proceed` at the start of Phase 3 — protects against
-  accidentally-pasted sensitive or private URLs)
-- Auto-resolving slug collisions silently — the chat notification
-  is mandatory per [references/seed-naming.md](references/seed-naming.md)
-- Auto-retrying failed fetches (mark `skipped-*` and surface the
-  reason; the user decides whether to re-add)
+  (resources stay pending; no `WebFetch`/`yt-dlp`/`Read` runs until
+  `proceed`). Same rule applies to Phase 1b.1's pre-fetch gate in
+  bootstrap mode.
+- Auto-resolving slug collisions silently — see [references/seed-naming.md](references/seed-naming.md)
+- Auto-retrying failed fetches (mark `skipped-*`, surface reason)
 - Persisting raw verbatim third-party content beyond what's
-  intent-relevant — extracts must be filtered, not whole-page dumps.
-  Quoting a paragraph that informs the intent is fine; quoting an
-  entire article because it was "easier" is not (this is a
-  quasi-quoting / copyright concern as well as a context-pollution
-  one)
-- Auto-launching `/plan-establisher`, `/codebase-planner`, or any
-  downstream skill from Phase 6 (the user runs the next-hop
-  explicitly when ready)
-- Loading or modifying `intent.<slug>.md` in any way other than
-  reading at Phase 1 — repairing a malformed intent is the
-  `intent-aligner`'s job
-- Creating `README.md`, `INSTALLATION_GUIDE.md`, or similar docs
-  inside this skill folder
+  intent-relevant — extracts must be filtered, not whole-page dumps
+  (quasi-quoting / copyright + context-pollution concern)
+- Auto-launching `/plan-establisher`, `/codebase-planner`, or
+  `/intent-aligner` from Phase 6
+- Loading or modifying `intent.<slug>.md` in `standard` mode — repair
+  is `/intent-aligner`'s job. **Exception**: bootstrap mode authors a
+  fresh intent (Phase 1b); that's the only seed-gatherer path that
+  writes intent.md.
+- Crystallizing an ideation seed without a feasibility check (the
+  feasibility-checked promise is what makes ideation seeds valuable —
+  see [references/ideation-mode.md](references/ideation-mode.md))
+- Running >2 feasibility tool calls per ideated idea (latency budget)
+- Setting `Revision` to anything other than `1` in bootstrap output
+  (updates are `/intent-aligner update`'s job)
+- Creating `README.md` / `INSTALLATION_GUIDE.md` inside this skill folder
 
 ---
 

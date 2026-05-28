@@ -18,6 +18,7 @@ derived from the resource's location, per the rules below.
 | `image` | filename without extension | `/Users/foo/screens/error-toast.png` → `error-toast` |
 | `local-doc` | filename without extension | `/path/to/RFC-9728.md` → `rfc-9728` |
 | `local-code` | filename including extension (slug-safe) | `/path/to/cache.config.ts` → `cache-config-ts` |
+| `ideation` | `idea-` prefix + short keyword phrase from the crystallized idea | crystallized idea "real-time dashboard sync via SSE" → `idea-realtime-sync-sse` |
 
 **Ordering note**: slug derivation runs on the **canonicalized**
 location, not the raw user input. Phase 2 canonicalization (see
@@ -65,6 +66,24 @@ Phase 2 classification — channels aren't single-resource extractions.
    collisions between `cache.config.ts` and `cache.config.js` in the
    same project.
 3. Sanitize (see below).
+
+### Ideation → slug
+
+1. Start from the agent's one-sentence description of the
+   crystallized idea (the value of `extracted_content` for ideation
+   resources).
+2. Extract up to 4 keyword tokens — drop stopwords (`a`, `the`, `for`,
+   `via`, `with`, etc.), prefer noun + qualifier pairs.
+3. Lowercase, hyphen-join the tokens.
+4. Prepend `idea-` so the resource_slug is `idea-<keyword-phrase>`.
+5. Sanitize (see below).
+
+Example: idea "Real-time dashboard sync via Server-Sent Events" →
+keywords `realtime-sync-sse` → resource_slug `idea-realtime-sync-sse`.
+
+If the keyword extraction yields fewer than 2 tokens (degenerate
+ideas like "do it"), fall back to `idea-unnamed-<short-rand>` and
+surface a note prompting the user to refine.
 
 ## Sanitization
 
