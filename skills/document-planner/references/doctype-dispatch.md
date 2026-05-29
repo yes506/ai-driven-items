@@ -81,6 +81,29 @@ Which would you like?
 Do NOT proceed by mapping their token to the nearest roster value
 silently — that hides a real gap.
 
+## Interaction with OUTPUT_LANGUAGE
+
+`OUTPUT_LANGUAGE` is captured immediately after DOCTYPE + AUDIENCE
+in Phase 0.5. The default is to inherit dialog `LANGUAGE`, but
+DOCTYPE + AUDIENCE often imply a different output language:
+
+| DOCTYPE | AUDIENCE pattern | Recommended OUTPUT_LANGUAGE default |
+|---|---|---|
+| api-spec | external partners, customer integrators, public docs | English |
+| api-spec | internal client teams (Korean shop) | Inherit dialog LANGUAGE |
+| tech-spec | reviewing engineers (single-language team) | Inherit dialog LANGUAGE |
+| tech-spec | cross-team / cross-region | English (lingua franca default) |
+| runbook | on-call SREs (single-language team) | Inherit dialog LANGUAGE |
+| ppt | mixed-audience deck | Ask explicitly — no good default |
+
+If the inferred default would differ from dialog `LANGUAGE`, ask the
+user explicitly. If they match, confirm with a single-line prompt
+("Output language: <X>. Type `proceed` to continue or name another.").
+
+OUTPUT_LANGUAGE is mandatory in all 4 lanes (frontmatter for
+feature/system, chat-handoff block for micro/local) — the downstream
+`document-implementer` depends on it for prose generation.
+
 ## Persistence
 
 `DOCTYPE` is written to `.document-planner-state.json` at Phase 4

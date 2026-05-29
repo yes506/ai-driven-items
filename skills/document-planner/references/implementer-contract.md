@@ -43,7 +43,7 @@ No file-system check. The implementer must verify the chat history
 contains BOTH:
 
 1. A chat-handoff block (DOCTYPE / OUTPUT_STACK / AUDIENCE /
-   TARGET_PATH / MARKER), AND
+   OUTPUT_LANGUAGE / TARGET_PATH / MARKER), AND
 2. A user confirmation token (`confirm plan` typed by the user)
    within the same conversation.
 

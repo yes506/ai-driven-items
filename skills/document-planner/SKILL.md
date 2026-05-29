@@ -58,7 +58,7 @@ Phase 0.5: Triage + DOCTYPE ───┬─ discovery (plan-establisher output, 
                                ├─ classify DOCTYPE (infer → confirm → select-from-list)
                                ├─ score (scope, risk, ambiguity)
                                ├─ derive OUTPUT_STACK from DOCTYPE
-                               ├─ capture TARGET_PATH + AUDIENCE
+                               ├─ capture TARGET_PATH + AUDIENCE + OUTPUT_LANGUAGE
                                └─ pick lane: micro | local | feature | system
                                   └─→ rubric in references/triage-and-readiness.md
 ```
@@ -74,6 +74,7 @@ State variables captured during Phases L/0/0.5 and threaded through later phases
 - `OUTPUT_STACK` — `text | structured` — derived from DOCTYPE (`ppt → structured`; others → text); routes downstream implementer toolchain
 - `TARGET_PATH` — where the user-facing document will live (e.g. `docs/api/v2/spec.md`); captured in Phase 0.5
 - `AUDIENCE` — document-level primary audience (e.g. `internal SREs`, `partner engineers`); captured in Phase 0.5; default for each stub's `audience` field; persisted for resume + included in chat-handoff
+- `OUTPUT_LANGUAGE` — language of the **produced document** (`Korean` | `English`); may differ from dialog `LANGUAGE` (a Korean-speaking dev may write English-facing API docs); captured in Phase 0.5; persisted for resume + included in chat-handoff and feature/system frontmatter
 - `INTENT_SLUG` — set if a plan-establisher `plan.<intent-slug>.v<N>.md` was accepted; else empty
 
 ---
@@ -133,24 +134,31 @@ for the DOCTYPE classification flow.
    confirm with a single yes/no, or ask if no inference. Required
    for all lanes — drives per-stub `audience` defaults and the
    Phase 7 audience-coherence rubric criterion.
-6. **Score** `(scope, risk, ambiguity)` each 0–3, with reasoning.
+6. **Capture `OUTPUT_LANGUAGE`** — default inherits from dialog
+   `LANGUAGE`; ask explicitly if `AUDIENCE` indicates an external/
+   different language (e.g. dialog Korean + AUDIENCE
+   `external partner engineers` → ask whether output is Korean or
+   English). Required for all lanes (drives prose generation
+   language downstream).
+7. **Score** `(scope, risk, ambiguity)` each 0–3, with reasoning.
    `scope` is content-volume only (no format-complexity weighting).
-7. **Resolve lane**: `final_scale = max(scope, risk)`; accepted plan's
+8. **Resolve lane**: `final_scale = max(scope, risk)`; accepted plan's
    `Proposed scale lane` is the default → `micro|local|feature|system`.
-8. **Block if `ambiguity >= 2` AND `final_scale <= 1`**: one
+9. **Block if `ambiguity >= 2` AND `final_scale <= 1`**: one
    consolidated question round; re-score with answers. No silent
    upgrades.
-9. Print classification (SCALE, DOCTYPE, OUTPUT_STACK, AUDIENCE,
-   TARGET_PATH) + prompt `confirm scale` / suggest different lane
-   (upgrade free; downgrade needs `confirm downgrade`) / `revise`.
-10. Compute `DOCPLANNER_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"`;
+10. Print classification (SCALE, DOCTYPE, OUTPUT_STACK, AUDIENCE,
+    OUTPUT_LANGUAGE, TARGET_PATH) + prompt `confirm scale` /
+    suggest different lane (upgrade free; downgrade needs
+    `confirm downgrade`) / `revise`.
+11. Compute `DOCPLANNER_ID="$(date +%s | tail -c 6)-$$-${RANDOM}"`;
     publish each checkpoint via
     `${CLAUDE_SKILL_DIR}/scripts/publish_thought.sh` (**heredoc body**
     per [thought-publishing.md](references/thought-publishing.md)).
 
-Persist `SCALE`, `DOCTYPE`, `OUTPUT_STACK`, `AUDIENCE`, `TARGET_PATH`,
-and the three scores to `.document-planner-state.json`
-(feature/system only).
+Persist `SCALE`, `DOCTYPE`, `OUTPUT_STACK`, `AUDIENCE`,
+`OUTPUT_LANGUAGE`, `TARGET_PATH`, and the three scores to
+`.document-planner-state.json` (feature/system only).
 
 **After Phase 0.5:**
 - micro / local → "Lightweight lanes" below
@@ -180,6 +188,7 @@ the entire artifact. The 9-field stub schema does NOT apply.
    DOCTYPE: <api-spec|tech-spec|runbook|ppt>
    OUTPUT_STACK: <text|structured>
    AUDIENCE: <document-level primary audience>
+   OUTPUT_LANGUAGE: <Korean|English>
    TARGET_PATH: <absolute or repo-relative>
    MARKER: (document-plan-<scale>, human-confirmed)
    ---
@@ -271,9 +280,9 @@ Order matters — only after Phase 3 confirmation:
 4. **Write the initial `.document-planner-state.json`** with
    `phase_completed: worktree_created`, plus `intent_slug`,
    `main_checkout`, `base_branch`, `docplanner_id`, `doctype`,
-   `output_stack`, `audience`, `target_path`, `language`. This is
-   what makes resume work if the skill crashes between Phase 4 and
-   Phase 5.
+   `output_stack`, `audience`, `output_language`, `target_path`,
+   `language`. This is what makes resume work if the skill crashes
+   between Phase 4 and Phase 5.
 
 Edge cases (path collision, dirty `BASE_BRANCH`, nested invocation,
 merge conflicts) are documented in

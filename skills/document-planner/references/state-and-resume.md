@@ -21,6 +21,7 @@ chat-handoff block at end-of-flow are their entire record.
   "doctype": "api-spec | tech-spec | runbook | ppt",
   "output_stack": "text | structured",
   "audience": "<document-level primary audience>",
+  "output_language": "Korean | English",
   "target_path": "<where the user-facing document will live>",
   "scale": "feature | system",
   "scores": {

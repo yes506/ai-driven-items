@@ -56,6 +56,25 @@ the implementer-skill contract.
    Phase 4 onward), update its top-level `language` field too. Do NOT
    reset other phase progress.
 
+## `LANGUAGE` vs `OUTPUT_LANGUAGE`
+
+`LANGUAGE` (this file's subject) is the **dialog** language — the
+language used for chat questions, prompts, and echoes during the
+planner run. `OUTPUT_LANGUAGE` is the **produced document**'s
+language — what `document-implementer` will write the prose / slide
+content in.
+
+The two are independent. A Korean-speaking developer may:
+- Run the planner dialog in Korean (`LANGUAGE=Korean`), AND
+- Produce an English-facing API spec (`OUTPUT_LANGUAGE=English`)
+
+`OUTPUT_LANGUAGE` is captured at Phase 0.5 per
+[doctype-dispatch.md](doctype-dispatch.md) (the "Interaction with
+OUTPUT_LANGUAGE" section). Default = inherit from `LANGUAGE`; ask
+when `AUDIENCE` implies a different output language. Persisted in
+the state file + frontmatter (feature/system) + chat-handoff block
+(micro/local).
+
 ## Where Phase L runs in the workflow
 
 Phase L is a **preamble**: it runs before Phase 0 (repo state
