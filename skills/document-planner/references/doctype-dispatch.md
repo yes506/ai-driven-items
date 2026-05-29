@@ -104,12 +104,13 @@ OUTPUT_LANGUAGE is mandatory in all 4 lanes (frontmatter for
 feature/system, chat-handoff block for micro/local) — the downstream
 `document-implementer` depends on it for prose generation.
 
-## Persistence
+## DOCTYPE persistence
 
 `DOCTYPE` is written to `.document-planner-state.json` at Phase 4
-(feature/system) and into the chat-handoff block at end-of-flow
-(micro/local). It is never inferred again on resume — the persisted
-value is canonical.
+(feature/system), into the frontmatter at Phase 5 (feature/system),
+and into the chat-handoff block at end-of-flow (micro/local).
+`OUTPUT_LANGUAGE` follows the same persistence pattern. Neither is
+inferred again on resume — the persisted values are canonical.
 
 ## Multi-doctype projects
 
