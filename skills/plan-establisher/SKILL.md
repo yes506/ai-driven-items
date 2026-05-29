@@ -1,16 +1,16 @@
 ---
 name: plan-establisher
 description: |
-  Sits between `seed-gatherer` and `codebase-planner` in the
-  chain (intent-aligner → seed-gatherer → plan-establisher →
-  codebase-planner → codebase-implementer). Reads `intent.<slug>.md`
-  (required) and `seeds/seed.<intent-slug>.*.md` (optional), runs 4
-  verification dimensions (intent self-consistency, seeds-vs-intent,
+  Sits between `seed-gatherer` and the downstream planners
+  (`codebase-planner` for code; `document-planner` for documents)
+  in the chain. Reads `intent.<slug>.md` (required) and
+  `seeds/seed.<intent-slug>.*.md` (optional), runs 4 verification
+  dimensions (intent self-consistency, seeds-vs-intent,
   seeds-vs-seeds, planner-rubric completeness), resolves ambiguities
   via interactive Socratic dialog, then emits a folded planner-ready
   `plan.<intent-slug>.v<N>.md` + `plan.<intent-slug>.v<N>.html` at
-  repo root. `codebase-planner` reads ONLY the plan; the intent and
-  seeds become raw source material it doesn't touch directly.
+  repo root. The downstream planner reads ONLY the plan; the intent
+  and seeds become raw source material it doesn't touch directly.
   Iteratively re-runnable — each invocation emits the next version,
   prior versions preserved as audit trail. Manual invocation only —
   `/plan-establisher`.
@@ -24,18 +24,18 @@ disable-model-invocation: true
 Take the intent (and any gathered seeds) and produce a single planner-
 ready doc. The skill verifies the inputs across 4 dimensions, drives
 ambiguity resolution through interactive Q&A, then folds the verified
-material into a `plan.<intent-slug>.v<N>.md` that codebase-planner
+material into a `plan.<intent-slug>.v<N>.md` that the downstream planner
 reads as its only active input:
 
 | Output | Audience | Purpose |
 |---|---|---|
-| `plan.<intent-slug>.v<N>.md` | AI (`codebase-planner` reads ONLY this) | Folded planner-ready doc — Goal, scope, constraints, success criteria, proposed scale lane + reasoning, evidence inventory, resolved ambiguities, remaining open questions |
+| `plan.<intent-slug>.v<N>.md` | AI (downstream planner reads ONLY this) | Folded planner-ready doc — Goal, scope, constraints, success criteria, proposed scale lane + reasoning, evidence inventory, resolved ambiguities, remaining open questions |
 | `plan.<intent-slug>.v<N>.html` | Human (browser-openable) | Self-contained verification doc, no CDN, HTML-escaped |
 
 The skill is **iteratively re-runnable**: each invocation runs in its
 own worktree+merge cycle, emits the next monotonic version, and
 preserves prior versions (audit trail of how the plan evolved).
-codebase-planner reads `max(N)`.
+The downstream planner reads `max(N)`.
 
 `disable-model-invocation: true` — the skill has side effects (writes
 files, creates a git worktree, merges branches). Never auto-trigger.
@@ -88,7 +88,7 @@ English fallback), echo + confirm with the user, capture. Persist to
 `.plan-state.json` at Phase 4; hold in memory until then. Mid-flow
 switches supported. Full rules — echo strings, override behavior, what
 is / isn't translated (plan-markdown field NAMES stay English for the
-codebase-planner parser; field VALUES follow `LANGUAGE`; merge marker
+downstream-planner parser; field VALUES follow `LANGUAGE`; merge marker
 `(plan, human-confirmed)` stays English):
 [references/language-selection.md](references/language-selection.md).
 
@@ -218,7 +218,7 @@ Summary:
 4. **Compute `PROPOSED_SCALE_LANE` + `LANE_REASONING`** based on
    verified inputs (heuristics in
    [references/ambiguity-resolution.md#picking-the-proposed-scale-lane](references/ambiguity-resolution.md)).
-   codebase-planner may override; we just propose with reasoning.
+   The downstream planner may override; we just propose with reasoning.
 5. **Build `EVIDENCE_INVENTORY`** — map each plan rubric field path
    (`Goal`, `in_scope[0]`, ...) to the list of contributing seed
    slugs. Empty list = intent-only.
@@ -312,7 +312,7 @@ actually-used N. Full algorithm + notification strings:
 Then (all **plan-file** writes happen at the **worktree root**, not
 at `MAIN_CHECKOUT` — Phase 6's `git merge --no-ff` is what brings
 the files to the repo root on `${BASE_BRANCH}` where
-`codebase-planner` reads them; the `.plan-state.json` written by
+the downstream planner reads them; the `.plan-state.json` written by
 Phase 4 / updated by Phase 5 also lives at the worktree root but
 stays gitignored throughout):
 
@@ -364,14 +364,15 @@ Print:
    `${MAIN_CHECKOUT}/.worktrees/plan-${INTENT_SLUG}-${PLAN_RUN_ID}/plan.${INTENT_SLUG}.v${N}.html`
    and the `.md` next to it. Note that *after* `confirm merge` the
    same files land at `${MAIN_CHECKOUT}/plan.${INTENT_SLUG}.v${N}.{md,html}`
-   on `${BASE_BRANCH}` — that's the post-merge path codebase-planner
-   reads from. Both paths point at the same content; the worktree
-   path is what's verifiable *now*.
+   on `${BASE_BRANCH}` — that's the post-merge path the downstream
+   planner reads from. Both paths point at the same content; the
+   worktree path is what's verifiable *now*.
 
 2. Next-step pointer:
 
    ```
-   Next step: run `/codebase-planner` when ready. It reads
+   Next step: run `/codebase-planner` (for code) or `/document-planner`
+   (for documents) when ready. It reads
    ${MAIN_CHECKOUT}/plan.${INTENT_SLUG}.v${N}.md (the latest version
    for this intent) as its only active input. The intent.md and seeds/
    become background source material the planner doesn't re-read by
@@ -419,14 +420,15 @@ same pattern the rest of the chain uses. The marker is a social
 contract, not cryptographic; the goal is catching accidental misuse
 and making deliberate bypass visible in git history.
 
-`codebase-planner` reads the **highest-N** `plan.<intent-slug>.v<N>.md`
-for the chosen intent and treats it as the only active input. The
-plan's `Proposed scale lane` is a hint; the planner may override but
-must justify in its own plan.
+The downstream planner reads the **highest-N**
+`plan.<intent-slug>.v<N>.md` for the chosen intent and treats it as
+the only active input. The plan's `Proposed scale lane` is a hint;
+the planner may override but must justify in its own plan.
 
 The skill does NOT auto-launch any downstream skill. The user runs
-`/codebase-planner` (or repeats `/plan-establisher` to emit a new
-version) explicitly when ready.
+`/codebase-planner` (code) or `/document-planner` (documents) — or
+repeats `/plan-establisher` to emit a new version — explicitly when
+ready.
 
 ---
 
@@ -454,8 +456,8 @@ for confirmation to deviate, but default to refusal):
   didn't explicitly defer via `(d) Defer` or `accept remaining`
   (silent skip is forbidden — every unresolved finding must be
   either resolved or explicitly accepted)
-- Auto-launching `/codebase-planner` or any downstream skill from
-  Phase 6 (the user runs the next-hop explicitly when ready)
+- Auto-launching any downstream skill from Phase 6 — e.g.
+  `/codebase-planner` or `/document-planner` (user runs the next-hop)
 - Inventing intent fields, seeds, or rubric content the inputs
   don't support (the plan is a *fold* of inputs, not an authoring
   step)
