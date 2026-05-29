@@ -63,7 +63,8 @@ ENUM_VALUES = {
 DELIM = "---"
 STUB_HEADING = re.compile(r"^\s*##\s+stub:\s")
 KEY_VALUE = re.compile(r"^([a-z][a-z0-9_]*)\s*:\s*(.*)$")
-FORBIDDEN_VALUE = re.compile(r"[\[\]\{\}]|^\s*[>|]")  # flow syntax / multiline
+FORBIDDEN_VALUE_PREFIX = ("[", "{")  # flow-syntax openers as value
+FORBIDDEN_VALUE_EXACT = ("|", ">")  # block-scalar markers as value
 
 
 def validate(path: Path) -> tuple[dict[str, str], list[str]]:
@@ -114,11 +115,6 @@ def validate(path: Path) -> tuple[dict[str, str], list[str]]:
         stripped = raw.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        if FORBIDDEN_VALUE.search(raw):
-            errors.append(
-                f"line {lineno}: forbidden syntax (flow `[]`/`{{}}` or multiline `|`/`>`)"
-            )
-            continue
         match = KEY_VALUE.match(stripped)
         if not match:
             errors.append(f"line {lineno}: not a `key: value` line")
@@ -127,6 +123,19 @@ def validate(path: Path) -> tuple[dict[str, str], list[str]]:
         # Strip wrapping quotes if present (single or double).
         if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
             value = value[1:-1]
+        # Forbid flow-syntax openers and block-scalar markers AS the value.
+        # Brackets/braces inside a longer value (e.g. "SRE team [internal]")
+        # are fine — only a value that BEGINS with `[`/`{` is YAML flow syntax.
+        if value[:1] in FORBIDDEN_VALUE_PREFIX:
+            errors.append(
+                f"line {lineno}: value starts with flow syntax `{value[0]}`"
+            )
+            continue
+        if value in FORBIDDEN_VALUE_EXACT:
+            errors.append(
+                f"line {lineno}: value is a block-scalar marker `{value}` (multi-line not supported)"
+            )
+            continue
         if key in seen_keys:
             errors.append(
                 f"line {lineno}: duplicate key `{key}` (first declared line {seen_keys[key]})"

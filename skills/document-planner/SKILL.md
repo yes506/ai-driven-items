@@ -349,11 +349,11 @@ python3 "${CLAUDE_SKILL_DIR}/scripts/validate_internal_refs.py" \
   document-plan.md
 ```
 
-Validator scope: `parse_frontmatter.py` enforces the 8-key frontmatter
-contract (4 boundary checks); `validate_doc_structure.py` checks `graph`
-header + unique IDs + edge-resolution + DFS cycle detection;
-`validate_internal_refs.py` resolves every `[[stub-id]]` to a declared
-`## stub: <id>` heading (orphans warned, not failed).
+Run all 3 sequentially (no `&&` — diagnostic mode surfaces every error
+in one round); collect each exit code and block Phase 7 if any is
+nonzero. Validator scope: frontmatter (4 checks), structure (header,
+unique IDs, edge resolution, DFS cycle), internal-refs (`[[stub-id]]`
+resolution; orphans warn). Details in [self-verification.md](references/self-verification.md).
 
 For `OUTPUT_STACK = structured` (ppt): validation runs on the
 planner-internal `.mmd` and stub list, NOT on the eventual `.pptx`
@@ -383,13 +383,9 @@ case "${SCALE}" in
 esac
 ```
 
-`document-structure.mmd` and `document-plan.md` are emitted in Phase
-5 (the renderer step + stub-list step). System adds
-`document-structure.html` here in Phase 7 (self-contained, no CDN,
-HTML-escaped per CLAUDE.md hard rule).
-
-**Agent step**: compose the human-readable rubric + checklist in the
-chat message before:
+System adds `document-structure.html` here (self-contained, no CDN,
+HTML-escaped per CLAUDE.md). Compose the rubric + checklist in chat
+before:
 
 ```bash
 git add ${ARTIFACTS}
