@@ -91,27 +91,33 @@ Older `light/plan` blocks before a `revise` or before a later
 `light/plan` are **superseded, not ambiguous** — the implementer
 ignores them.
 
-**Refuse only when**:
-- Multiple plausible `light/plan` blocks appear at the same
-  chronological position (e.g. two consecutive `light/plan` events
-  with no `revise` / `escalate` token between them), OR
-- No `confirm plan` token appears between the matched `light/plan`
-  and the handoff block, OR
-- A `revise` / `escalate` token appears AFTER the matched
-  `light/plan` and BEFORE the matched `confirm plan` (indicates a
-  later `light/plan` should have been emitted; broken planner
-  output).
+**Refuse only when** (each rule fires the matching worked-example
+case below):
+
+- **(a)** Multiple plausible `light/plan` blocks appear at the
+  same chronological position (e.g. two consecutive `light/plan`
+  events with no `revise` / `escalate` token between them), OR
+- **(b)** No `confirm plan` token appears between the matched
+  `light/plan` and the handoff block, OR
+- **(c)** A `revise` / `escalate` token appears AFTER the matched
+  `light/plan` and BEFORE the matched `confirm plan` (indicates
+  a later `light/plan` should have been emitted; broken planner
+  output), OR
+- **(d)** Any `light/plan` token appears AFTER the matched
+  `confirm plan` AND BEFORE the handoff block (indicates broken
+  planner output — the planner emitted a later reflection that
+  was never user-confirmed by a subsequent `confirm plan`).
 
 ### Worked examples
 
-| Transcript pattern | Decision |
-|---|---|
-| `light/plan` → `confirm plan` → handoff | Pair. Normal path. |
-| `light/plan` → `revise` → `light/plan` → `confirm plan` → handoff | Pair 2nd light/plan with handoff. 1st superseded. Normal revise path. |
-| `light/plan` → `light/plan` → `confirm plan` → handoff | Refuse — ambiguous (two consecutive plans, no `revise` between). |
-| `light/plan` → `confirm plan` → `light/plan` → handoff | Refuse — light/plan emitted after the matched confirm but before handoff. |
-| Just a handoff, no `light/plan` visible | Refuse — fresh session or pasted partial. |
-| `light/plan` in chat, no `confirm plan` | Refuse — user never confirmed. |
+| Transcript pattern | Decision | Rule fired |
+|---|---|---|
+| `light/plan` → `confirm plan` → handoff | Pair. Normal path. | — |
+| `light/plan` → `revise` → `light/plan` → `confirm plan` → handoff | Pair 2nd light/plan with handoff. 1st superseded. | — |
+| `light/plan` → `light/plan` → `confirm plan` → handoff | Refuse — ambiguous. | (a) |
+| `light/plan` → `confirm plan` → `light/plan` → handoff | Refuse — orphan light/plan after confirm. | (d) |
+| Just a handoff, no `light/plan` visible | Refuse — fresh session or pasted partial. | (b) |
+| `light/plan` in chat, no `confirm plan` | Refuse — user never confirmed. | (b) |
 
 **Chat is canonical.** The `publish_thought.sh`-emitted collab-memory
 file `docplanner-<DOCPLANNER_ID>-phase-light-plan.md` MAY be consulted
