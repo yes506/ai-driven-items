@@ -60,18 +60,68 @@ contains BOTH:
 If the implementer can't see the planner output (e.g., running in a
 fresh session), the gate fails and the implementer must refuse.
 
-## Chat-adjacency pairing rule (micro + local)
+## Chronological pairing rule (micro + local)
 
-When the same conversation contains multiple micro/local handoff
-blocks (e.g. user planned two different intents in one session),
-the implementer MUST pair each marker with its handoff block by
-**chat-adjacency**: the marker is paired with the **nearest
-preceding** handoff block in the conversation transcript.
+The planner's lightweight-lane emission order is:
 
-This rule mirrors codebase-planner's chat-adjacency convention for
-multiple parallel planner runs. The implementer should refuse if
-ordering is ambiguous (e.g. marker with no preceding handoff block,
-or handoff block with no following marker).
+```
+[earliest] light/plan content (3–7 bullet reflection)
+           ↓
+           [user types `revise` → planner re-emits a new light/plan
+            (publish_thought.sh light/plan files overwrite per
+            DOCPLANNER_ID); 0..N revise cycles possible]
+           ↓
+           User token: `confirm plan`
+           ↓
+[latest]   Handoff block (6 fields) — emitted ON confirm
+```
+
+The implementer pairs by **chronological backward walk** from the
+handoff block:
+
+1. Locate the handoff block (6 fields visible in current
+   conversation; pasted transcripts refused).
+2. Walk backward to the **nearest preceding `confirm plan`**. That
+   token is the gate confirmation that produced the handoff.
+3. Walk further backward to the **nearest preceding `light/plan`**
+   before that `confirm plan`. Those are the bullets the user
+   confirmed.
+
+Older `light/plan` blocks before a `revise` or before a later
+`light/plan` are **superseded, not ambiguous** — the implementer
+ignores them.
+
+**Refuse only when**:
+- Multiple plausible `light/plan` blocks appear at the same
+  chronological position (e.g. two consecutive `light/plan` events
+  with no `revise` / `escalate` token between them), OR
+- No `confirm plan` token appears between the matched `light/plan`
+  and the handoff block, OR
+- A `revise` / `escalate` token appears AFTER the matched
+  `light/plan` and BEFORE the matched `confirm plan` (indicates a
+  later `light/plan` should have been emitted; broken planner
+  output).
+
+### Worked examples
+
+| Transcript pattern | Decision |
+|---|---|
+| `light/plan` → `confirm plan` → handoff | Pair. Normal path. |
+| `light/plan` → `revise` → `light/plan` → `confirm plan` → handoff | Pair 2nd light/plan with handoff. 1st superseded. Normal revise path. |
+| `light/plan` → `light/plan` → `confirm plan` → handoff | Refuse — ambiguous (two consecutive plans, no `revise` between). |
+| `light/plan` → `confirm plan` → `light/plan` → handoff | Refuse — light/plan emitted after the matched confirm but before handoff. |
+| Just a handoff, no `light/plan` visible | Refuse — fresh session or pasted partial. |
+| `light/plan` in chat, no `confirm plan` | Refuse — user never confirmed. |
+
+**Chat is canonical.** The `publish_thought.sh`-emitted collab-memory
+file `docplanner-<DOCPLANNER_ID>-phase-light-plan.md` MAY be consulted
+to attach a `DOCPLANNER_ID` to chat-visible bullets when two planner
+runs in the same conversation produce visually similar reflections.
+The collab-memory file alone does NOT satisfy the gate.
+
+A `(document-plan-micro|local, human-confirmed)` marker found in
+`git log` is **refused as forged** — those scales are chat-only per
+the marker contract above.
 
 ## `[[stub-id]]` transformation contract (feature + system)
 

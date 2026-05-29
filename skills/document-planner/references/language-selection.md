@@ -18,7 +18,7 @@ file at those scales).
 | `document-structure.mmd` Mermaid node labels | natural form |
 | `document-structure.html` prose (lane summary, gate explanation) | follows `LANGUAGE` |
 | `document-structure.html` machine-derived content (rubric scores, file paths, Mermaid render) | natural form |
-| Chat-handoff block (`DOCTYPE`, `OUTPUT_STACK`, `TARGET_PATH`, `MARKER`) | natural form (verbatim — read by `document-implementer`) |
+| Chat-handoff block (`DOCTYPE`, `OUTPUT_STACK`, `AUDIENCE`, `OUTPUT_LANGUAGE`, `TARGET_PATH`, `MARKER`) | natural form (verbatim — read by `document-implementer`) |
 | Merge-commit marker `(document-plan-<scale>, human-confirmed)` | natural form (verbatim — grep contract for downstream tools) |
 | This skill's own SKILL.md / references/ / scripts/ | never translated (agent-facing) |
 
