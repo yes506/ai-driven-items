@@ -1,4 +1,55 @@
-# State and resume — `.document-planner-state.json` schema
+# State and resume — `.document-planner-state.json` schema +
+# `document-plan.md` frontmatter spec
+
+## `document-plan.md` frontmatter (feature/system)
+
+Emitted at the TOP of `document-plan.md` in Phase 5, BEFORE any stubs.
+The frontmatter is the canonical metadata source for the downstream
+`document-implementer` skill (since `.document-planner-state.json` is
+gitignored and doesn't survive merge to `${BASE_BRANCH}`).
+
+```yaml
+---
+doctype: api-spec | tech-spec | runbook | ppt
+output_stack: text | structured
+audience: <document-level primary audience>
+output_language: Korean | English
+target_path: <repo-relative or absolute path>
+scale: feature | system
+intent_slug: <slug>
+docplanner_id: <stable id from Phase 0.5>
+---
+```
+
+**Intentionally omits `marker:`** — the merge commit message is the
+canonical gate; the implementer greps `git log` for the marker.
+Putting the marker in frontmatter would add a second source of truth
+that can drift OR be hand-faked.
+
+### `---`-in-body ban
+
+`document-plan.md` is an **implementer-facing stub artifact**, not
+human-facing prose. Authors must NEVER use `---` as a horizontal-rule
+divider in the body. The parser (`parse_frontmatter.py`) rejects any
+`---` line after the closing frontmatter delimiter so malformed
+placement can't slip past `validate_internal_refs.py` (which ignores
+frontmatter). Stub YAML bodies use fenced ` ```yaml ... ``` ` blocks,
+not top-level `---`.
+
+### Boundary checks (enforced by `parse_frontmatter.py`)
+
+1. Body must start at line 1 with `---`.
+2. A closing `---` must appear before the first `## stub: <id>`.
+3. No `---` may appear in the body after the closing delimiter.
+4. All 8 required keys present exactly once; enum values validated.
+
+The bundled parser is **stdlib-only** — no PyYAML dependency. Scalar
+grammar only (`key: value` per line; rejects `[]` / `{}` flow syntax
+and `|` / `>` multi-line forms).
+
+---
+
+## `.document-planner-state.json` schema
 
 The state file is the per-run persistent record for feature/system
 lanes. It's gitignored on the worktree's own `.gitignore` (Phase 4
@@ -8,7 +59,7 @@ working state for resumability.
 Micro/local lanes create no state file; the chat history + the
 chat-handoff block at end-of-flow are their entire record.
 
-## Schema
+### Schema
 
 ```json
 {

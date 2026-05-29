@@ -25,6 +25,16 @@ chat-handoff block (micro/local).
 | feature | `(document-plan-feature, human-confirmed)` | merge commit on `${BASE_BRANCH}` | `document-plan.md` + `document-structure.mmd` committed on the merged branch |
 | system | `(document-plan-system, human-confirmed)` | merge commit on `${BASE_BRANCH}` | `document-plan.md` + `document-structure.mmd` + `document-structure.html` committed on the merged branch |
 
+## Canonical metadata source (feature + system)
+
+`document-plan.md` carries a YAML frontmatter block at the top with
+`doctype`, `output_stack`, `audience`, `output_language`,
+`target_path`, `scale`, `intent_slug`, `docplanner_id`. Spec +
+boundary checks: [state-and-resume.md](state-and-resume.md). The
+implementer parses the frontmatter via `parse_frontmatter.py` (bundled
+stdlib-only scalar parser; no PyYAML). Absence or malformed
+frontmatter is an implementer-side refusal.
+
 ## Canonical gate check (feature + system)
 
 ```bash

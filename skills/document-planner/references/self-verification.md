@@ -100,6 +100,22 @@ self-contained — no CDN imports, no external CSS, all node labels and
 field values HTML-escaped (per CLAUDE.md hard rule + the
 `render_doc_structure.py` implementation).
 
+## Phase 6 gates that must pass before scoring
+
+The Phase 7 rubric scores **content** (stub completeness, evidence,
+audience coherence, etc.). It does NOT re-score the validators —
+those are binary gates in Phase 6 that must already have passed:
+
+- `parse_frontmatter.py` — frontmatter present, all 8 required keys
+  valid, no `---` drift in body, no `## stub:` heading before close.
+- `validate_doc_structure.py` — single graph header, unique IDs,
+  declared-edge resolution, no cycles.
+- `validate_internal_refs.py` — every `[[stub-id]]` resolves.
+
+If any Phase 6 gate failed, the rubric does NOT run. The planner exits
+to `revise` per Phase 6's failure handling. The rubric is for content
+quality, not contract compliance.
+
 ## Known v1 limitations
 
 - **`dependencies:` ↔ Mermaid-edge drift is not auto-checked.** Both

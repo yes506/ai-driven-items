@@ -74,7 +74,7 @@ State variables captured during Phases L/0/0.5 and threaded through later phases
 - `OUTPUT_STACK` — `text | structured` — derived from DOCTYPE (`ppt → structured`; others → text); routes downstream implementer toolchain
 - `TARGET_PATH` — where the user-facing document will live (e.g. `docs/api/v2/spec.md`); captured in Phase 0.5
 - `AUDIENCE` — document-level primary audience (e.g. `internal SREs`, `partner engineers`); captured in Phase 0.5; default for each stub's `audience` field; persisted for resume + included in chat-handoff
-- `OUTPUT_LANGUAGE` — language of the **produced document** (`Korean` | `English`); may differ from dialog `LANGUAGE` (a Korean-speaking dev may write English-facing API docs); captured in Phase 0.5; persisted for resume + included in chat-handoff and feature/system frontmatter
+- `OUTPUT_LANGUAGE` — produced-document language (`Korean | English`); may differ from dialog `LANGUAGE`; captured in Phase 0.5; persisted everywhere AUDIENCE is
 - `INTENT_SLUG` — set if a plan-establisher `plan.<intent-slug>.v<N>.md` was accepted; else empty
 
 ---
@@ -134,12 +134,9 @@ for the DOCTYPE classification flow.
    confirm with a single yes/no, or ask if no inference. Required
    for all lanes — drives per-stub `audience` defaults and the
    Phase 7 audience-coherence rubric criterion.
-6. **Capture `OUTPUT_LANGUAGE`** — default inherits from dialog
-   `LANGUAGE`; ask explicitly if `AUDIENCE` indicates an external/
-   different language (e.g. dialog Korean + AUDIENCE
-   `external partner engineers` → ask whether output is Korean or
-   English). Required for all lanes (drives prose generation
-   language downstream).
+6. **Capture `OUTPUT_LANGUAGE`** — default inherits dialog `LANGUAGE`;
+   ask explicitly when `AUDIENCE` implies a different language.
+   Heuristics in [doctype-dispatch.md](references/doctype-dispatch.md).
 7. **Score** `(scope, risk, ambiguity)` each 0–3, with reasoning.
    `scope` is content-volume only (no format-complexity weighting).
 8. **Resolve lane**: `final_scale = max(scope, risk)`; accepted plan's
@@ -293,6 +290,12 @@ never auto-resolve.
 
 ## Phase 5 — Stub emission (feature+system)
 
+**First, write the frontmatter** at the top of `document-plan.md`
+per the 8-key spec in [state-and-resume.md](references/state-and-resume.md),
+using captured state values. Then run
+`parse_frontmatter.py document-plan.md` to verify the 4 boundary
+checks pass before appending stubs.
+
 For each stub from Phase 3, emit the 9-field stub per
 [stub-schema.md](references/stub-schema.md), using the machine-readable
 `## stub: <id>` heading + YAML body convention (so
@@ -338,19 +341,19 @@ in the commit.
 Run bundled structural validators on the emitted artifacts:
 
 ```bash
+python3 "${CLAUDE_SKILL_DIR}/scripts/parse_frontmatter.py" \
+  document-plan.md
 python3 "${CLAUDE_SKILL_DIR}/scripts/validate_doc_structure.py" \
   document-structure.mmd
 python3 "${CLAUDE_SKILL_DIR}/scripts/validate_internal_refs.py" \
   document-plan.md
 ```
 
-`validate_doc_structure.py` checks: exactly one `graph` header, unique
-node IDs, every dependency edge references a declared stub, AND the
-dependency graph has no cycles (DFS-based; the failing cycle path is
-printed). \
-`validate_internal_refs.py` checks: every `[[stub-id]]` resolves to a
-declared `## stub: <id>` heading; orphaned stubs are warned, not
-failed.
+Validator scope: `parse_frontmatter.py` enforces the 8-key frontmatter
+contract (4 boundary checks); `validate_doc_structure.py` checks `graph`
+header + unique IDs + edge-resolution + DFS cycle detection;
+`validate_internal_refs.py` resolves every `[[stub-id]]` to a declared
+`## stub: <id>` heading (orphans warned, not failed).
 
 For `OUTPUT_STACK = structured` (ppt): validation runs on the
 planner-internal `.mmd` and stub list, NOT on the eventual `.pptx`
