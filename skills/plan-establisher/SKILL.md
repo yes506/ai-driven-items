@@ -1,16 +1,16 @@
 ---
 name: plan-establisher
 description: |
-  Sits between `seed-gatherer` and `codebase-planner` in the
-  chain (intent-aligner → seed-gatherer → plan-establisher →
-  codebase-planner → codebase-implementer). Reads `intent.<slug>.md`
-  (required) and `seeds/seed.<intent-slug>.*.md` (optional), runs 4
-  verification dimensions (intent self-consistency, seeds-vs-intent,
+  Sits between `seed-gatherer` and the downstream planners
+  (`codebase-planner` for code; `document-planner` for documents)
+  in the chain. Reads `intent.<slug>.md` (required) and
+  `seeds/seed.<intent-slug>.*.md` (optional), runs 4 verification
+  dimensions (intent self-consistency, seeds-vs-intent,
   seeds-vs-seeds, planner-rubric completeness), resolves ambiguities
   via interactive Socratic dialog, then emits a folded planner-ready
   `plan.<intent-slug>.v<N>.md` + `plan.<intent-slug>.v<N>.html` at
-  repo root. `codebase-planner` reads ONLY the plan; the intent and
-  seeds become raw source material it doesn't touch directly.
+  repo root. The downstream planner reads ONLY the plan; the intent
+  and seeds become raw source material it doesn't touch directly.
   Iteratively re-runnable — each invocation emits the next version,
   prior versions preserved as audit trail. Manual invocation only —
   `/plan-establisher`.
@@ -371,7 +371,8 @@ Print:
 2. Next-step pointer:
 
    ```
-   Next step: run `/codebase-planner` when ready. It reads
+   Next step: run `/codebase-planner` (for code) or `/document-planner`
+   (for documents) when ready. It reads
    ${MAIN_CHECKOUT}/plan.${INTENT_SLUG}.v${N}.md (the latest version
    for this intent) as its only active input. The intent.md and seeds/
    become background source material the planner doesn't re-read by
@@ -425,8 +426,9 @@ plan's `Proposed scale lane` is a hint; the planner may override but
 must justify in its own plan.
 
 The skill does NOT auto-launch any downstream skill. The user runs
-`/codebase-planner` (or repeats `/plan-establisher` to emit a new
-version) explicitly when ready.
+`/codebase-planner` (code) or `/document-planner` (documents) — or
+repeats `/plan-establisher` to emit a new version — explicitly when
+ready.
 
 ---
 
