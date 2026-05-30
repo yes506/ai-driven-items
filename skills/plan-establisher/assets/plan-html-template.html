@@ -68,7 +68,38 @@
       margin-left: 8px;
     }
     .pill.version { background: var(--info-soft); color: var(--info); }
-    .pill.lane    { background: var(--accent-soft); color: var(--accent); }
+
+    /* ── PIPELINE BREADCRUMB (chain ubiquitous vocabulary) ───── */
+    .pipeline-wrap { margin: 0 0 18px; }
+    .pipeline-svg {
+      width: 100%; height: auto; max-height: 76px; display: block;
+    }
+
+    /* ── STAT TAPE (at-a-glance counts) ──────────────────────── */
+    .stat-tape-wrap {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 6px;
+      margin-bottom: 22px;
+      box-shadow: var(--shadow);
+    }
+    .stat-tape {
+      width: 100%; height: auto; max-height: 64px; display: block;
+    }
+
+    /* ── LANE LADDER SVG (replaces text lane pill) ───────────── */
+    .lane-ladder-wrap {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 22px;
+      box-shadow: var(--shadow);
+    }
+    .lane-ladder {
+      width: 100%; height: auto; max-width: 360px; display: block;
+    }
 
     /* ── HERO ────────────────────────────────────────────────── */
     .hero {
@@ -385,13 +416,17 @@
 <body>
 <div class="page">
 
+<div class="pipeline-wrap">{{PIPELINE_SVG}}</div>
+
 <header class="doc-head">
   <h1>
     {{T_TITLE_PREFIX}} — <span class="slug">{{INTENT_SLUG}}</span>
     <span class="pill version">v{{PLAN_VERSION}}</span>
-    <span class="pill lane">{{T_LANE_LABEL}}</span>
   </h1>
 </header>
+
+<div class="stat-tape-wrap">{{STAT_TAPE}}</div>
+<div class="lane-ladder-wrap">{{LANE_LADDER}}</div>
 
 {{HERO_BLOCK}}
 {{SCOPE_BLOCK}}

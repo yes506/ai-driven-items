@@ -61,16 +61,67 @@
     header.doc-head h1 .slug {
       color: var(--accent);
     }
-    .mode-pill {
-      display: inline-block;
-      padding: 3px 12px;
-      border-radius: 999px;
+    /* ── PIPELINE BREADCRUMB (chain ubiquitous vocabulary) ──── */
+    .pipeline-wrap {
+      margin: 0 0 18px;
+    }
+    .pipeline-svg {
+      width: 100%;
+      height: auto;
+      max-height: 76px;
+      display: block;
+    }
+    /* ── MODE BADGE (replaces text pill) ────────────────────── */
+    .mode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 6px 12px 6px 10px;
+      border: 1px solid;
+      border-radius: 8px;
       background: var(--accent-soft);
-      color: var(--accent);
       font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.02em;
+    }
+    .mode-badge svg { flex: 0 0 20px; }
+    .mode-badge .mode-text {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.15;
+    }
+    .mode-badge .mode-text strong {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
+    }
+    .mode-badge .mode-tagline {
+      font-size: 11px;
+      opacity: 0.78;
+      font-weight: 500;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+    /* ── STAT TAPE (at-a-glance counts) ─────────────────────── */
+    .stat-tape-wrap {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 6px;
+      margin-bottom: 22px;
+      box-shadow: var(--shadow);
+    }
+    .stat-tape {
+      width: 100%;
+      height: auto;
+      max-height: 64px;
+      display: block;
+    }
+    /* ── FISHBONE ───────────────────────────────────────────── */
+    .fishbone-svg {
+      width: 100%;
+      height: auto;
+      max-height: 230px;
+      display: block;
     }
     /* ── HERO BLOCK ─────────────────────────────────────────── */
     .hero {
@@ -219,48 +270,6 @@
       top: 5px;
       color: var(--accent);
     }
-    /* ── ROOT-CAUSE FLOW (problem mode) ─────────────────────── */
-    .root-cause-flow {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: stretch;
-      gap: 0;
-      margin: 0;
-    }
-    .rc-step {
-      flex: 1 1 140px;
-      min-width: 140px;
-      background: var(--warn-soft);
-      border: 1px solid var(--warn-line);
-      border-radius: 6px;
-      padding: 10px 12px;
-      font-size: 13px;
-      line-height: 1.4;
-      position: relative;
-    }
-    .rc-step.symptom { background: var(--bad-soft); border-color: var(--bad-line); }
-    .rc-step.root    { background: var(--good-soft); border-color: var(--good-line); }
-    .rc-step .rc-label {
-      display: block;
-      font-size: 10px;
-      letter-spacing: 0.08em;
-      font-weight: 700;
-      text-transform: uppercase;
-      color: var(--fg-soft);
-      margin-bottom: 4px;
-    }
-    .rc-step.symptom .rc-label { color: var(--bad); }
-    .rc-step.root    .rc-label { color: var(--good); }
-    .rc-arrow {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 8px;
-      color: var(--fg-soft);
-      font-size: 18px;
-      font-weight: 700;
-      flex: 0 0 auto;
-    }
     /* ── EXAMPLES (paired ✓ / ✗) ────────────────────────────── */
     .ex-grid {
       display: grid;
@@ -354,18 +363,20 @@
     /* ── NARROW ─────────────────────────────────────────────── */
     @media (max-width: 640px) {
       .scope-grid, .ex-grid { grid-template-columns: 1fr; }
-      .rc-step { flex: 1 1 100%; }
-      .rc-arrow { transform: rotate(90deg); padding: 4px 0; }
     }
   </style>
 </head>
 <body>
 <div class="page">
 
+<div class="pipeline-wrap">{{PIPELINE_SVG}}</div>
+
 <header class="doc-head">
   <h1>{{T_TITLE_PREFIX}} — <span class="slug">{{PROJECT_SLUG}}</span></h1>
-  <span class="mode-pill">{{T_MODE_LABEL}}</span>
+  {{MODE_BADGE}}
 </header>
+
+<div class="stat-tape-wrap">{{STAT_TAPE}}</div>
 
 {{HERO_BLOCK}}
 {{SCOPE_BLOCK}}
