@@ -4,50 +4,77 @@
   <meta charset="utf-8">
   <title>Architecture report — {{PROJECT_SLUG}}</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-           max-width: 960px; margin: 2em auto; padding: 0 1em; color: #1a1a1a; }
-    h1 { border-bottom: 2px solid #1a1a1a; padding-bottom: .25em; }
-    h2 { margin-top: 2em; border-bottom: 1px solid #ccc; padding-bottom: .15em; }
-    h4 { margin-bottom: .25em; color: #444; }
-    code { background: #f4f4f4; padding: .15em .4em; border-radius: 3px; }
-    pre { background: #f9f9f9; padding: 1em; border-radius: 6px; overflow-x: auto; }
+    body { font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", Roboto, system-ui, sans-serif;
+           max-width: 960px; margin: 0 auto; padding: 36px 32px 60px; color: #1a1a1a; background: #f7f7f5; }
+    h1 { font-size: 22px; font-weight: 600; border-bottom: 1px solid #e0e0dc; padding-bottom: 14px; margin: 0 0 8px; }
+    h1 .slug { color: #0f7a83; }
+    h2 { margin: 28px 0 12px; font-size: 14px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #888; border: none; padding: 0; }
+    h4 { margin-bottom: .25em; color: #444; font-size: 13.5px; }
+    code { background: #f0f0ec; padding: .15em .4em; border-radius: 3px; font: 13px ui-monospace, SFMono-Regular, monospace; }
+    pre { background: #f9f9f7; padding: 1em; border-radius: 6px; overflow-x: auto; font-size: 12.5px; }
     pre.doc { background: #fafaf2; border-left: 3px solid #ccc; padding: .6em .9em;
               font-size: .85em; white-space: pre-wrap; }
     summary { cursor: pointer; padding: .5em 0; }
     details { margin: .5em 0; padding-left: 1em; border-left: 2px solid #eee; }
-    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
-    th, td { border: 1px solid #ddd; padding: .4em .6em; text-align: left; }
-    th { background: #f9f9f9; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 13.5px; }
+    th, td { border-bottom: 1px solid #ececec; padding: .5em .7em; text-align: left; }
+    th { background: #f9f9f7; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: #666; }
     .meta { color: #666; font-size: .9em; }
+    .card { background: #fff; border: 1px solid #e0e0dc; border-radius: 8px; padding: 18px 22px; margin-bottom: 22px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
     .checklist { line-height: 1.8; }
     .checklist li { list-style: none; }
     .checklist li::before { content: "☐ "; color: #888; margin-right: .25em; }
+
+    /* ── PIPELINE BREADCRUMB (chain ubiquitous vocabulary) ──── */
+    .pipeline-wrap { margin: 0 0 18px; }
+    .pipeline-svg { width: 100%; height: auto; max-height: 76px; display: block; }
+
+    /* ── STAT TAPE ──────────────────────────────────────────── */
+    .stat-tape-wrap { background: #fff; border: 1px solid #e0e0dc; border-radius: 8px; padding: 8px 6px; margin-bottom: 22px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .stat-tape { width: 100%; height: auto; max-height: 64px; display: block; }
+
+    /* ── INTERFACE DAG (visual) ─────────────────────────────── */
+    .iface-dag { width: 100%; height: auto; display: block; }
+    .empty-dag { color: #888; font-style: italic; padding: 32px; text-align: center; }
+
+    @media print {
+      body { background: #fff; }
+      .card { box-shadow: none; page-break-inside: avoid; }
+    }
   </style>
 </head>
 <body>
-  <h1>{{PROJECT_SLUG}}</h1>
+  <div class="pipeline-wrap">{{PIPELINE_SVG}}</div>
+
+  <h1>Architecture report — <span class="slug">{{PROJECT_SLUG}}</span></h1>
   <p class="meta">Language: <strong>{{LANGUAGE}}</strong> · Last completed phase: <strong>{{PHASE}}</strong></p>
 
+  <div class="stat-tape-wrap">{{STAT_TAPE}}</div>
+
   <h2>Project plan</h2>
-  {{PLAN}}
+  <section class="card">{{PLAN}}</section>
 
   <h2>Package layout</h2>
-  {{PACKAGES}}
+  <section class="card">{{PACKAGES}}</section>
+
+  <h2>Interface dependency graph</h2>
+  <section class="card">{{INTERFACE_DAG_SVG}}</section>
 
   <h2>Interfaces &amp; method docstrings</h2>
   <p class="meta">All interfaces are expanded by default so the reviewer can spot-check the 9-field docstrings without scrolling through a chat log.</p>
-  {{INTERFACES}}
+  <section class="card">{{INTERFACES}}</section>
 
-  <h2>Dependency DAG (Mermaid source)</h2>
-  <p class="meta">Inline Mermaid source — this report is fully self-contained and does not load any external scripts. To render the diagram, paste the block below into a Mermaid renderer (e.g. <code>mermaid-cli</code> or <code>mermaid.live</code>) or open the sibling <code>architecture.mmd</code> file.</p>
-  <pre>
+  <details>
+    <summary><strong>Mermaid source</strong> (for pasting into mermaid.live — the inline SVG above is the canonical visual)</summary>
+    <pre>
 {{MERMAID}}
-  </pre>
+    </pre>
+  </details>
 
   <h2>Self-verification rubric</h2>
-  {{RUBRIC}}
+  <section class="card">{{RUBRIC}}</section>
 
   <h2>Reviewer checklist</h2>
-  {{CHECKLIST}}
+  <section class="card">{{CHECKLIST}}</section>
 </body>
 </html>

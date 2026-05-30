@@ -21,6 +21,9 @@ import re
 import sys
 from pathlib import Path
 
+# Sibling module — chain visual primitives
+from _chain_visuals import pipeline_breadcrumb_svg, stat_tape_svg
+
 
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "assets" / "plan-html-template.html"
 
@@ -124,6 +127,73 @@ def _render_template(template: str, replacements: dict) -> str:
 
 def _lane_label(lane: str, t: dict) -> str:
     return t.get(f"lane_{(lane or '').lower()}", t["lane_unknown"])
+
+
+# ── plan-specific SVG primitives ──────────────────────────────────────────
+
+
+# Lane order, plus the per-lane primary color used in the SVG ladder.
+_LANE_ORDER = [
+    ("micro",   "#0f7a83"),  # smallest scope — calm teal
+    ("local",   "#2b5fb5"),  # blue
+    ("feature", "#7a3fb5"),  # purple
+    ("system",  "#b53737"),  # largest scope — red, signals weight
+]
+
+
+def _scale_lane_ladder_svg(lane: str, t: dict, lang: str) -> str:
+    """4-step ladder SVG showing the chosen scale lane. The chosen step is
+    filled + bold; the others are outline + muted. Replaces the previous
+    text-only `pill.lane` so the relative scale (1 of 4) is visible at a
+    glance without reading the label.
+    """
+    chosen = (lane or "").lower()
+    # Bars share a common baseline `baseline_y`; the tallest (system, i=3)
+    # is `min_h + 3*step_h` tall and must fit inside the viewBox. Round-3
+    # F-E: the previous geometry placed `system`'s top at y=-2, clipping
+    # it. Compute baseline so the tallest bar starts at y=top_margin.
+    width = 360
+    step_w = 76
+    gap = 8
+    start_x = 4
+    min_h = 16
+    step_h = 8
+    n_lanes = len(_LANE_ORDER)
+    tallest_h = min_h + (n_lanes - 1) * step_h  # 40
+    top_margin = 6
+    label_band = 18  # space at bottom for the label row
+    baseline_y = top_margin + tallest_h         # 46
+    height = baseline_y + label_band            # 64
+    label_y = baseline_y + 12
+    parts = [
+        f'<svg class="lane-ladder" viewBox="0 0 {width} {height}" '
+        f'preserveAspectRatio="xMidYMid meet" role="img" '
+        f'aria-label="Scale lane: {_esc(chosen or "unknown")}">'
+    ]
+    for i, (name, color) in enumerate(_LANE_ORDER):
+        x = start_x + i * (step_w + gap)
+        is_chosen = (name == chosen)
+        fill = color if is_chosen else "#fff"
+        stroke = color
+        sw = 2 if is_chosen else 1.4
+        bar_h = min_h + i * step_h
+        bar_y = baseline_y - bar_h
+        parts.append(
+            f'<rect x="{x}" y="{bar_y}" width="{step_w}" height="{bar_h}" rx="3" '
+            f'fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>'
+        )
+        label = t.get(f"lane_{name}", name)
+        text_color = color if is_chosen else "#888"
+        weight = "700" if is_chosen else "500"
+        parts.append(
+            f'<text x="{x + step_w//2}" y="{label_y}" text-anchor="middle" '
+            f'font-size="11" font-weight="{weight}" fill="{text_color}" '
+            f'letter-spacing="0.04em" '
+            f'font-family="-apple-system, system-ui, sans-serif">'
+            f'{_esc(label.upper())}</text>'
+        )
+    parts.append('</svg>')
+    return "".join(parts)
 
 
 # ── block renderers ──────────────────────────────────────────────────────
@@ -393,11 +463,42 @@ def main() -> int:
     intent = state.get("intent") or {}
     lane = state.get("proposed_scale_lane") or ""
     t = _strings_for(state.get("language"))
+    lang = t["html_lang"]
+
+    # stat tape: counts that matter at-a-glance for a plan. Empty
+    # categories render muted so sparsity is immediately visible.
+    findings = state.get("findings") or []
+    resolved_n = sum(
+        1 for f in findings
+        if isinstance(f, dict) and (f.get("resolution") or {}).get("mode") not in (None, "deferred")
+    )
+    deferred_n = sum(
+        1 for f in findings
+        if isinstance(f, dict) and (f.get("resolution") or {}).get("mode") == "deferred"
+    )
+    # Count distinct seed_slugs that informed any plan field.
+    seed_set = set()
+    for entries in (state.get("evidence_inventory") or {}).values():
+        for entry in (entries or []):
+            slug = entry.get("seed_slug") if isinstance(entry, dict) else entry
+            if slug:
+                seed_set.add(str(slug))
+    stat_tuples = [
+        (len(intent.get("in_scope")        or []), "In scope",    "범위 안",    "#2f7c4f"),
+        (len(intent.get("out_of_scope")    or []), "Out of scope","범위 밖",    "#b53737"),
+        (len(intent.get("success_criteria")or []), "Success",     "성공 기준",  "#2b5fb5"),
+        (len(intent.get("constraints")     or []), "Constraints", "제약",       "#7a3fb5"),
+        (len(seed_set),                            "Seeds used",  "기여 시드",  "#0f7a83"),
+        (resolved_n,                               "Resolved",    "해결됨",     "#2f7c4f"),
+        (deferred_n,                               "Open Q",      "미해결",     "#b87900"),
+    ]
 
     replacements = {
         "HTML_LANG":            _esc(t["html_lang"]),
         "T_TITLE_PREFIX":       _esc(t["title_prefix"]),
-        "T_LANE_LABEL":         _esc(_lane_label(lane, t)),
+        "PIPELINE_SVG":         pipeline_breadcrumb_svg("plan", lang),
+        "STAT_TAPE":            stat_tape_svg(stat_tuples, lang),
+        "LANE_LADDER":          _scale_lane_ladder_svg(lane, t, lang),
         "T_INTENT_LABEL":       _esc(t["intent_label"]),
         "T_VERSION_LABEL":      _esc(t["version_label"]),
         "T_RUN_ID_LABEL":       _esc(t["run_id_label"]),

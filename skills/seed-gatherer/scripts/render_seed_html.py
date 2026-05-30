@@ -23,6 +23,9 @@ import re
 import sys
 from pathlib import Path
 
+# Sibling module — chain visual primitives (pipeline breadcrumb, etc.)
+from _chain_visuals import pipeline_breadcrumb_svg
+
 
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "assets" / "seed-html-template.html"
 
@@ -283,6 +286,72 @@ def _type_label(rtype: str, t: dict) -> str:
     return t.get(f"type_{rtype}", rtype or "?")
 
 
+# ── SVG type badge — replaces the text-only type pill ─────────────────────
+
+
+# Per-resource-type glyph drawn as inline SVG, plus the badge color used for
+# the surrounding pill. Glyphs are renderer-defined (no user input flows in
+# as coordinates) and the labels pass through _esc(). XSS-safe.
+_TYPE_GLYPHS = {
+    # web — globe (circle with two intersecting arcs)
+    "web": ("#2b5fb5",
+        '<circle cx="14" cy="14" r="9.5" fill="none" stroke="#2b5fb5" stroke-width="1.8"/>'
+        '<ellipse cx="14" cy="14" rx="4" ry="9.5" fill="none" stroke="#2b5fb5" stroke-width="1.5"/>'
+        '<line x1="4.5" y1="14" x2="23.5" y2="14" stroke="#2b5fb5" stroke-width="1.5"/>'),
+    # youtube — rounded rect + play triangle
+    "youtube": ("#b53737",
+        '<rect x="4" y="6.5" width="20" height="15" rx="3" fill="#b53737"/>'
+        '<polygon points="12,11 12,17 18,14" fill="#fff"/>'),
+    # pdf — page with corner fold + "PDF" lines
+    "pdf": ("#b53737",
+        '<path d="M6.5 4.5 H17 L21.5 9 V23.5 H6.5 Z" fill="none" stroke="#b53737" stroke-width="1.8" stroke-linejoin="round"/>'
+        '<path d="M17 4.5 V9 H21.5" fill="none" stroke="#b53737" stroke-width="1.5" stroke-linejoin="round"/>'
+        '<line x1="9.5" y1="14" x2="18" y2="14" stroke="#b53737" stroke-width="1.4"/>'
+        '<line x1="9.5" y1="17.5" x2="18" y2="17.5" stroke="#b53737" stroke-width="1.4"/>'
+        '<line x1="9.5" y1="21" x2="14.5" y2="21" stroke="#b53737" stroke-width="1.4"/>'),
+    # image — frame + sun + mountains
+    "image": ("#7a3fb5",
+        '<rect x="3.5" y="6" width="21" height="16" rx="2" fill="none" stroke="#7a3fb5" stroke-width="1.8"/>'
+        '<circle cx="9" cy="11" r="1.6" fill="#7a3fb5"/>'
+        '<polyline points="3.5,20 10,14 14,17 18,12 24.5,20" fill="none" stroke="#7a3fb5" stroke-width="1.5" stroke-linejoin="round"/>'),
+    # local-doc — folder with horizontal lines
+    "local-doc": ("#b87900",
+        '<path d="M3.5 8 V21.5 H24.5 V10 H13 L11 8 Z" fill="none" stroke="#b87900" stroke-width="1.8" stroke-linejoin="round"/>'
+        '<line x1="7" y1="14" x2="20" y2="14" stroke="#b87900" stroke-width="1.4"/>'
+        '<line x1="7" y1="17.5" x2="17" y2="17.5" stroke="#b87900" stroke-width="1.4"/>'),
+    # local-code — angle brackets
+    "local-code": ("#0f7a83",
+        '<polyline points="9,8 4,14 9,20" fill="none" stroke="#0f7a83" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
+        '<polyline points="19,8 24,14 19,20" fill="none" stroke="#0f7a83" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
+        '<line x1="16" y1="6" x2="12" y2="22" stroke="#0f7a83" stroke-width="1.8" stroke-linecap="round"/>'),
+    # ideation — lightbulb
+    "ideation": ("#b87900",
+        '<path d="M14 4.5 a7 7 0 0 1 4 12.5 V19 H10 V17 a7 7 0 0 1 4 -12.5 Z" fill="none" stroke="#b87900" stroke-width="1.8" stroke-linejoin="round"/>'
+        '<line x1="11" y1="21" x2="17" y2="21" stroke="#b87900" stroke-width="1.6" stroke-linecap="round"/>'
+        '<line x1="12" y1="23.5" x2="16" y2="23.5" stroke="#b87900" stroke-width="1.6" stroke-linecap="round"/>'),
+}
+
+
+def _type_badge_svg(rtype: str, t: dict) -> str:
+    """Render an SVG type badge for one resource. Falls back to a neutral
+    block glyph when `rtype` is unknown so the layout never collapses.
+    """
+    color, glyph = _TYPE_GLYPHS.get(rtype, ("#5a5a5a",
+        '<rect x="4" y="4" width="20" height="20" rx="3" fill="none" stroke="#5a5a5a" stroke-width="1.6"/>'))
+    soft_map = {
+        "#2b5fb5": "#e8f0fb", "#b53737": "#fbeaea", "#7a3fb5": "#f1e8fb",
+        "#b87900": "#fff4d6", "#0f7a83": "#dff3f5", "#5a5a5a": "#f0f0ec",
+    }
+    soft = soft_map.get(color, "#f0f0ec")
+    label = _type_label(rtype, t)
+    return (
+        f'<span class="type-badge" style="background:{soft};border-color:{color};color:{color}">'
+        f'<svg viewBox="0 0 28 28" width="22" height="22" aria-hidden="true">{glyph}</svg>'
+        f'<strong>{_esc(label)}</strong>'
+        f'</span>'
+    )
+
+
 def main() -> int:
     if len(sys.argv) != 3:
         sys.stderr.write("usage: render_seed_html.py <path-to-.seed-state.json> <resource_slug>\n")
@@ -308,12 +377,14 @@ def main() -> int:
         return 2
 
     t = _strings_for(state.get("language"))
+    lang = t["html_lang"]  # "ko" or "en"
     rtype = (match.get("type") or "").lower()
 
     replacements = {
         "HTML_LANG":             _esc(t["html_lang"]),
         "T_TITLE_PREFIX":        _esc(t["title_prefix"]),
-        "T_TYPE_LABEL":          _esc(_type_label(rtype, t)),
+        "PIPELINE_SVG":          pipeline_breadcrumb_svg("seed", lang),
+        "TYPE_BADGE":            _type_badge_svg(rtype, t),
         "T_SOURCE_LABEL":        _esc(t["source_label"]),
         "T_EXTRACTED_LABEL":     _esc(t["extracted_label"]),
         "T_RATIONALE_LABEL":     _esc(t["rationale_label"]),

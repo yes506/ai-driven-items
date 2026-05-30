@@ -9,15 +9,29 @@ and `project_slug` at the top level; seed-gatherer stores them at
 `intent.mode` and `intent_slug` respectively. The renderer reads both
 forms (intent-aligner keys first, seed-state fallbacks second) so a
 single script handles both invocations without drift. The HTML is
-fully self-contained — no CDN, no external JS. Every user-supplied
-value is HTML-escaped before substitution.
+fully self-contained — no CDN, no external JS, no external SVG. Every
+user-supplied value is HTML-escaped before substitution.
 
-The HTML is designed as a *first-class human verification document*, not
-an MD→HTML conversion: a hero card with the goal, a side-by-side scope
-grid, a success checklist, a root-cause flow (problem mode only), paired
-example/counter-example columns, and a loud open-questions callout when
-unresolved items remain. Machine-only fields (intent_id, language knob)
-are NOT rendered — those stay in intent.<slug>.md.
+The HTML is designed as a *first-class visual verification document*:
+- A **pipeline breadcrumb SVG** anchoring this Intent in the 5-stage
+  chain (Intent → Seed → Plan → Doc Stub → Interface).
+- A **stat tape SVG** showing in-scope / out-of-scope / criteria /
+  constraint / open-question counts at a glance, replacing prose.
+- An **SVG mode badge** (⚙ Feature vs ⚠ Problem) replacing the text pill.
+- A **hero card** with the goal.
+- A **scope grid** with SVG check / cross glyphs.
+- A **success checklist** with SVG checkbox glyphs.
+- An **SVG fishbone** for the root-cause chain (problem mode only).
+- Paired example / counter-example columns with SVG bullets.
+- A loud SVG-iconed open-questions callout when unresolved items remain.
+
+Machine-only fields (intent_id, language knob) are NOT rendered — those
+stay in intent.<slug>.md.
+
+The shared visual vocabulary (stage glyphs, colors, status palette) is
+documented in references/visual-language.md. The five chain skills'
+renderers all emit the same five-stage breadcrumb so a reviewer who
+opens any HTML output immediately knows where the artifact sits.
 
 Read-only: writes only to stdout. Caller redirects with
 `> intent.<slug>.html` per SKILL.md Phase 5.
@@ -28,6 +42,13 @@ import json
 import re
 import sys
 from pathlib import Path
+
+# Sibling module — Python adds this script's directory to sys.path[0] when
+# the script is invoked directly, so a plain import works without packaging.
+from _chain_visuals import (
+    pipeline_breadcrumb_svg,
+    stat_tape_svg,
+)
 
 
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "assets" / "intent-html-template.html"
@@ -126,6 +147,155 @@ def _render_template(template: str, replacements: dict) -> str:
     return pattern.sub(lambda m: replacements[m.group(1)], template)
 
 
+# ── intent-aligner-specific visual primitives ─────────────────────────────
+# (Pipeline breadcrumb, stat tape, and stage glyphs come from
+# _chain_visuals.py — see the imports at the top of this file. The mode
+# badge and root-cause fishbone are intent-aligner-only.)
+
+
+def _mode_badge_svg(mode: str, t: dict, lang: str) -> str:
+    """Inline SVG badge for Feature vs Problem mode. Replaces the text pill
+    so the visual asymmetry between the two modes is immediately legible.
+    """
+    is_problem = (mode == "problem")
+    color = "#b53737" if is_problem else "#2b5fb5"
+    soft = "#fbeaea" if is_problem else "#e8f0fb"
+    label = t["mode_problem"] if is_problem else t["mode_feature"]
+    tagline_en = "Root-cause analysis" if is_problem else "New capability"
+    tagline_ko = "근본 원인 분석" if is_problem else "신규 기능"
+    tagline = tagline_ko if lang == "ko" else tagline_en
+
+    if is_problem:
+        # ⚠ warning triangle
+        glyph = (
+            '<polygon points="14,4 26,24 2,24" fill="none" '
+            f'stroke="{color}" stroke-width="2.2" stroke-linejoin="round"/>'
+            f'<line x1="14" y1="11" x2="14" y2="18" stroke="{color}" stroke-width="2.2" stroke-linecap="round"/>'
+            f'<circle cx="14" cy="21.5" r="1.2" fill="{color}"/>'
+        )
+    else:
+        # ⚙ gear (simplified 6-tooth)
+        glyph = (
+            f'<circle cx="14" cy="14" r="5" fill="none" stroke="{color}" stroke-width="2"/>'
+            f'<circle cx="14" cy="14" r="1.7" fill="{color}"/>'
+        )
+        # 6 little teeth
+        for ang_deg in (0, 60, 120, 180, 240, 300):
+            import math as _m
+            rad = _m.radians(ang_deg)
+            x1 = 14 + 7 * _m.cos(rad)
+            y1 = 14 + 7 * _m.sin(rad)
+            x2 = 14 + 10 * _m.cos(rad)
+            y2 = 14 + 10 * _m.sin(rad)
+            glyph += (
+                f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                f'stroke="{color}" stroke-width="2" stroke-linecap="round"/>'
+            )
+
+    return (
+        f'<span class="mode-badge" style="background:{soft};border-color:{color};color:{color}">'
+        f'<svg viewBox="0 0 28 28" width="20" height="20" aria-hidden="true">{glyph}</svg>'
+        f'<span class="mode-text"><strong>{_esc(label)}</strong>'
+        f'<span class="mode-tagline">{_esc(tagline)}</span></span>'
+        f'</span>'
+    )
+
+
+def _fishbone_svg(steps: list, t: dict, lang: str) -> str:
+    """Render the 5-Whys chain as an SVG fishbone:
+
+        Symptom ──┬── Why1 ──┬── Why2 ──┬── Root
+                  │          │          │
+                 (bone)    (bone)     (bone)
+
+    Each step gets a horizontal segment + a slanted "bone" leading to a
+    label. This replaces the previous flex-based horizontal cards.
+
+    Caller has already validated len(steps) >= 2 and that steps are
+    non-empty strings.
+    """
+    n = len(steps)
+    width = 880
+    gap = (width - 40) // max(n - 1, 1)
+    height = 230
+    spine_y = 130
+    parts = [
+        f'<svg class="fishbone-svg" viewBox="0 0 {width} {height}" '
+        f'preserveAspectRatio="xMidYMid meet" role="img" '
+        f'aria-label="Root cause chain">'
+    ]
+    # spine
+    parts.append(
+        f'<line x1="20" y1="{spine_y}" x2="{20 + gap*(n-1) + 0}" y2="{spine_y}" '
+        f'stroke="#888" stroke-width="2.5"/>'
+    )
+    # arrowhead at end (pointing right)
+    end_x = 20 + gap * (n - 1)
+    parts.append(
+        f'<polygon points="{end_x},{spine_y} {end_x-10},{spine_y-6} {end_x-10},{spine_y+6}" '
+        f'fill="#888"/>'
+    )
+
+    # Per-step nodes + bones. Alternate top/bottom so labels don't collide.
+    for i, step in enumerate(steps):
+        x = 20 + gap * i
+        is_top = (i % 2 == 0)
+        if i == 0:
+            role_en, role_ko, color = "Symptom", "증상", "#b53737"
+        elif i == n - 1:
+            role_en, role_ko, color = "Root cause", "근본 원인", "#2f7c4f"
+        else:
+            role_en, role_ko, color = f"Why {i}", f"이유 {i}", "#b87900"
+        role = role_ko if lang == "ko" else role_en
+
+        # node dot on spine
+        parts.append(
+            f'<circle cx="{x}" cy="{spine_y}" r="6" fill="{color}" '
+            f'stroke="#fff" stroke-width="2"/>'
+        )
+        # label box first (so we know where the bone should land — round-3
+        # F-F fixed an issue where the last node's bone overran the viewBox
+        # by always pointing 30px right of the node; now the bone lands on
+        # the actual clamped box position).
+        bone_dy = -50 if is_top else 50
+        bone_y = spine_y + bone_dy
+        box_y = bone_y - 22 if is_top else bone_y - 2
+        box_w = min(gap, 220)
+        box_h = 56
+        # preferred box origin = 30px to the right of the node, but for
+        # the rightmost nodes clamp left so the box (and the bone that
+        # connects to it) stays inside the viewBox.
+        box_x = x + 30
+        if box_x + box_w > width - 4:
+            box_x = max(0, width - 4 - box_w)
+        # bone goes from the spine node to the near corner of the box
+        parts.append(
+            f'<line x1="{x}" y1="{spine_y}" x2="{box_x}" y2="{bone_y}" '
+            f'stroke="{color}" stroke-width="2" stroke-dasharray="3 3"/>'
+        )
+        parts.append(
+            f'<rect x="{box_x}" y="{box_y}" width="{box_w}" height="{box_h}" '
+            f'rx="5" fill="#fff" stroke="{color}" stroke-width="1.5"/>'
+        )
+        parts.append(
+            f'<text x="{box_x + 8}" y="{box_y + 16}" font-size="10" font-weight="700" '
+            f'fill="{color}" letter-spacing="0.06em" '
+            f'font-family="-apple-system, system-ui, sans-serif">'
+            f'{_esc(role.upper())}</text>'
+        )
+        # body text (truncate visually; full text remains in markdown)
+        snippet = step if len(step) <= 60 else (step[:57] + "…")
+        parts.append(
+            f'<text x="{box_x + 8}" y="{box_y + 36}" font-size="12" '
+            f'fill="#1a1a1a" '
+            f'font-family="-apple-system, system-ui, sans-serif">'
+            f'{_esc(snippet)}</text>'
+        )
+
+    parts.append('</svg>')
+    return "".join(parts)
+
+
 # ── block renderers ──────────────────────────────────────────────────────
 
 
@@ -201,11 +371,14 @@ def _constraints_block(intent: dict, t: dict) -> str:
     )
 
 
-def _root_cause_block(intent: dict, mode: str, t: dict) -> str:
-    """Visual horizontal flow of the 5-Whys chain. Problem mode only.
+def _root_cause_block(intent: dict, mode: str, t: dict, lang: str) -> str:
+    """SVG fishbone of the 5-Whys chain. Problem mode only.
 
-    Suppressed for n<2 chains: a one-element "chain" has no flow.
-    Avoids labeling a lone step "Symptom" with no `Why` to flow into.
+    Suppressed for n<2 chains: a one-element "chain" has no flow. Avoids
+    labeling a lone step "Symptom" with no Why to flow into. For n>=2 the
+    chain is rendered as an SVG fishbone (see `_fishbone_svg`). The
+    full-text version of each step still lives in the markdown intent file
+    — the SVG truncates labels for visual fit.
     """
     if mode != "problem":
         return ""
@@ -217,29 +390,10 @@ def _root_cause_block(intent: dict, mode: str, t: dict) -> str:
     steps = [str(x).strip() for x in chain if str(x).strip()]
     if len(steps) < 2:
         return ""
-
-    parts = []
-    n = len(steps)
-    for i, step in enumerate(steps):
-        if i == 0:
-            cls, label = "rc-step symptom", t["rc_symptom"]
-        elif i == n - 1 and n > 1:
-            cls, label = "rc-step root", t["rc_root"]
-        else:
-            cls, label = "rc-step", f'{t["rc_why"]} {i}'
-        parts.append(
-            f'<div class="{cls}">'
-            f'<span class="rc-label">{_esc(label)}</span>'
-            f'{_esc(step)}'
-            '</div>'
-        )
-        if i != n - 1:
-            parts.append('<div class="rc-arrow" aria-hidden="true">→</div>')
-
     return (
         '<section class="panel">'
         f'<h2>{_esc(t["why_happening"])}</h2>'
-        f'<div class="root-cause-flow">{"".join(parts)}</div>'
+        f'{_fishbone_svg(steps, t, lang)}'
         '</section>'
     )
 
@@ -293,12 +447,6 @@ def _open_questions_block(intent: dict, t: dict) -> str:
     )
 
 
-def _mode_label(mode: str, t: dict) -> str:
-    if mode == "problem":
-        return t["mode_problem"]
-    return t["mode_feature"]
-
-
 def main() -> int:
     if len(sys.argv) != 2:
         sys.stderr.write(f"usage: {Path(__file__).name} <path-to-state.json>\n")
@@ -328,19 +476,32 @@ def main() -> int:
     project_slug = state.get("project_slug") or state.get("intent_slug") or "(unnamed)"
     verified_at = state.get("bootstrap_verified_at") or state.get("verified_at")
     t = _strings_for(state.get("language"))
+    lang = t["html_lang"]  # "ko" or "en"
+
+    # stat tape: counts per category. Empty categories are still shown
+    # (muted) so the reviewer can see what is missing at a glance.
+    stat_tuples = [
+        (len(intent.get("in_scope")        or []), "In scope",    "범위 안",    "#2f7c4f"),
+        (len(intent.get("out_of_scope")    or []), "Out of scope","범위 밖",    "#b53737"),
+        (len(intent.get("success_criteria")or []), "Success",     "성공 기준",  "#2b5fb5"),
+        (len(intent.get("constraints")     or []), "Constraints", "제약",       "#7a3fb5"),
+        (len(intent.get("open_questions")  or []), "Open Q",      "미해결",     "#b87900"),
+    ]
 
     replacements = {
         "HTML_LANG":            _esc(t["html_lang"]),
         "T_TITLE_PREFIX":       _esc(t["title_prefix"]),
-        "T_MODE_LABEL":         _esc(_mode_label(mode, t)),
         "T_VERIFIED_AT":        _esc(t["verified_at"]),
         "PROJECT_SLUG":         _esc(project_slug),
         "VERIFIED_AT":          _esc(verified_at or t["not_recorded"]),
+        "PIPELINE_SVG":         pipeline_breadcrumb_svg("intent", lang),
+        "MODE_BADGE":           _mode_badge_svg(mode, t, lang),
+        "STAT_TAPE":            stat_tape_svg(stat_tuples, lang),
         "HERO_BLOCK":           _hero_block(intent, t),
         "SCOPE_BLOCK":          _scope_block(intent, t),
         "SUCCESS_BLOCK":        _success_block(intent, t),
         "CONSTRAINTS_BLOCK":    _constraints_block(intent, t),
-        "ROOT_CAUSE_BLOCK":     _root_cause_block(intent, mode, t),
+        "ROOT_CAUSE_BLOCK":     _root_cause_block(intent, mode, t, lang),
         "EXAMPLES_BLOCK":       _examples_block(intent, mode, t),
         "OPEN_QUESTIONS_BLOCK": _open_questions_block(intent, t),
     }

@@ -8,55 +8,21 @@ the state; otherwise just nodes are emitted.
 Read-only: writes only to stdout. Caller redirects with `> architecture.mmd`.
 
 Safety:
-- Node IDs are deterministic and collision-free even when interface names share
-  the same _safe()-stripped form (a counter suffix is appended for collisions).
-- Node labels are escaped against Mermaid syntax injection — quotes, angle
-  brackets, and click-directive separators in interface names cannot break
-  out of the label or inject directives.
+- Node IDs come from `_iface_graph.build_id_map()` — same source of truth
+  the in-html embedded Mermaid + inline SVG use, so all three outputs
+  agree on the id-collision-free naming (fixes round-4 R4-1 where the
+  in-html paths had the F-D collision fix but this sibling did not).
+- Node labels are escaped against Mermaid syntax injection by
+  `_iface_graph.mermaid_label()` — quotes, angle brackets, click-directive
+  separators, newlines, and backticks all neutralized.
 """
 
 import json
 import sys
 from pathlib import Path
 
-
-def _safe(name: str) -> str:
-    """Conservative ASCII identifier from arbitrary text."""
-    cleaned = "".join(c if c.isalnum() else "_" for c in name)
-    return cleaned or "node"
-
-
-def _label_escape(name: str) -> str:
-    """Escape a string for safe use as a Mermaid quoted label.
-
-    Mermaid renders `id["LABEL"]` blocks; the label is HTML-decoded by the
-    renderer, so we use #-prefixed entity codes (Mermaid's preferred form)
-    plus standard HTML entities to neutralize quotes, brackets, click
-    directives, newlines, and backticks (Mermaid v10+ alternate label
-    delimiter).
-    """
-    return (
-        str(name)
-        .replace("&", "&amp;")
-        .replace('"', "#quot;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\n", " ")
-        .replace("\r", " ")
-        .replace("|", "&#124;")
-        .replace("[", "&#91;")
-        .replace("]", "&#93;")
-        .replace("`", "&#96;")
-    )
-
-
-def _unique_id(base: str, taken: dict) -> str:
-    """Return a unique node id; if `base` is already taken, append a counter."""
-    if base not in taken:
-        taken[base] = 1
-        return base
-    taken[base] += 1
-    return f"{base}_{taken[base]}"
+# Sibling module — same id-map + edge logic the in-html paths use.
+from _iface_graph import build_id_map, collect_edges, mermaid_label
 
 
 def main() -> int:
@@ -77,33 +43,11 @@ def main() -> int:
         print('  empty["(no interfaces emitted yet)"]')
         return 0
 
-    # First pass: assign unique node ids per interface.
-    name_to_id = {}
-    taken = {}
-    for iface in interfaces:
-        original = str(iface.get("name", "?"))
-        node_id = _unique_id(_safe(original), taken)
-        name_to_id[original] = node_id
-        print(f'  {node_id}["{_label_escape(original)}"]')
-
-    # Second pass: emit edges from collaborators.
-    seen_edges = set()
-    for iface in interfaces:
-        src_name = str(iface.get("name", "?"))
-        src_id = name_to_id.get(src_name)
-        if src_id is None:
-            continue
-        for method in iface.get("methods") or []:
-            for collab in method.get("collaborators") or []:
-                target_name = str(collab).split(".", 1)[0]
-                target_id = name_to_id.get(target_name)
-                if target_id is None or target_id == src_id:
-                    continue
-                edge = (src_id, target_id)
-                if edge in seen_edges:
-                    continue
-                seen_edges.add(edge)
-                print(f"  {src_id} --> {target_id}")
+    name_to_id = build_id_map(interfaces)
+    for original, node_id in name_to_id.items():
+        print(f'  {node_id}["{mermaid_label(original)}"]')
+    for src_id, dst_id in collect_edges(interfaces, name_to_id):
+        print(f"  {src_id} --> {dst_id}")
     return 0
 
 

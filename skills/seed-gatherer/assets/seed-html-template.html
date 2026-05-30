@@ -68,17 +68,26 @@
     header.doc-head h1 .crumb-resource {
       color: var(--accent);
     }
-    .type-pill {
-      display: inline-block;
-      padding: 3px 12px;
-      border-radius: 999px;
+    /* ── PIPELINE BREADCRUMB (chain ubiquitous vocabulary) ──── */
+    .pipeline-wrap { margin: 0 0 18px; }
+    .pipeline-svg {
+      width: 100%; height: auto; max-height: 76px; display: block;
+    }
+    /* ── TYPE BADGE (replaces text type pill) ───────────────── */
+    .type-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px 4px 8px;
+      border: 1px solid;
+      border-radius: 8px;
       background: var(--accent-soft);
-      color: var(--accent);
       font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
     }
+    .type-badge svg { flex: 0 0 22px; }
+    .type-badge strong { font-weight: 700; font-size: 12px; }
     /* ── SOURCE CARD ────────────────────────────────────────── */
     .source-card {
       background: var(--bg-card);
@@ -217,13 +226,15 @@
 <body>
 <div class="page">
 
+<div class="pipeline-wrap">{{PIPELINE_SVG}}</div>
+
 <header class="doc-head">
   <h1>
     <span class="crumb-intent">{{INTENT_SLUG}}</span>
     <span class="crumb-sep">/</span>
     <span class="crumb-resource">{{RESOURCE_SLUG}}</span>
   </h1>
-  <span class="type-pill">{{T_TYPE_LABEL}}</span>
+  {{TYPE_BADGE}}
 </header>
 
 <section class="source-card">
