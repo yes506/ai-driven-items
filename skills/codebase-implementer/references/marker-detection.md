@@ -49,8 +49,10 @@ unless exactly one is present (do NOT `tail -1`):
 RUN_DIR_LINES="$(git -C "${MAIN_CHECKOUT}" show -s --format=%B "${PLANNER_MARKER_COMMIT}" \
   | git interpret-trailers --parse \
   | grep '^AI-Artifacts-Run-Dir:' || true)"
-N="$(printf '%s' "${RUN_DIR_LINES}" | grep -c . )"
-[ "${N}" -eq 1 ] || { echo "expected exactly 1 AI-Artifacts-Run-Dir trailer, found ${N} — refusing"; exit 1; }
+# Inline `grep -c` so the substitution's exit status is discarded — the
+# two-step `N=$(grep -c .)` form aborts under `set -e` on a zero count.
+[ "$(printf '%s' "${RUN_DIR_LINES}" | grep -c .)" -eq 1 ] \
+  || { echo "expected exactly 1 AI-Artifacts-Run-Dir trailer — refusing"; exit 1; }
 # Strip the key (and surrounding whitespace) → bare run-dir value.
 RUN_DIR="$(printf '%s' "${RUN_DIR_LINES}" | sed -e 's/^AI-Artifacts-Run-Dir:[[:space:]]*//' -e 's/[[:space:]]*$//')"
 # ANCHORED, single-line, code-chain allowlist. Rejects absolute paths,
@@ -78,6 +80,10 @@ case "${PLANNER_MARKER_SCALE}" in
     git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/plan.md" 2>/dev/null \
       && git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/plan.mmd" 2>/dev/null \
       || { echo "feature marker present but plan.{md,mmd} missing at ${RUN_DIR}"; exit 1; }
+    ;;
+  *)
+    # Fail closed: an unset/unexpected scale must never skip artifact checks.
+    echo "BLOCKER: unexpected planner marker scale: ${PLANNER_MARKER_SCALE:-<unset>}"; exit 1
     ;;
 esac
 ```

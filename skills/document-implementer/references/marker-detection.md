@@ -51,10 +51,12 @@ see the commit body, so the trailer is read with a SECOND lookup:
 
 ```bash
 TRAILER_LINES="$(git -C "${MAIN_CHECKOUT}" show -s --format=%B "${PLANNER_MARKER_COMMIT}" \
-  | git interpret-trailers --parse | grep '^AI-Artifacts-Run-Dir:')"
+  | git interpret-trailers --parse | grep '^AI-Artifacts-Run-Dir:' || true)"
 # COUNT matches — refuse on 0 or >1 (do NOT tail -1; ambiguity is a hard error).
-N="$(printf '%s' "${TRAILER_LINES}" | grep -c .)"
-[ "${N}" -eq 1 ] || { echo "BLOCKER: expected exactly 1 AI-Artifacts-Run-Dir trailer, got ${N}."; exit 1; }
+# Inline `grep -c` so the substitution's exit status is discarded — the
+# two-step `N=$(grep -c .)` form aborts under `set -e` on a zero count.
+[ "$(printf '%s' "${TRAILER_LINES}" | grep -c .)" -eq 1 ] \
+  || { echo "BLOCKER: expected exactly 1 AI-Artifacts-Run-Dir trailer"; exit 1; }
 
 # Strip the key, then validate with an ANCHORED, SINGLE-LINE, DOC-CHAIN allowlist.
 RUN_DIR="$(printf '%s' "${TRAILER_LINES}" | sed -e 's/^AI-Artifacts-Run-Dir:[[:space:]]*//')"
@@ -62,21 +64,36 @@ case "${RUN_DIR}" in
   ai-artifacts/runs/doc/*) ;;
   *) echo "BLOCKER: run-dir outside doc chain: ${RUN_DIR}"; exit 1 ;;
 esac
-printf '%s' "${RUN_DIR}" | grep -Eqx 'ai-artifacts/runs/doc/[a-z0-9-]+-[A-Za-z0-9._-]+' \
+printf '%s' "${RUN_DIR}" | grep -Eqx '^ai-artifacts/runs/doc/[a-z0-9-]+-[A-Za-z0-9._-]+$' \
   || { echo "BLOCKER: run-dir failed allowlist: ${RUN_DIR}"; exit 1; }
 # The anchored regex already rejects absolute paths, '..', and embedded
 # whitespace/newline/CR (no '/' beyond the fixed prefix, no '.' runs).
 ```
 
 Validate the per-lane artifacts exist **at the marker commit's tree**
-(not HEAD) — the worktree may have advanced:
+(not HEAD) — the worktree may have advanced. Branch by `${SCALE}` so a
+verbatim copy checks only the lane's artifacts (a single sequential
+block would false-fail a valid feature run on the system-only
+`document-structure.html`):
 
 ```bash
-# feature
-git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-plan.md"
-git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-structure.mmd"
-# system — additionally:
-git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-structure.html"
+case "${SCALE}" in
+  feature)
+    git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-plan.md" 2>/dev/null \
+      && git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-structure.mmd" 2>/dev/null \
+      || { echo "BLOCKER: document-plan.md/document-structure.mmd missing at ${PLANNER_MARKER_COMMIT}:${RUN_DIR}"; exit 1; }
+    ;;
+  system)
+    git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-plan.md" 2>/dev/null \
+      && git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-structure.mmd" 2>/dev/null \
+      && git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-structure.html" 2>/dev/null \
+      || { echo "BLOCKER: document-plan.md/document-structure.{mmd,html} missing at ${PLANNER_MARKER_COMMIT}:${RUN_DIR}"; exit 1; }
+    ;;
+  *)
+    # Fail closed: an unset/unexpected scale must never skip artifact checks.
+    echo "BLOCKER: unexpected planner marker scale: ${SCALE:-<unset>}"; exit 1
+    ;;
+esac
 ```
 
 Any failure on a feature/system marker → **REFUSE** (never fall back to
@@ -86,19 +103,31 @@ newest marker. Micro/local lanes have no planner commit → no trailer →
 no `RUN_DIR` (the implementer uses its own id-keyed sibling dir for its
 report; see [state-and-resume.md](state-and-resume.md)).
 
-## Canonical gate check (feature + system)
+## Canonical gate check (feature + system) — frontmatter
+
+Artifact **existence** is already validated at the marker commit's tree
+above (`git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/..."`). The
+one remaining feature/system gate is **frontmatter validity**, and it
+must read the marker-tree blob too — NOT the worktree path, which may
+have advanced past `PLANNER_MARKER_COMMIT`. `parse_frontmatter.py` takes
+a file path, so extract the marker-tree blob to a temp file first:
 
 ```bash
-# feature
-test -f "${RUN_DIR}/document-plan.md" && test -f "${RUN_DIR}/document-structure.mmd" \
-  && git log --grep='(document-plan-feature, human-confirmed)' --format=%H | grep -q . \
-  && python3 "${CLAUDE_SKILL_DIR}/scripts/parse_frontmatter.py" "${RUN_DIR}/document-plan.md"
-
-# system
-test -f "${RUN_DIR}/document-plan.md" && test -f "${RUN_DIR}/document-structure.mmd" && test -f "${RUN_DIR}/document-structure.html" \
-  && git log --grep='(document-plan-system, human-confirmed)' --format=%H | grep -q . \
-  && python3 "${CLAUDE_SKILL_DIR}/scripts/parse_frontmatter.py" "${RUN_DIR}/document-plan.md"
+# feature + system — validate frontmatter at the marker commit's tree
+TMP_PLAN="$(mktemp)"
+git cat-file -p "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-plan.md" > "${TMP_PLAN}" \
+  || { rm -f "${TMP_PLAN}"; echo "BLOCKER: cannot read document-plan.md at ${PLANNER_MARKER_COMMIT}:${RUN_DIR}"; exit 1; }
+python3 "${CLAUDE_SKILL_DIR}/scripts/parse_frontmatter.py" "${TMP_PLAN}" \
+  || { rm -f "${TMP_PLAN}"; echo "BLOCKER: document-plan.md frontmatter invalid at ${PLANNER_MARKER_COMMIT}:${RUN_DIR}"; exit 1; }
+rm -f "${TMP_PLAN}"
 ```
+
+Do **NOT** re-check existence with `test -f` on the worktree or re-grep
+`git log` for the marker here — both are HEAD/cwd-bound and contradict
+the marker-commit binding established above (a later commit could
+move/delete the files, or recreate them at the same path, producing a
+false-fail or false-pass). The marker commit was already selected once
+as `PLANNER_MARKER_COMMIT`; reuse it.
 
 ## Canonical gate check (micro + local) — chronological pairing
 
