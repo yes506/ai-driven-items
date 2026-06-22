@@ -76,8 +76,8 @@ For the stub `S` being implemented:
 
 4. **Track degraded deps** in state for Phase 5 surfacing:
    `state.work_queue[i].dep_context_degraded = ["<dep-id>", ...]`.
-   The implementation-report.md shows this so the human reviewer
-   can decide whether full-prose context would have helped.
+   The Phase 5 self-verification report shows this so the human
+   reviewer can decide whether full-prose context would have helped.
 
 ## Generation rules per OUTPUT_STACK
 

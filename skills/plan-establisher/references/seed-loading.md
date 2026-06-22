@@ -1,4 +1,4 @@
-# Loading seeds/seed.<intent-slug>.*.md
+# Loading ai-artifacts/seeds/seed.<intent-slug>.*.md
 
 Phase 1 (after loading the intent) discovers and loads all seeds
 emitted by `/seed-gatherer` for the chosen `INTENT_SLUG`. The
@@ -8,7 +8,7 @@ dimensions 2 and 3 (seeds-vs-intent and seeds-vs-seeds).
 ## Discovery rule
 
 ```bash
-ls -1 "${MAIN_CHECKOUT}"/seeds/seed."${INTENT_SLUG}".*.md 2>/dev/null
+ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/seeds/seed."${INTENT_SLUG}".*.md 2>/dev/null
 ```
 
 Three cases:
@@ -25,7 +25,7 @@ warn and proceed.
 
 ## Field parsing per seed
 
-Each `seeds/seed.<intent-slug>.<resource-slug>.md` follows the schema
+Each `ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.md` follows the schema
 documented in `seed-gatherer/references/output-schema.md`. The
 relevant fields for verification are:
 

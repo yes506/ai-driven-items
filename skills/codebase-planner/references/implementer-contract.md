@@ -15,8 +15,15 @@ verbatim in the merge commit message that lands the planner branch on
 |---|---|---|---|
 | micro | `(plan-micro, human-confirmed)` | chat history only — no commit | the in-chat confirmation token from the user |
 | local | `(plan-local, human-confirmed)` | chat history only — no commit | the in-chat confirmation token |
-| feature | `(plan-feature, human-confirmed)` | merge commit on `${BASE_BRANCH}` | `plan.md` + `plan.mmd` committed on the merged branch |
-| system | `(interfaces only, human-confirmed)` | merge commit on `${BASE_BRANCH}` | `architecture.html` + `architecture.mmd` committed on the merged branch |
+| feature | `(plan-feature, human-confirmed)` | merge commit on `${BASE_BRANCH}` | `$RUN_DIR/plan.md` + `$RUN_DIR/plan.mmd` committed on the merged branch |
+| system | `(interfaces only, human-confirmed)` | merge commit on `${BASE_BRANCH}` | `$RUN_DIR/architecture.html` + `$RUN_DIR/architecture.mmd` committed on the merged branch |
+
+`$RUN_DIR` is `ai-artifacts/runs/code/<slug>-<planner-id>`, carried as
+the `AI-Artifacts-Run-Dir:` git trailer on the merge commit's body. The
+implementer resolves it by parsing that trailer (the marker scan emits
+subject only), validates it against an anchored allowlist
+(`^ai-artifacts/runs/code/[a-z0-9-]+-[A-Za-z0-9._-]+$`; reject absolute,
+`..`, whitespace), then checks the artifacts at the marker commit's tree.
 
 The `system` marker is **unchanged from the pre-rename codebase-architect
 skill** — that's deliberate. The downstream-gate semantic ("a committed
@@ -26,15 +33,18 @@ implementer that already grep's for it. Other scales use the new
 
 ## Canonical gate check (feature + system)
 
+First resolve `$RUN_DIR` from the marker commit's `AI-Artifacts-Run-Dir:`
+trailer (see note above), then:
+
 ```bash
-test -f architecture.html && test -f architecture.mmd \
+test -f "$RUN_DIR/architecture.html" && test -f "$RUN_DIR/architecture.mmd" \
   && git log --grep='(interfaces only, human-confirmed)' --format=%H | grep -q .
 ```
 
 OR
 
 ```bash
-test -f plan.md && test -f plan.mmd \
+test -f "$RUN_DIR/plan.md" && test -f "$RUN_DIR/plan.mmd" \
   && git log --grep='(plan-feature, human-confirmed)' --format=%H | grep -q .
 ```
 

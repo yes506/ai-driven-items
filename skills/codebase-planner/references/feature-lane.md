@@ -8,10 +8,13 @@ Phase 3 decomposition discovers a real cross-boundary contract.
 
 ## Artifact set
 
+`$RUN_DIR` is `ai-artifacts/runs/code/${PROJECT_SLUG}-${PLANNER_ID}`
+(`mkdir -p` it before writing). All artifacts land inside it.
+
 | File | Required | Contents |
 |---|---|---|
-| `plan.md` | yes | Plan synthesis (goal, in-scope, out-of-scope, constraints, success criteria, open questions from Phase 1) + Phase 2 package layout + Phase 3 decomposition table |
-| `plan.mmd` | yes | Mermaid DAG of the same nodes from Phase 3. Same renderer as system lane (`render_mermaid_dag.py` reads `.planner-state.json`) — just redirected to `plan.mmd` |
+| `$RUN_DIR/plan.md` | yes | Plan synthesis (goal, in-scope, out-of-scope, constraints, success criteria, open questions from Phase 1) + Phase 2 package layout + Phase 3 decomposition table |
+| `$RUN_DIR/plan.mmd` | yes | Mermaid DAG of the same nodes from Phase 3. Same renderer as system lane (`render_mermaid_dag.py` reads `.planner-state.json`) — just redirected to `$RUN_DIR/plan.mmd` |
 | Interface skeletons | optional | Only when Phase 3 finds a genuine cross-boundary contract; user confirms via `emit skeletons` token before Phase 5 runs |
 
 Merge marker (Phase 8): `(plan-feature, human-confirmed)`.
@@ -56,10 +59,10 @@ artifacts will land in Phase 7's commit instead.
   smoke-check passes.
 
 The smoke-check (run after rendering in Phase 7):
-- `plan.md` is non-empty and contains the required headers (`## Goal`,
-  `## Package layout`, `## Decomposition`).
-- `plan.mmd` parses as valid Mermaid (`head -1` returns `flowchart`
-  or `graph`).
+- `$RUN_DIR/plan.md` is non-empty and contains the required headers
+  (`## Goal`, `## Package layout`, `## Decomposition`).
+- `$RUN_DIR/plan.mmd` parses as valid Mermaid (`head -1` returns
+  `flowchart` or `graph`).
 
 If either check fails, do not commit; surface to user and ask to
 revise.
@@ -87,7 +90,7 @@ rubric applies AND `plan.md` lists the emitted interfaces in an
 Commit:
 
 ```bash
-git add plan.md plan.mmd
+git add "$RUN_DIR/plan.md" "$RUN_DIR/plan.mmd"
 git commit -m "docs(planner): self-verification artifacts (feature lane)"
 ```
 
@@ -97,13 +100,15 @@ Use the feature marker, not the system marker:
 
 ```bash
 git -C "${MAIN_CHECKOUT}" merge --no-ff "planner/${PROJECT_SLUG}-${PLANNER_ID}" \
-  -m "feat(planner): merge ${PROJECT_SLUG} plan (plan-feature, human-confirmed)"
+  -m "feat(planner): merge ${PROJECT_SLUG} plan (plan-feature, human-confirmed)" \
+  -m "AI-Artifacts-Run-Dir: ai-artifacts/runs/code/${PROJECT_SLUG}-${PLANNER_ID}"
 ```
 
 Downstream implementers reading the gate per
 [implementer-contract.md](implementer-contract.md) require both:
 
-- `plan.md` + `plan.mmd` exist on `${BASE_BRANCH}`
+- `$RUN_DIR/plan.md` + `$RUN_DIR/plan.mmd` exist on `${BASE_BRANCH}`
+  (`$RUN_DIR` resolved from the `AI-Artifacts-Run-Dir:` merge trailer)
 - `(plan-feature, human-confirmed)` marker appears in `git log`
 
 ## What plan.md contains (templated)
@@ -151,9 +156,10 @@ Downstream implementers reading the gate per
 The SKILL.md body uses these lane-conditional variables in Phase 7/8:
 
 ```bash
+RUN_DIR="ai-artifacts/runs/code/${PROJECT_SLUG}-${PLANNER_ID}"; mkdir -p "${RUN_DIR}"
 case "${SCALE}" in
-  system)  ARTIFACTS="architecture.mmd architecture.html"; MARKER="(interfaces only, human-confirmed)" ;;
-  feature) ARTIFACTS="plan.mmd plan.md";                   MARKER="(plan-feature, human-confirmed)" ;;
+  system)  ARTIFACTS="${RUN_DIR}/architecture.mmd ${RUN_DIR}/architecture.html"; MARKER="(interfaces only, human-confirmed)" ;;
+  feature) ARTIFACTS="${RUN_DIR}/plan.mmd ${RUN_DIR}/plan.md";                   MARKER="(plan-feature, human-confirmed)" ;;
 esac
 ```
 

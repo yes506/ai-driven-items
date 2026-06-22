@@ -11,8 +11,8 @@ label to prevent `click ... href="javascript:..."` injection or
 mid-label `<script>` injection.
 
 Usage:
-  render_doc_structure.py <state.json> --format mmd > document-structure.mmd
-  render_doc_structure.py <state.json> --format html > document-structure.html
+  render_doc_structure.py <state.json> --format mmd > "$RUN_DIR/document-structure.mmd"
+  render_doc_structure.py <state.json> --format html > "$RUN_DIR/document-structure.html"
 
 Expected state.json shape (minimum):
   {

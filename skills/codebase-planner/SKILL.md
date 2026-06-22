@@ -147,7 +147,7 @@ See [triage-and-readiness.md](references/triage-and-readiness.md) for
 full rubric, discovery rule, and worked examples.
 
 1. **Discovery first** (no user questions yet): scan for plan-establisher
-   `plan.<slug>.v<N>.md` per [plan-ingestion.md](references/plan-ingestion.md);
+   `ai-artifacts/plans/plan.<slug>.v<N>.md` per [plan-ingestion.md](references/plan-ingestion.md);
    then read CLAUDE.md / AGENTS.md / README.md, named files, grep call
    sites + tests, `git log -n 20 --oneline -- <path>`. Surface what you found.
 2. **Score** `(scope, risk, ambiguity)` each 0–3, with reasoning shown.
@@ -356,17 +356,18 @@ without skeletons), checklist, visual artifacts. The Mermaid renderer
 escapes interface names against `click ... href` injection.
 
 ```bash
+RUN_DIR="ai-artifacts/runs/code/${PROJECT_SLUG}-${PLANNER_ID}"; mkdir -p "${RUN_DIR}"
 case "${SCALE}" in
-  system)  ARTIFACTS="architecture.mmd architecture.html"; MARKER="(interfaces only, human-confirmed)"
-           python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" .planner-state.json > architecture.mmd
-           python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py" .planner-state.json > architecture.html ;;
-  feature) ARTIFACTS="plan.mmd plan.md";                   MARKER="(plan-feature, human-confirmed)"
-           python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" .planner-state.json > plan.mmd ;;
+  system)  ARTIFACTS="${RUN_DIR}/architecture.mmd ${RUN_DIR}/architecture.html"; MARKER="(interfaces only, human-confirmed)"
+           python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" .planner-state.json > "${RUN_DIR}/architecture.mmd"
+           python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py" .planner-state.json > "${RUN_DIR}/architecture.html" ;;
+  feature) ARTIFACTS="${RUN_DIR}/plan.mmd ${RUN_DIR}/plan.md";                   MARKER="(plan-feature, human-confirmed)"
+           python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" .planner-state.json > "${RUN_DIR}/plan.mmd" ;;
 esac
 ```
 
-**Agent step (feature only, not shell)**: compose `plan.md` per
-feature-lane.md and run smoke-check (headers + Mermaid parse) before:
+**Agent step (feature only, not shell)**: compose `${RUN_DIR}/plan.md`
+per feature-lane.md, smoke-check (headers + Mermaid parse) before:
 
 ```bash
 git add ${ARTIFACTS}
@@ -382,12 +383,9 @@ Update state: `phase_completed: artifacts_emitted`.
 The agent's cwd may be inside the worktree. Use `git -C "${MAIN_CHECKOUT}"`
 so subsequent commands are cwd-independent.
 
-Print:
-
-1. The rubric scores (Phase 7.1)
-2. The human-confirmation checklist (Phase 7.2)
-3. Paths to the artifacts emitted in Phase 7 (`${ARTIFACTS}` — `architecture.mmd`+`.html` for system, `plan.mmd`+`plan.md` for feature)
-4. The exact prompt:
+Print: (1) rubric scores (Phase 7.1); (2) human-confirmation checklist
+(Phase 7.2); (3) artifact paths from Phase 7 (`${ARTIFACTS}`, all under
+`${RUN_DIR}`); (4) the exact prompt:
 
 ```
 Type `confirm plan` to mark this planner output human-confirmed
@@ -417,13 +415,13 @@ Type `confirm plan` to mark this planner output human-confirmed
     ```bash
     git -C "${MAIN_CHECKOUT}" checkout "${BASE_BRANCH}"
     git -C "${MAIN_CHECKOUT}" merge --no-ff "planner/${PROJECT_SLUG}-${PLANNER_ID}" \
-      -m "feat(planner): merge ${PROJECT_SLUG} ${MARKER}"
+      -m "feat(planner): merge ${PROJECT_SLUG} ${MARKER}" \
+      -m "AI-Artifacts-Run-Dir: ai-artifacts/runs/code/${PROJECT_SLUG}-${PLANNER_ID}"
     ```
-    For system this expands to `... merge <slug> (interfaces only,
-    human-confirmed)`; for feature, `... merge <slug> (plan-feature,
-    human-confirmed)`. The explicit `-m` is mandatory — without it git
-    drops into `$EDITOR` and hangs in non-interactive use. **Do not**
-    `git push` — that is the user's call.
+    Subject `-m` unchanged; second `-m` carries the run-dir as a git
+    trailer the implementer parses (see
+    [implementer-contract.md](references/implementer-contract.md)). Both
+    `-m`s mandatory (else git opens `$EDITOR`). **Do not** `git push`.
 - `revise` → leave worktree intact, return to relevant phase.
 - Anything else → re-ask.
 

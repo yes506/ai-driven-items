@@ -1,8 +1,8 @@
 # Plan ingestion — reading plan-establisher output
 
 `document-planner`'s preferred upstream input is a
-`plan-establisher`-emitted `plan.<intent-slug>.v<N>.md` at the repo
-root. Phase 0.5 discovery auto-scans for it; Phase 1 reads it as the
+`plan-establisher`-emitted `ai-artifacts/plans/plan.<intent-slug>.v<N>.md`.
+Phase 0.5 discovery auto-scans for it; Phase 1 reads it as the
 canonical synthesis.
 
 ## Auto-discovery
@@ -10,7 +10,7 @@ canonical synthesis.
 At Phase 0.5 step 1:
 
 ```bash
-ls -1 plan.*.v*.md 2>/dev/null
+ls -1 ai-artifacts/plans/plan.*.v*.md 2>/dev/null
 ```
 
 If multiple plans exist for distinct intent slugs, ask the user which
@@ -105,7 +105,7 @@ planner's synthesized view.
 
 ## Handling stale plan-establisher output
 
-If `plan.<intent-slug>.v<N>.md` exists but its `last-modified` is
+If `ai-artifacts/plans/plan.<intent-slug>.v<N>.md` exists but its `last-modified` is
 older than the most recent commit touching code/docs the plan
 references, surface that gap:
 

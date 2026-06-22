@@ -80,7 +80,7 @@ the user to either remove the worktree or supply a state file.
 
 Resume mode finds untracked files inside the worktree that aren't in
 the state file (other than the expected `.seed-state.json` and any
-already-emitted `seeds/seed.*.{md,html}`). Refuse, list the unexpected
+already-emitted `ai-artifacts/seeds/seed.*.{md,html}`). Refuse, list the unexpected
 files, and ask the user to either delete them or commit them as a
 separate concern before proceeding.
 
@@ -88,7 +88,7 @@ separate concern before proceeding.
 
 Seed branch can't fast-forward or 3-way merge cleanly into
 `${BASE_BRANCH}`. Most likely cause: a prior seed run for the same
-intent merged a `seeds/seed.<intent-slug>.<resource-slug>.md` with the
+intent merged a `ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.md` with the
 same resource slug. Refuse to merge. Surface the conflicts. Ask the
 user to either: (a) update the seed branch with `git pull --rebase`
 from a fresh checkout of `${BASE_BRANCH}` and resolve the slug

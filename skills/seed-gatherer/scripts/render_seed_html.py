@@ -11,7 +11,7 @@ uses single-pass placeholder substitution to defuse the chained-replace
 re-substitution class.
 
 Read-only: writes only to stdout. Caller redirects with
-`> seeds/seed.<intent-slug>.<resource-slug>.html` per SKILL.md Phase 5.
+`> ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.html` per SKILL.md Phase 5.
 
 Usage:
     render_seed_html.py <path-to-.seed-state.json> <resource_slug>

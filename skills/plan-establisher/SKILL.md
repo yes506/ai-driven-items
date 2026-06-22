@@ -3,13 +3,13 @@ name: plan-establisher
 description: |
   Sits between `seed-gatherer` and the downstream planners
   (`codebase-planner` for code; `document-planner` for documents)
-  in the chain. Reads `intent.<slug>.md` (required) and
-  `seeds/seed.<intent-slug>.*.md` (optional), runs 4 verification
-  dimensions (intent self-consistency, seeds-vs-intent,
-  seeds-vs-seeds, planner-rubric completeness), resolves ambiguities
-  via interactive Socratic dialog, then emits a folded planner-ready
-  `plan.<intent-slug>.v<N>.md` + `plan.<intent-slug>.v<N>.html` at
-  repo root. The downstream planner reads ONLY the plan; the intent
+  in the chain. Reads `ai-artifacts/intents/intent.<slug>.md`
+  (required) and `ai-artifacts/seeds/seed.<intent-slug>.*.md`
+  (optional), runs 4 verification dimensions (intent self-consistency,
+  seeds-vs-intent, seeds-vs-seeds, planner-rubric completeness),
+  resolves ambiguities via interactive Socratic dialog, then emits a
+  folded planner-ready `ai-artifacts/plans/plan.<intent-slug>.v<N>.md`
+  + `.html`. The downstream planner reads ONLY the plan; the intent
   and seeds become raw source material it doesn't touch directly.
   Iteratively re-runnable — each invocation emits the next version,
   prior versions preserved as audit trail. Manual invocation only —
@@ -24,13 +24,13 @@ disable-model-invocation: true
 Take the intent (and any gathered seeds) and produce a single planner-
 ready doc. The skill verifies the inputs across 4 dimensions, drives
 ambiguity resolution through interactive Q&A, then folds the verified
-material into a `plan.<intent-slug>.v<N>.md` that the downstream planner
-reads as its only active input:
+material into an `ai-artifacts/plans/plan.<intent-slug>.v<N>.md` that
+the downstream planner reads as its only active input:
 
 | Output | Audience | Purpose |
 |---|---|---|
-| `plan.<intent-slug>.v<N>.md` | AI (downstream planner reads ONLY this) | Folded planner-ready doc — Goal, scope, constraints, success criteria, proposed scale lane + reasoning, evidence inventory, resolved ambiguities, remaining open questions |
-| `plan.<intent-slug>.v<N>.html` | Human (browser-openable) | Self-contained verification doc, no CDN, HTML-escaped |
+| `ai-artifacts/plans/plan.<intent-slug>.v<N>.md` | AI (downstream planner reads ONLY this) | Folded planner-ready doc — Goal, scope, constraints, success criteria, proposed scale lane + reasoning, evidence inventory, resolved ambiguities, remaining open questions |
+| `ai-artifacts/plans/plan.<intent-slug>.v<N>.html` | Human (browser-openable) | Self-contained verification doc, no CDN, HTML-escaped |
 
 The skill is **iteratively re-runnable**: each invocation runs in its
 own worktree+merge cycle, emits the next monotonic version, and
@@ -68,8 +68,8 @@ Captured during Phases L–4 and threaded through later phases:
 - `MAIN_CHECKOUT` — absolute path to the parent main worktree.
 - `BASE_BRANCH` — branch the plan worktree branches from (default `dev`).
 - `INTENT_SLUG` — chosen at Phase 1.
-- `INTENT` — parsed 6 rubric fields from `intent.<INTENT_SLUG>.md`.
-- `SEEDS` — loaded from `seeds/seed.<INTENT_SLUG>.*.md` (may be `[]`).
+- `INTENT` — parsed 6 rubric fields from `ai-artifacts/intents/intent.<INTENT_SLUG>.md`.
+- `SEEDS` — loaded from `ai-artifacts/seeds/seed.<INTENT_SLUG>.*.md` (may be `[]`).
 - `N` — tentative plan version (`max(existing) + 1`), possibly bumped
   at Phase 5 race-guard.
 - `PLAN_RUN_ID` — stable run handle; computed at end of Phase 1.
@@ -126,12 +126,12 @@ Capture from JSON: `MAIN_CHECKOUT`, `default_branch`. Set
 **1a — Intent selection.** Discover `intent.*.md` files at repo root:
 
 ```bash
-ls -1 "${MAIN_CHECKOUT}"/intent.*.md 2>/dev/null
+ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/intents/intent.*.md 2>/dev/null
 ```
 
 | Match count | Action |
 |---|---|
-| 0 | refuse: *"No `intent.<slug>.md` found. Run `/intent-aligner` first."* exit cleanly |
+| 0 | refuse: *"No `ai-artifacts/intents/intent.<slug>.md` found. Run `/intent-aligner` first."* exit cleanly |
 | 1 | auto-pick; echo slug + goal line; wait for `confirm intent` |
 | ≥2 | numbered menu; prompt: *"Which intent should this plan serve?"* |
 
@@ -143,7 +143,7 @@ proceeding — do NOT silently fill in.
 **1b — Seed loading.** Discover seeds for the chosen intent:
 
 ```bash
-ls -1 "${MAIN_CHECKOUT}"/seeds/seed."${INTENT_SLUG}".*.md 2>/dev/null
+ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/seeds/seed."${INTENT_SLUG}".*.md 2>/dev/null
 ```
 
 | Match count | Action |
@@ -157,7 +157,7 @@ Skip malformed seeds with a warning; do NOT crash.
 **1c — Version pick.** Scan for existing plans:
 
 ```bash
-existing="$(ls -1 "${MAIN_CHECKOUT}"/plan."${INTENT_SLUG}".v*.md 2>/dev/null \
+existing="$(ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/plans/plan."${INTENT_SLUG}".v*.md 2>/dev/null \
   | sed -nE 's|.*/plan\.[a-z0-9-]+\.v([0-9]+)\.md$|\1|p' \
   | sort -n | tail -1)"
 N=$(( ${existing:-0} + 1 ))
@@ -301,8 +301,9 @@ Stop and ask the user — never auto-resolve.
 
 ## Phase 5 — Emit plan + commit
 
-**Version-race guard FIRST**: re-scan `plan.<INTENT_SLUG>.v*.md` at
-`MAIN_CHECKOUT`; if `max(existing) ≥ N`, bump `N` to
+**Version-race guard FIRST**: re-scan
+`ai-artifacts/plans/plan.<INTENT_SLUG>.v*.md` at `MAIN_CHECKOUT`; if
+`max(existing) ≥ N`, bump `N` to
 `max(existing) + 1` and notify the user in chat (mandatory — never
 silent). Persist the new `plan_version` to the state file BEFORE
 writing the files, so a crash mid-write leaves state pointing at the
@@ -316,19 +317,19 @@ the downstream planner reads them; the `.plan-state.json` written by
 Phase 4 / updated by Phase 5 also lives at the worktree root but
 stays gitignored throughout):
 
-1. **Write `plan.<INTENT_SLUG>.v<N>.md`** at the worktree root via
-   `Write` per the schema in
-   [references/output-schema.md](references/output-schema.md). Use a
-   relative path `"plan.${INTENT_SLUG}.v${N}.md"` — the file becomes
-   part of the worktree's working tree, gets committed at step 3,
-   and Phase 6 merge brings it to `MAIN_CHECKOUT`. Field NAMES
-   English; VALUES follow `LANGUAGE`.
+1. **Write `ai-artifacts/plans/plan.<INTENT_SLUG>.v<N>.md`** at the
+   worktree root via `Write` per the schema in
+   [references/output-schema.md](references/output-schema.md). First
+   `mkdir -p ai-artifacts/plans` (idempotent), then write to the
+   relative path `"ai-artifacts/plans/plan.${INTENT_SLUG}.v${N}.md"`
+   — committed at step 3, brought to `MAIN_CHECKOUT` by the Phase 6
+   merge. Field NAMES English; VALUES follow `LANGUAGE`.
 
 2. **Render `.html`** at the worktree root:
 
    ```bash
    python3 "${CLAUDE_SKILL_DIR}/scripts/render_plan_html.py" \
-     .plan-state.json > "plan.${INTENT_SLUG}.v${N}.html"
+     .plan-state.json > "ai-artifacts/plans/plan.${INTENT_SLUG}.v${N}.html"
    ```
 
    Renderer is self-contained (no CDN, HTML-escapes all user content).
@@ -339,7 +340,8 @@ stays gitignored throughout):
    nothing; the skip prevents a "nothing to commit" abort:
 
    ```bash
-   git add "plan.${INTENT_SLUG}.v${N}.md" "plan.${INTENT_SLUG}.v${N}.html"
+   git add "ai-artifacts/plans/plan.${INTENT_SLUG}.v${N}.md" \
+     "ai-artifacts/plans/plan.${INTENT_SLUG}.v${N}.html"
    if ! git diff --cached --quiet; then
      git commit -m "feat(plan): emit ${INTENT_SLUG} v${N}"
    fi
@@ -361,9 +363,9 @@ Print:
 1. Absolute paths to the **gate-time** artifacts inside the worktree
    — the user opens the HTML to verify *before* deciding whether to
    merge:
-   `${MAIN_CHECKOUT}/.worktrees/plan-${INTENT_SLUG}-${PLAN_RUN_ID}/plan.${INTENT_SLUG}.v${N}.html`
+   `${MAIN_CHECKOUT}/.worktrees/plan-${INTENT_SLUG}-${PLAN_RUN_ID}/ai-artifacts/plans/plan.${INTENT_SLUG}.v${N}.html`
    and the `.md` next to it. Note that *after* `confirm merge` the
-   same files land at `${MAIN_CHECKOUT}/plan.${INTENT_SLUG}.v${N}.{md,html}`
+   same files land at `${MAIN_CHECKOUT}/ai-artifacts/plans/plan.${INTENT_SLUG}.v${N}.{md,html}`
    on `${BASE_BRANCH}` — that's the post-merge path the downstream
    planner reads from. Both paths point at the same content; the
    worktree path is what's verifiable *now*.
@@ -373,7 +375,7 @@ Print:
    ```
    Next step: run `/codebase-planner` (for code) or `/document-planner`
    (for documents) when ready. It reads
-   ${MAIN_CHECKOUT}/plan.${INTENT_SLUG}.v${N}.md (the latest version
+   ${MAIN_CHECKOUT}/ai-artifacts/plans/plan.${INTENT_SLUG}.v${N}.md (the latest version
    for this intent) as its only active input. The intent.md and seeds/
    become background source material the planner doesn't re-read by
    default. To revise: re-run `/plan-establisher` for a v${next} that
@@ -449,8 +451,9 @@ for confirmation to deviate, but default to refusal):
 - `--no-verify` on commits (pre-commit hooks must run)
 - Treating user silence as confirmation at any gate (intent
   selection, `confirm plan`, `confirm merge`, "remove worktree?")
-- Modifying `intent.<slug>.md` or any file under `seeds/` in any
-  way other than reading — those are read-only inputs owned by
+- Modifying `ai-artifacts/intents/intent.<slug>.md` or any file under
+  `ai-artifacts/seeds/` in any way other than reading — those are
+  read-only inputs owned by
   upstream skills
 - Emitting a plan with `Remaining open questions` that the user
   didn't explicitly defer via `(d) Defer` or `accept remaining`

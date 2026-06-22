@@ -60,6 +60,30 @@ ai-driven-items/
 └── README.md
 ```
 
+**Where skills write their deliverables.** Side-effect skills never scatter
+artifacts across your project root — they all write under a single committed
+`ai-artifacts/` directory (created on first use), so multiple skill runs in one
+project never collide:
+
+```
+ai-artifacts/
+├── intents/   intent.<slug>.{md,html}             # intent-aligner / seed-gatherer
+├── seeds/     seed.<slug>.<resource>.{md,html}    # seed-gatherer
+├── plans/     plan.<slug>.v<N>.{md,html}          # plan-establisher (versioned)
+└── runs/
+    ├── code/<slug>-<planner-id>/                  # codebase-planner → codebase-implementer
+    │     plan.md  plan.mmd | architecture.{html,mmd}   report.<impl-id>.md
+    └── doc/<slug>-<docplanner-id>/                # document-planner → document-implementer
+          document-plan.md  document-structure.{mmd,html}   report.<impl-id>.md
+```
+
+Durable artifacts (intents/seeds/plans) are slug- and version-named; per-run
+planner→implementer handoffs keep stable filenames inside a run-id-keyed
+directory whose path is passed downstream via an `AI-Artifacts-Run-Dir:` git
+trailer on the merge commit. Exempt from `ai-artifacts/`: `document-implementer`
+writes the finished document to your chosen `TARGET_PATH`; `collect-searches`
+and `live-notes` write to their own note targets.
+
 ### Installing
 
 The install instructions below use `project-scaffolder` as the running example. **Substitute `<name>`** with the directory name of any other utility from the index above (e.g. `codebase-planner`).
@@ -247,6 +271,30 @@ ai-driven-items/
 ├── playbooks/          (예정) 재사용 가능한 AI 친화적 구현 가이드
 └── README.md
 ```
+
+**스킬 산출물이 저장되는 위치.** 부작용(side-effect)이 있는 스킬은 산출물을
+프로젝트 루트에 흩뿌리지 않습니다 — 모두 커밋되는 단일 `ai-artifacts/`
+디렉터리 아래에 기록하므로(최초 실행 시 생성), 한 프로젝트에서 여러 스킬을
+여러 번 실행해도 서로 충돌하지 않습니다:
+
+```
+ai-artifacts/
+├── intents/   intent.<slug>.{md,html}             # intent-aligner / seed-gatherer
+├── seeds/     seed.<slug>.<resource>.{md,html}    # seed-gatherer
+├── plans/     plan.<slug>.v<N>.{md,html}          # plan-establisher (버전 관리)
+└── runs/
+    ├── code/<slug>-<planner-id>/                  # codebase-planner → codebase-implementer
+    │     plan.md  plan.mmd | architecture.{html,mmd}   report.<impl-id>.md
+    └── doc/<slug>-<docplanner-id>/                # document-planner → document-implementer
+          document-plan.md  document-structure.{mmd,html}   report.<impl-id>.md
+```
+
+지속(durable) 산출물(intents/seeds/plans)은 slug·버전으로 이름이 붙고, 실행별
+planner→implementer 핸드오프는 run-id 기반 디렉터리 안에서 고정 파일명을
+유지하며, 그 경로는 머지 커밋의 `AI-Artifacts-Run-Dir:` git trailer 로
+다운스트림에 전달됩니다. `ai-artifacts/` 예외: `document-implementer` 는 완성
+문서를 사용자가 지정한 `TARGET_PATH` 에 기록하고, `collect-searches` 와
+`live-notes` 는 각자의 노트 대상에 기록합니다.
 
 ### 설치
 

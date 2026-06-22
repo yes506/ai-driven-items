@@ -25,6 +25,8 @@ lands on `${BASE_BRANCH}`.
 
   "planner_marker_scale": "<scale>",
   "planner_marker_commit": "<sha or empty for micro/local>",
+  "planner_artifact_dir": "<resolved RUN_DIR under ai-artifacts/runs/doc/ for feature/system; empty for micro/local>",
+  "report_slug": "<sanitized TARGET_PATH/project basename; used for the micro/local report sibling dir>",
   "source_hash": "<sha256 over planner artifacts at Phase 1>",
 
   "max_autofix_attempts": 3,
@@ -93,7 +95,10 @@ When Phase 0 detects `inside-document-implementer-worktree`:
    - re-extract (discards in-progress impl + re-runs Phase 1), OR
    - abort (leave worktree intact; user investigates manually).
 4. Restore in-memory state from the JSON (LANGUAGE, work queue,
-   validation runs, etc.).
+   validation runs, etc.). **Reuse the persisted `planner_artifact_dir`
+   as `RUN_DIR`** — do NOT re-resolve the newest marker on resume (a
+   newer planner run must not silently re-target a mid-flight
+   implementer). For micro/local, restore `report_slug`.
 5. Dispatch to the next phase per the resume map.
 
 ## Incremental write strategy
@@ -164,8 +169,8 @@ case "${SCALE}" in
     # Hash the union of planner artifacts on the merged branch.
     SOURCE_HASH="$(
       {
-        cat document-plan.md document-structure.mmd 2>/dev/null
-        [ "${SCALE}" = "system" ] && cat document-structure.html 2>/dev/null
+        cat "${RUN_DIR}/document-plan.md" "${RUN_DIR}/document-structure.mmd" 2>/dev/null
+        [ "${SCALE}" = "system" ] && cat "${RUN_DIR}/document-structure.html" 2>/dev/null
       } | sha256_portable | cut -c1-12)"
     ;;
   micro|local)

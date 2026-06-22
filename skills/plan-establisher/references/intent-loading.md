@@ -1,17 +1,18 @@
-# Loading intent.<slug>.md
+# Loading ai-artifacts/intents/intent.<slug>.md
 
-Phase 1 reads `intent.<intent-slug>.md` from the repo root (i.e. the
-`MAIN_CHECKOUT` working tree on `${BASE_BRANCH}`) and parses out the
+Phase 1 reads `ai-artifacts/intents/intent.<intent-slug>.md` from the
+`MAIN_CHECKOUT` working tree on `${BASE_BRANCH}` and parses out the
 6 rubric fields the verification step (Phase 2) needs to evaluate.
 
 ## Discovery rule
 
-1. List `intent.*.md` files at the repo root:
+1. List `ai-artifacts/intents/intent.*.md` files:
    ```bash
-   ls -1 "${MAIN_CHECKOUT}"/intent.*.md 2>/dev/null
+   ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/intents/intent.*.md 2>/dev/null
    ```
 2. Cases:
-   - **Zero matches** → refuse with: *"No `intent.<slug>.md` found at
+   - **Zero matches** → refuse with: *"No
+     `ai-artifacts/intents/intent.<slug>.md` found at
      `${MAIN_CHECKOUT}`. Run `/intent-aligner` first to capture your
      intent."* Exit cleanly — do NOT proceed without an intent.
    - **One match** → auto-pick. Echo the slug and the goal line back to

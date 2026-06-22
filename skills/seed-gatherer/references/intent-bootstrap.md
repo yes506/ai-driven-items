@@ -1,12 +1,12 @@
 # Intent bootstrap — capturing intent ad-hoc within seed-gatherer
 
 When the user runs `/seed-gatherer` and **no `intent.<slug>.md` exists**
-at `MAIN_CHECKOUT`, the skill can capture intent ad-hoc and emit
-`intent.<slug>.{md,html}` alongside seeds in the same worktree+merge
+at `MAIN_CHECKOUT/ai-artifacts/intents/`, the skill can capture intent ad-hoc and emit
+`ai-artifacts/intents/intent.<slug>.{md,html}` alongside seeds in the same worktree+merge
 cycle. This is the **bootstrap path** — the second of three Phase 1
 branches.
 
-| Match count at `MAIN_CHECKOUT` for `intent.*.md` | Phase 1 branch |
+| Match count at `MAIN_CHECKOUT/ai-artifacts/intents/` for `intent.*.md` | Phase 1 branch |
 |---|---|
 | 0 | offer bootstrap OR abort — full spec in this file |
 | 1 | auto-pick (standard path) |
@@ -33,12 +33,12 @@ seeds — see the chain narrative in SKILL.md.
 Phase 1's zero-match case opens with:
 
 ```
-No `intent.<slug>.md` found at <MAIN_CHECKOUT>.
+No `intent.<slug>.md` found at <MAIN_CHECKOUT>/ai-artifacts/intents/.
 
 You have two options:
   1) Bootstrap intent here — paste a prompt / URL / file path
      describing what you want to build or fix, and I'll capture it
-     as `intent.<slug>.md` (revision 1) alongside the seeds we collect.
+     as `ai-artifacts/intents/intent.<slug>.md` (revision 1) alongside the seeds we collect.
   2) Abort — run `/intent-aligner` first for a more thorough capture,
      then come back to `/seed-gatherer`.
 
@@ -171,14 +171,15 @@ bootstrap-specific.
 Phase 5 emits BOTH intent and seed artifacts in the same per-resource
 loop's prefix and suffix:
 
-1. **Pre-loop**: write `intent.${INTENT_SLUG}.md` and
-   `intent.${INTENT_SLUG}.html` at the worktree root. The HTML is
+1. **Pre-loop**: `mkdir -p ai-artifacts/intents`, then write
+   `ai-artifacts/intents/intent.${INTENT_SLUG}.md` and
+   `ai-artifacts/intents/intent.${INTENT_SLUG}.html` at the worktree root. The HTML is
    rendered by the bundled `scripts/render_intent_html.py` (copied
    from intent-aligner — see "HTML renderer provenance" below):
 
    ```bash
    python3 "${CLAUDE_SKILL_DIR}/scripts/render_intent_html.py" \
-     .seed-state.json > "intent.${INTENT_SLUG}.html"
+     .seed-state.json > "ai-artifacts/intents/intent.${INTENT_SLUG}.html"
    ```
 
    The script reads `.seed-state.json` looking for an `intent` object
@@ -186,7 +187,7 @@ loop's prefix and suffix:
    the intent object with all required fields so the renderer is
    format-compatible.
 
-2. **Per-resource loop**: emit `seeds/seed.${INTENT_SLUG}.*.{md,html}`
+2. **Per-resource loop**: emit `ai-artifacts/seeds/seed.${INTENT_SLUG}.*.{md,html}`
    exactly as the standard flow (see SKILL.md Phase 5).
 
 3. **Single batch commit** subject:
@@ -194,8 +195,8 @@ loop's prefix and suffix:
    feat(seeds+intent): bootstrap ${INTENT_SLUG} (rev 1 + ${SEED_COUNT} seeds)
    ```
 
-   The commit stages `intent.${INTENT_SLUG}.{md,html}` AND
-   `seeds/seed.${INTENT_SLUG}.*.{md,html}` together.
+   The commit stages `ai-artifacts/intents/intent.${INTENT_SLUG}.{md,html}` AND
+   `ai-artifacts/seeds/seed.${INTENT_SLUG}.*.{md,html}` together.
 
 The intent.md MUST include in its Provenance section:
 

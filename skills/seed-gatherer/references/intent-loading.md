@@ -1,15 +1,15 @@
 # Loading intent.<slug>.md
 
-Phase 1 reads `intent.<intent-slug>.md` from the repo root (i.e. the
+Phase 1 reads `ai-artifacts/intents/intent.<intent-slug>.md` from the repo root (i.e. the
 `MAIN_CHECKOUT` working tree on `${BASE_BRANCH}`) and parses out the
 fields the downstream extraction (Phase 3) needs to filter resources
 against.
 
 ## Discovery rule
 
-1. List `intent.*.md` files at the repo root:
+1. List `intent.*.md` files under `ai-artifacts/intents/`:
    ```bash
-   ls -1 "${MAIN_CHECKOUT}"/intent.*.md 2>/dev/null
+   ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/intents/intent.*.md 2>/dev/null
    ```
 2. Cases:
    - **Zero matches** → offer the **bootstrap path** OR abort. The
@@ -17,7 +17,7 @@ against.
      run; full spec: [intent-bootstrap.md](intent-bootstrap.md). The
      Phase 1 dialog is:
      ```
-     No `intent.<slug>.md` found at <MAIN_CHECKOUT>. Choose:
+     No `intent.<slug>.md` found at <MAIN_CHECKOUT>/ai-artifacts/intents/. Choose:
        1) Bootstrap intent here — paste prompt / URL / file path
        2) Abort — run `/intent-aligner` first
      ```
@@ -28,7 +28,7 @@ against.
      `revise` to abort and let user manually specify a slug). The user
      can also type `bootstrap` to ignore the existing intent and
      capture a new one ad-hoc — but this is rare; warn first
-     (*"`intent.<existing>.md` is at the repo root. Bootstrap will
+     (*"`intent.<existing>.md` is at `ai-artifacts/intents/`. Bootstrap will
      create a sibling intent; the two will coexist. Continue?"*).
    - **Multiple matches** → list all slugs with their `Goal:` lines as a
      numbered menu. Prompt: *"Which intent should these seeds serve?
@@ -44,7 +44,7 @@ chooses ideation, not at Phase 1).
 ## Field parsing
 
 Parse the following 6 rubric sections from
-`intent.<intent-slug>.md`. The intent-aligner format uses level-2
+`ai-artifacts/intents/intent.<intent-slug>.md`. The intent-aligner format uses level-2
 markdown headings (`## <Field>`) followed by content:
 
 | Markdown heading | Parsed into `intent.<field>` | Expected shape |
