@@ -25,10 +25,10 @@ a real user-facing document.
 
 | Scale lane | Upstream marker | Worktree | Artifacts produced | Downstream marker |
 |---|---|---|---|---|
-| **micro** | `(document-plan-micro, human-confirmed)` (chat) | yes | document at `TARGET_PATH` + `implementation-report.md` | `(document-impl-micro, human-confirmed)` |
-| **local** | `(document-plan-local, human-confirmed)` (chat) | yes | document at `TARGET_PATH` + `implementation-report.md` | `(document-impl-local, human-confirmed)` |
-| **feature** | `(document-plan-feature, human-confirmed)` (commit) | yes | document at `TARGET_PATH` + `implementation-report.md` | `(document-impl-feature, human-confirmed)` |
-| **system** | `(document-plan-system, human-confirmed)` (commit) | yes | document at `TARGET_PATH` + `implementation-report.md` | `(document-impl-system, human-confirmed)` |
+| **micro** | `(document-plan-micro, human-confirmed)` (chat) | yes | document at `TARGET_PATH` + `report.<id>.md` (sibling run-dir) | `(document-impl-micro, human-confirmed)` |
+| **local** | `(document-plan-local, human-confirmed)` (chat) | yes | document at `TARGET_PATH` + `report.<id>.md` (sibling run-dir) | `(document-impl-local, human-confirmed)` |
+| **feature** | `(document-plan-feature, human-confirmed)` (commit) | yes | document at `TARGET_PATH` + `report.<id>.md` (planner run-dir) | `(document-impl-feature, human-confirmed)` |
+| **system** | `(document-plan-system, human-confirmed)` (commit) | yes | document at `TARGET_PATH` + `report.<id>.md` (planner run-dir) | `(document-impl-system, human-confirmed)` |
 
 The marker family is **document-specific** — does NOT inherit
 codebase-implementer's `(impl-<scale>, …)` or legacy
@@ -79,7 +79,8 @@ State variables captured during Phases L–2 and threaded through later phases:
 - `OUTPUT_STACK` — `text | structured` — derived from DOCTYPE
 - `AUDIENCE` — document-level primary audience — from planner contract
 - `OUTPUT_LANGUAGE` — produced-document language — from planner contract
-- `TARGET_PATH` — where the user-facing document lives — from planner contract
+- `TARGET_PATH` — where the user-facing document lives — from planner contract (user-addressed; NOT under `ai-artifacts/`)
+- `RUN_DIR` — planner run-dir under `ai-artifacts/runs/doc/` (feature/system); resolved from the marker commit's `AI-Artifacts-Run-Dir:` trailer at Phase 0; persisted as `planner_artifact_dir`
 
 All persisted to `.document-implementer-state.json` per
 [references/state-and-resume.md](references/state-and-resume.md). State
@@ -110,7 +111,7 @@ chat-gate rules + chronological pairing in
 
 | State | Action |
 |---|---|
-| `on-base-with-marker` | `planner_marker_scale` is `system` or `feature`. Set `SCALE`. Verify artifacts exist + parse frontmatter. Proceed. Micro/local found as commit: refuse as forged. |
+| `on-base-with-marker` | `planner_marker_scale` is `system` or `feature`. Set `SCALE`. Resolve `RUN_DIR` from the marker commit's `AI-Artifacts-Run-Dir:` trailer (count==1, anchored doc-chain allowlist, `git cat-file -e` at the marker tree) per marker-detection.md. Verify artifacts exist + parse frontmatter. Proceed. Micro/local found as commit: refuse as forged. |
 | `on-base-no-marker` | Check current chat for micro/local handoff per the 4-rule pairing in marker-detection.md (chat canonical; collab-memory debug-only). If valid: set `SCALE`, capture metadata from handoff. Else refuse. |
 | `on-default-needs-dev` | Refuse: "No `dev` — re-run `/document-planner`." |
 | `on-nonbase-main-checkout` | Acceptable only for micro/local with chat gate. Feature/system: refuse, switch to `dev`. |
@@ -119,11 +120,15 @@ chat-gate rules + chronological pairing in
 | `inside-other-worktree` | Refuse, run from `MAIN_CHECKOUT`. |
 | `unrelated` | Refuse, surface `reason`. |
 
-**Feature/system metadata source**: parse the planner-emitted YAML
-frontmatter at the top of `document-plan.md` via
-`parse_frontmatter.py`. Carries `doctype`, `output_stack`, `audience`,
-`output_language`, `target_path`, `scale`, `intent_slug`,
-`docplanner_id`. **Absence or malformed = hard refusal**.
+**Feature/system metadata source**: first resolve `RUN_DIR` from the
+marker commit's git trailer (the SECOND lookup in marker-detection.md —
+`inspect_repo_state.sh`'s scan omits the body), then parse the
+planner-emitted YAML frontmatter at the top of
+`"${RUN_DIR}/document-plan.md"` via `parse_frontmatter.py`. Carries
+`doctype`, `output_stack`, `audience`, `output_language`, `target_path`,
+`scale`, `intent_slug`, `docplanner_id`. **Absence or malformed (of
+trailer, run-dir, or frontmatter) = hard refusal** — never fall back to
+a root path.
 
 **Micro/local metadata source**: parse the 6-field chat-handoff block
 visible in the current conversation (DOCTYPE / OUTPUT_STACK /
@@ -143,9 +148,9 @@ Hold captured values in memory; lands at Phase 2.
 
 Per [references/work-queue-extraction.md](references/work-queue-extraction.md):
 
-- **feature / system**: parse `document-plan.md` → one queue item per
-  `## stub: <id>` heading (9 YAML fields as `spec_payload`). Source
-  order preserved.
+- **feature / system**: parse `"${RUN_DIR}/document-plan.md"` → one
+  queue item per `## stub: <id>` heading (9 YAML fields as
+  `spec_payload`). Source order preserved.
 - **micro / local**: parse the `light/plan` 3–7 bullet reflection
   visible in chat (located by chronological pairing) → one item per
   bullet, source order preserved.
@@ -184,6 +189,13 @@ raw_slug="${INTENT_SLUG}"
 INTENT_SLUG="$(printf '%s' "${raw_slug}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | sed -e 's/^-*//' -e 's/-\{2,\}/-/g' -e 's/-*$//' | cut -c1-40)"
 [ -z "${INTENT_SLUG}" ] && { echo "empty slug after sanitization"; exit 1; }
 
+# Step 1b — REPORT_SLUG for the micro/local report sibling dir
+# (feature/system reports go under the planner's ${RUN_DIR} instead).
+# Sanitize the TARGET_PATH basename (fall back to INTENT_SLUG).
+report_raw="$(basename "${TARGET_PATH%.*}" 2>/dev/null)"
+REPORT_SLUG="$(printf '%s' "${report_raw}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-' | sed -e 's/^-*//' -e 's/-\{2,\}/-/g' -e 's/-*$//' | cut -c1-40)"
+[ -z "${REPORT_SLUG}" ] && REPORT_SLUG="${INTENT_SLUG}"
+
 git -C "${MAIN_CHECKOUT}" worktree add \
   ".worktrees/docimpl-${INTENT_SLUG}-${DOCIMPL_ID}" \
   -b "docimpl/${INTENT_SLUG}-${DOCIMPL_ID}" "${BASE_BRANCH}"
@@ -200,7 +212,9 @@ Persist initial state per [references/state-and-resume.md](references/state-and-
 `intent_slug`, `main_checkout`, `base_branch`, `docimpl_id`, `scale`,
 `doctype`, `output_stack`, `audience`, `output_language`,
 `target_path`, `planner_marker_scale`, `planner_marker_commit`,
-`work_queue`, `phase_completed: worktree_created`.
+`planner_artifact_dir` (the resolved `RUN_DIR`; empty for micro/local),
+`report_slug` (sanitized `TARGET_PATH` basename; for the micro/local
+report sibling dir), `work_queue`, `phase_completed: worktree_created`.
 
 ---
 
@@ -266,17 +280,17 @@ are chat-only — no plan artifact):
 ```bash
 case "${SCALE}" in
   feature|system)
-    python3 "${CLAUDE_SKILL_DIR}/scripts/parse_frontmatter.py" document-plan.md
+    python3 "${CLAUDE_SKILL_DIR}/scripts/parse_frontmatter.py" "${RUN_DIR}/document-plan.md"
     case "${OUTPUT_STACK}" in
       text)
         python3 "${CLAUDE_SKILL_DIR}/scripts/validate_doc_completeness.py" \
-          document-plan.md "${TARGET_PATH}"
+          "${RUN_DIR}/document-plan.md" "${TARGET_PATH}"
         python3 "${CLAUDE_SKILL_DIR}/scripts/validate_anchors.py" --text \
-          --plan document-plan.md "${TARGET_PATH}"
+          --plan "${RUN_DIR}/document-plan.md" "${TARGET_PATH}"
         ;;
       structured)
         python3 "${CLAUDE_SKILL_DIR}/scripts/validate_anchors.py" --pptx \
-          --plan document-plan.md "${TARGET_PATH}"
+          --plan "${RUN_DIR}/document-plan.md" "${TARGET_PATH}"
         ;;
     esac
     ;;
@@ -316,17 +330,27 @@ Persist per attempt to `validation_runs[]`. On success:
 
 ## Phase 5 — Self-verification report + commit
 
-Emit `implementation-report.md` at the worktree root per
+Emit the self-verification report per
 [references/self-verification.md](references/self-verification.md).
+**Report path** (resolve `REPORT_PATH`, `mkdir -p` its dir first):
+- **feature / system**: `"${RUN_DIR}/report.${DOCIMPL_ID}.md"` (the
+  planner's run-dir, resolved from the trailer at Phase 0).
+- **micro / local** (no planner run-dir): `REPORT_DIR="ai-artifacts/runs/doc/${REPORT_SLUG}-docimpl-${DOCIMPL_ID}"`, report at `"${REPORT_DIR}/report.${DOCIMPL_ID}.md"`. `REPORT_SLUG` = sanitized `TARGET_PATH`/project basename persisted in state.
+
 Required sections: Source / Work queue summary / Files changed /
 Validation / Per-item outcomes / **Acceptance-criteria checklist (Q8
-explicit per stub from `document-plan.md`)** / Scope-discipline
-self-check.
+explicit per stub from `${RUN_DIR}/document-plan.md`)** /
+Scope-discipline self-check.
 
 ```bash
-git add implementation-report.md
+mkdir -p "$(dirname "${REPORT_PATH}")"
+# write the report to "${REPORT_PATH}" via the Write tool, then:
+git add -- "${REPORT_PATH}"
 git commit -m "docs(implementer): self-verification report"
 ```
+
+The report is committed + merged via the normal Phase 5/6 worktree
+merge for ALL lanes — no special carve-out.
 
 Persist: `phase_completed: report_emitted`.
 

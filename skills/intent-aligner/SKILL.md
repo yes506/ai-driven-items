@@ -6,9 +6,9 @@ description: |
   5 Whys + example/counter-example disambiguation), auto-detects whether the
   user brings a feature/product idea or a problem/pain, and emits a dual-
   format artifact: `intent.<slug>.md` (structured AI-parseable seed) and
-  `intent.<slug>.html` (static, self-contained, human-verifiable).
-  Slug-scoped filenames let multiple intents coexist at the repo root
-  after merge. Bidirectional with `seed-gatherer`: the initial intent is
+  `intent.<slug>.html` (static, self-contained, human-verifiable), both
+  under `ai-artifacts/intents/`. Slug-scoped filenames let multiple
+  intents coexist after merge. Bidirectional with `seed-gatherer`: the initial intent is
   not immutable — `/intent-aligner update <slug>` refines an existing
   intent from accumulated seeds, bumping its revision until the intent
   is solid enough to plan against. Chain: intent-aligner ⇄ seed-gatherer
@@ -30,12 +30,12 @@ then emits two artifacts:
 
 | Output | Audience | Purpose |
 |---|---|---|
-| `intent.<slug>.md` | AI (next-hop is `seed-gatherer`, then `plan-establisher`) | Structured seed listing the user's goal, scope, constraints, and reasoning |
-| `intent.<slug>.html` | Human | Static, self-contained, print-friendly verification doc — the user reads it and confirms "yes, that's what I meant" |
+| `ai-artifacts/intents/intent.<slug>.md` | AI (next-hop is `seed-gatherer`, then `plan-establisher`) | Structured seed listing the user's goal, scope, constraints, and reasoning |
+| `ai-artifacts/intents/intent.<slug>.html` | Human | Static, self-contained, print-friendly verification doc — the user reads it and confirms "yes, that's what I meant" |
 
-Artifact names are **slug-scoped** so multiple intents can coexist at
-the repo root after merge — running `/intent-aligner` for two different
-projects produces `intent.foo.md` and `intent.bar.md` without
+Artifact names are **slug-scoped** so multiple intents can coexist in
+`ai-artifacts/intents/` after merge — running `/intent-aligner` for two
+different projects produces `intent.foo.md` and `intent.bar.md` without
 overwriting each other.
 
 The skill sits at the head of the chain and is **bidirectional** with
@@ -123,7 +123,7 @@ planner's parser reads them; field VALUES follow `LANGUAGE`; merge marker
 
 **Arg-parse**: `/intent-aligner` ⇒ `RUN_MODE=create`. `/intent-aligner
 update <slug>` or `--update <slug>` ⇒ `RUN_MODE=update` (verify
-`intent.<slug>.md` exists after repo-state check; if not, refuse with
+`ai-artifacts/intents/intent.<slug>.md` exists after repo-state check; if not, refuse with
 list of existing intents). Bare `update` with no slug ⇒ refuse. Update-
 mode specifics: [references/update-mode.md](references/update-mode.md).
 
@@ -148,8 +148,8 @@ Capture from JSON: `MAIN_CHECKOUT`, `default_branch`. Default
 `BASE_BRANCH=dev`. Stack-agnostic.
 
 **Gate**: capture `RUN_MODE` + `MAIN_CHECKOUT` + `BASE_BRANCH` before
-Phase 1 / 1u. In update mode, also verify `intent.<slug>.md` exists at
-`MAIN_CHECKOUT` and parse `BASE_REVISION` from its Provenance (default `1`).
+Phase 1 / 1u. In update mode, also verify `ai-artifacts/intents/intent.<slug>.md`
+exists at `MAIN_CHECKOUT` and parse `BASE_REVISION` from its Provenance (default `1`).
 
 ---
 
@@ -325,28 +325,28 @@ and ask the user — never auto-resolve.
 
 ## Phase 5 — Emit intent.<slug>.md + intent.<slug>.html + commit
 
-Render both artifacts at the worktree root. Filenames are
+Render both artifacts under `ai-artifacts/intents/` at the worktree root
+(run `mkdir -p ai-artifacts/intents` first — idempotent). Filenames are
 **slug-scoped** (`intent.${PROJECT_SLUG}.md` and
-`intent.${PROJECT_SLUG}.html`) so multiple intents can coexist at the
-repo root after merge without overwriting each other.
+`intent.${PROJECT_SLUG}.html`) so multiple intents can coexist in
+`ai-artifacts/intents/` after merge without overwriting each other.
 
-1. **`intent.${PROJECT_SLUG}.md`** — the AI-parseable seed. Structure
-   per [references/output-schema.md](references/output-schema.md).
+1. **`ai-artifacts/intents/intent.${PROJECT_SLUG}.md`** — the AI-parseable
+   seed. Structure per [references/output-schema.md](references/output-schema.md).
    Field NAMES stay in English (machine grammar — downstream parsers
    read them); field VALUES follow `LANGUAGE` per Phase L. Write
    directly with `Write` (not shell).
 
-2. **`intent.${PROJECT_SLUG}.html`** — the human-verifiable doc. Generate via:
+2. **`ai-artifacts/intents/intent.${PROJECT_SLUG}.html`** — the human-verifiable doc. Generate via:
 
    ```bash
    python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py" \
-     .intent-state.json > "intent.${PROJECT_SLUG}.html"
+     .intent-state.json > "ai-artifacts/intents/intent.${PROJECT_SLUG}.html"
    ```
 
    The renderer is self-contained (no CDN, no external JS) and
    HTML-escapes all user-supplied content. The HTML template lives at
-   `${CLAUDE_SKILL_DIR}/assets/intent-html-template.html` — the renderer
-   resolves it relative to its own path; no need to pass.
+   `${CLAUDE_SKILL_DIR}/assets/intent-html-template.html` — resolved relative to the script's own path; no need to pass.
 
 Provenance MUST include `- Revision: ${REVISION}` (1 in create, else
 `TARGET_REVISION`). Update mode also emits `Refined from seeds` +
@@ -354,7 +354,7 @@ Provenance MUST include `- Revision: ${REVISION}` (1 in create, else
 Commit with `--cached --quiet` guard (resume-safe):
 
 ```bash
-git add "intent.${PROJECT_SLUG}.md" "intent.${PROJECT_SLUG}.html"
+git add "ai-artifacts/intents/intent.${PROJECT_SLUG}.md" "ai-artifacts/intents/intent.${PROJECT_SLUG}.html"
 if ! git diff --cached --quiet; then
   [ "${RUN_MODE}" = "update" ] \
     && SUBJECT="feat(intent): refine ${PROJECT_SLUG} rev ${BASE_REVISION}→${TARGET_REVISION}" \
@@ -374,8 +374,8 @@ The agent's cwd may be inside the worktree; use `git -C "${MAIN_CHECKOUT}"`.
 
 Print:
 
-1. Absolute paths to `intent.${PROJECT_SLUG}.{md,html}` (so the user
-   can open the HTML in a browser).
+1. Absolute paths to `ai-artifacts/intents/intent.${PROJECT_SLUG}.{md,html}`
+   (so the user can open the HTML in a browser).
 2. The next-step pointer (transition-safe):
    ```
    Next step: run `/seed-gatherer` to grow an evidence corpus from
@@ -384,7 +384,7 @@ Print:
    fold intent + seeds into a planner-ready handoff. To refine THIS
    intent later from accumulated seeds, run `/intent-aligner update
    ${PROJECT_SLUG}` — that bumps the revision. If downstream skills
-   aren't installed, you can also pass intent.${PROJECT_SLUG}.md
+   aren't installed, you can also pass ai-artifacts/intents/intent.${PROJECT_SLUG}.md
    directly to `/codebase-planner` (the 6 rubric fields are readable
    as-is; you lose the plan-establisher folds).
    ```

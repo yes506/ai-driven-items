@@ -9,7 +9,7 @@ template uses single-pass placeholder substitution to defuse the
 chained-replace re-substitution class.
 
 Read-only: writes only to stdout. Caller redirects with
-`> plan.<intent-slug>.v<N>.html` per SKILL.md Phase 5.
+`> ai-artifacts/plans/plan.<intent-slug>.v<N>.html` per SKILL.md Phase 5.
 
 Usage:
     render_plan_html.py <path-to-.plan-state.json>

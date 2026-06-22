@@ -1,8 +1,10 @@
 # Plan naming and versioning
 
 Each invocation emits one plan pair:
-`plan.<intent-slug>.v<N>.md` and `plan.<intent-slug>.v<N>.html` at
-the repo root (sibling to `intent.<slug>.md` and `seeds/`).
+`ai-artifacts/plans/plan.<intent-slug>.v<N>.md` and
+`ai-artifacts/plans/plan.<intent-slug>.v<N>.html` (siblings under
+`ai-artifacts/plans/`, alongside `ai-artifacts/intents/` and
+`ai-artifacts/seeds/`).
 
 The `<intent-slug>` part is fixed for the run (chosen at Phase 1, see
 [intent-loading.md](intent-loading.md)). The `v<N>` part is
@@ -16,14 +18,14 @@ are preserved.
 After loading the intent, scan for existing plans:
 
 ```bash
-existing="$(ls -1 "${MAIN_CHECKOUT}"/plan."${INTENT_SLUG}".v*.md 2>/dev/null \
+existing="$(ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/plans/plan."${INTENT_SLUG}".v*.md 2>/dev/null \
   | sed -nE 's|.*/plan\.[a-z0-9-]+\.v([0-9]+)\.md$|\1|p' \
   | sort -n | tail -1)"
 N="${existing:-0}"
 N=$((N + 1))
 ```
 
-If no `plan.<INTENT_SLUG>.v*.md` exists → `N = 1`.
+If no `ai-artifacts/plans/plan.<INTENT_SLUG>.v*.md` exists → `N = 1`.
 Otherwise → `N = max(existing) + 1`.
 
 This tentative `N` is held in memory through Phases 2–4 and persisted
@@ -31,11 +33,11 @@ to `.plan-state.json` at Phase 4 as `plan_version`.
 
 ### At Phase 5 (race-guard re-scan)
 
-Re-scan `plan.<INTENT_SLUG>.v*.md` at the start of Phase 5, just
-before computing the target filename:
+Re-scan `ai-artifacts/plans/plan.<INTENT_SLUG>.v*.md` at the start of
+Phase 5, just before computing the target filename:
 
 ```bash
-existing_at_emit="$(ls -1 "${MAIN_CHECKOUT}"/plan."${INTENT_SLUG}".v*.md 2>/dev/null \
+existing_at_emit="$(ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/plans/plan."${INTENT_SLUG}".v*.md 2>/dev/null \
   | sed -nE 's|.*/plan\.[a-z0-9-]+\.v([0-9]+)\.md$|\1|p' \
   | sort -n | tail -1)"
 MAX_EXISTING="${existing_at_emit:-0}"
@@ -58,7 +60,8 @@ fi
 **Why re-scan**: the worktree-creation pattern (Phase 4) isolates *this
 worktree's branch* from concurrent edits to `dev`, but the user can
 manually run `/plan-establisher` from a separate terminal in parallel,
-or another seed/intent/plan worktree could merge a `plan.<slug>.v*.md`
+or another seed/intent/plan worktree could merge an
+`ai-artifacts/plans/plan.<slug>.v*.md`
 between this run's Phase 1 and Phase 5. Worktree isolation doesn't
 protect the version-number namespace; the re-scan does.
 
@@ -82,20 +85,21 @@ renderer; the `.md` is written directly by the skill.
 
 ## What codebase-planner reads
 
-`codebase-planner` reads the **highest-N** `plan.<intent-slug>.v<N>.md`
-at the repo root for the chosen intent. Implementation hint for the
-downstream planner (it picks this up from its own SKILL.md when it
-ships, not this file):
+`codebase-planner` reads the **highest-N**
+`ai-artifacts/plans/plan.<intent-slug>.v<N>.md` for the chosen intent.
+Implementation hint for the downstream planner (it picks this up from
+its own SKILL.md when it ships, not this file):
 
 ```bash
-latest="$(ls -1 "${REPO_ROOT}"/plan."${INTENT_SLUG}".v*.md 2>/dev/null \
+latest="$(ls -1 "${REPO_ROOT}"/ai-artifacts/plans/plan."${INTENT_SLUG}".v*.md 2>/dev/null \
   | sed -nE 's|.*/plan\.[a-z0-9-]+\.v([0-9]+)\.md$|\1|p' \
   | sort -n | tail -1)"
-plan_file="${REPO_ROOT}/plan.${INTENT_SLUG}.v${latest}.md"
+plan_file="${REPO_ROOT}/ai-artifacts/plans/plan.${INTENT_SLUG}.v${latest}.md"
 ```
 
 If the planner finds no plan: it should refuse with *"No
-`plan.<intent-slug>.v*.md` found — run `/plan-establisher` first."*
+`ai-artifacts/plans/plan.<intent-slug>.v*.md` found — run
+`/plan-establisher` first."*
 
 ## Why monotonic versions (not overwrite)
 
@@ -126,8 +130,9 @@ version (e.g., v3 was a thinko, they want v4 to be the canonical
 starting point), the path is:
 
 1. On `${BASE_BRANCH}` (NOT inside the plan worktree), `rm` both
-   `plan.<intent-slug>.v<N>.md` AND `plan.<intent-slug>.v<N>.html`
-   for every version the user wants gone. **Both files in the pair**
+   `ai-artifacts/plans/plan.<intent-slug>.v<N>.md` AND
+   `ai-artifacts/plans/plan.<intent-slug>.v<N>.html` for every version
+   the user wants gone. **Both files in the pair**
    — removing only the `.md` leaves an orphan `.html` until the next
    emit.
 2. **Commit the removal**. (Skipping the commit trips Phase 4's

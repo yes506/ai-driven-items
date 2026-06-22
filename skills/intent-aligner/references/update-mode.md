@@ -16,8 +16,8 @@ formal feedback path closing the seed→intent loop in the chain.
 ## When to use update mode
 
 The user has already run `/intent-aligner` once (or `/seed-gatherer`
-in bootstrap mode) to produce `intent.<slug>.md`, and since then
-`seeds/seed.<slug>.*.md` files have accumulated. Update mode reads
+in bootstrap mode) to produce `ai-artifacts/intents/intent.<slug>.md`, and since then
+`ai-artifacts/seeds/seed.<slug>.*.md` files have accumulated. Update mode reads
 both, proposes targeted refinements per rubric field, and emits a new
 revision of the intent.
 
@@ -25,7 +25,7 @@ Skip update mode if:
 
 - No seeds exist yet for this intent → run `/seed-gatherer` first.
 - The user wants to **replace** the intent wholesale rather than
-  refine it → ask them to delete `intent.<slug>.md` and run
+  refine it → ask them to delete `ai-artifacts/intents/intent.<slug>.md` and run
   `/intent-aligner` (create mode) again. Update is for incremental
   refinement, not rewrites.
 
@@ -44,7 +44,7 @@ Parse rules (case-sensitive on `update` / `--update`):
 | `/intent-aligner update` (no slug) | refuse | Ask: *"Update mode needs an intent slug. Existing intents at `${MAIN_CHECKOUT}`: <list>. Re-invoke as `/intent-aligner update <slug>`."* |
 | `/intent-aligner <anything-else>` | refuse | Ask: *"Unrecognized argument. Use `/intent-aligner` to create, or `/intent-aligner update <slug>` to refine an existing intent."* |
 
-The slug must match an existing `intent.<slug>.md` at `MAIN_CHECKOUT`.
+The slug must match an existing `ai-artifacts/intents/intent.<slug>.md` at `MAIN_CHECKOUT`.
 If not found, refuse and list existing intents.
 
 ## Phase map (update mode)
@@ -71,14 +71,14 @@ mode states, update mode adds:
 
 | State | Action |
 |---|---|
-| `on-dev` + slug arg given + `intent.<slug>.md` exists | proceed to Phase 1u |
-| `on-dev` + slug arg given + no matching intent file | refuse: *"No `intent.<slug>.md` at `${MAIN_CHECKOUT}`. Existing intents: <list>. To create new, run `/intent-aligner` without `update`."* |
+| `on-dev` + slug arg given + `ai-artifacts/intents/intent.<slug>.md` exists | proceed to Phase 1u |
+| `on-dev` + slug arg given + no matching intent file | refuse: *"No `ai-artifacts/intents/intent.<slug>.md` at `${MAIN_CHECKOUT}`. Existing intents: <list>. To create new, run `/intent-aligner` without `update`."* |
 | `inside-intent-worktree` whose state file has `run_mode: update` | resume update mode from `.intent-state.json` |
 | All other create-mode states | apply as written in create mode |
 
 ## Phase 1u — load existing intent + glob seeds
 
-1. Parse `intent.<slug>.md` fully — not just the 6 rubric sections but
+1. Parse `ai-artifacts/intents/intent.<slug>.md` fully — not just the 6 rubric sections but
    also `## Mode`, `## Persona`, `## Examples`, `## Counter-examples`,
    `## Root-cause`, `## Provenance`. The existing intent is the **base
    revision** that refinements diff against.
@@ -98,13 +98,13 @@ mode states, update mode adds:
 
 4. Glob seed files for this intent:
    ```bash
-   ls -1 "${MAIN_CHECKOUT}"/seeds/seed."${INTENT_SLUG}".*.md 2>/dev/null
+   ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/seeds/seed."${INTENT_SLUG}".*.md 2>/dev/null
    ```
    For each seed file, parse `## Source`, `## Resource type`,
    `## Extracted content (intent-filtered)`, and `## Relevance
    rationale` (the field labels are fixed per seed-gatherer's
    output-schema). If zero seeds → refuse: *"No seeds found at
-   `seeds/seed.${INTENT_SLUG}.*.md`. Run `/seed-gatherer` first to
+   `ai-artifacts/seeds/seed.${INTENT_SLUG}.*.md`. Run `/seed-gatherer` first to
    accumulate evidence, then re-run update mode."*
 
 5. Surface a summary to the user before any elicitation:
@@ -133,7 +133,7 @@ Iterate per rubric field (`Goal`, `In-scope features`, `Out-of-scope`,
 `Persona`, `Examples`, `Counter-examples`, `Root-cause`). For each
 field:
 
-1. **Show the current value.** Verbatim from `intent.<slug>.md`.
+1. **Show the current value.** Verbatim from `ai-artifacts/intents/intent.<slug>.md`.
 2. **Propose targeted refinements.** For each refinement, name the
    seed(s) that back it. Format:
    ```
@@ -233,8 +233,9 @@ used in Phase 2u).
 
 ## Phase 5u — emit updated intent.<slug>.md + .html + commit
 
-Overwrite the existing `intent.<slug>.md` and `intent.<slug>.html`
-with the refined content. The Provenance section MUST include:
+Overwrite the existing `ai-artifacts/intents/intent.<slug>.md` and
+`ai-artifacts/intents/intent.<slug>.html` (run `mkdir -p ai-artifacts/intents`
+first — idempotent) with the refined content. The Provenance section MUST include:
 
 ```markdown
 ## Provenance

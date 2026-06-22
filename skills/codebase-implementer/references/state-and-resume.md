@@ -13,7 +13,8 @@ main checkout (where it is not gitignored and would dirty `git
 status` on `${BASE_BRANCH}`).
 
 The canonical confirmation record on the implementer branch is the
-Phase 5 commit of `implementation-report.md` plus the Phase 6 merge
+Phase 5 commit of the report (`${RUN_DIR}/report.${IMPLEMENTER_ID}.md`)
+plus the Phase 6 merge
 commit message `feat(implementer): merge <slug> (impl-<scale>,
 human-confirmed)`. Downstream automation (CI, review skills) reads
 those, not this file.
@@ -26,7 +27,8 @@ those, not this file.
   "language": "Korean | English (captured at Phase L; written for the first time when this state file is created at Phase 2; absent value on resume defaults to Korean)",
   "planner_marker_scale": "micro | local | feature | system",
   "planner_marker_commit": "string (sha — empty for micro/local since they have no commit)",
-  "planner_artifact_paths": ["plan.md", "plan.mmd"],
+  "planner_artifact_dir": "string (feature/system: the trailer-resolved run-dir, e.g. 'ai-artifacts/runs/code/<slug>-<planner-id>'; micro/local: the implementer's own id-keyed sibling dir 'ai-artifacts/runs/code/<slug>-impl-<implementer-id>'. On resume, reuse this rather than re-resolving the newest marker)",
+  "planner_artifact_paths": ["plan.md", "plan.mmd (run-dir-relative — join under planner_artifact_dir)"],
   "source_hash": "sha256 of the concatenated planner artifacts (or chat block for micro/local)",
   "project_slug": "string (kebab-case ascii, used in worktree path + branch name)",
   "main_checkout": "absolute path to main worktree (physical, symlinks resolved)",
@@ -61,6 +63,29 @@ those, not this file.
 }
 ```
 
+## Report path (Phase 5 producer)
+
+The self-verification report is written under `ai-artifacts/` inside the
+worktree and merges via the normal Phase 6 worktree merge for **all**
+lanes (no carve-out). Resolve the directory by lane:
+
+```bash
+case "${SCALE}" in
+  # feature/system: reuse the trailer-resolved run-dir.
+  feature|system) REPORT_DIR="${RUN_DIR}" ;;
+  # micro/local: no planner run-dir → self-keyed sibling dir. <slug> is
+  # the sanitized PROJECT_SLUG already computed at Phase 2.
+  micro|local)    REPORT_DIR="ai-artifacts/runs/code/${PROJECT_SLUG}-impl-${IMPLEMENTER_ID}" ;;
+esac
+REPORT_PATH="${REPORT_DIR}/report.${IMPLEMENTER_ID}.md"
+mkdir -p "${REPORT_DIR}"   # idempotent
+```
+
+For micro/local, persist `REPORT_DIR` into the state field
+`planner_artifact_dir` (the lane has no planner-resolved dir of its
+own) so resume reuses the same report location instead of minting a new
+`IMPLEMENTER_ID`-keyed dir.
+
 ## Write discipline (incremental)
 
 The state file is written after EACH of these sub-steps. Anything less
@@ -68,7 +93,7 @@ risks resume losing track of in-flight work.
 
 | Sub-step | What's written |
 |---|---|
-| Phase 0 done | **in memory only** — `scale`, `planner_marker_*`, `planner_artifact_paths`, `source_hash` |
+| Phase 0 done | **in memory only** — `scale`, `planner_marker_*`, `planner_artifact_dir`, `planner_artifact_paths`, `source_hash` |
 | Phase 1 done | **in memory only** — `work_queue` (all items, status=pending), tentative `language_stack`, tentative `validation_command` |
 | Phase 2 done | **first on-disk write** — flushes all in-memory values plus `project_slug`, `main_checkout`, `base_branch`, `implementer_id`, `baseline_validation_exit`, `max_autofix_attempts`; `phase_completed: worktree_created` |
 | Phase 3 per item start | `work_queue[i].status: in_progress`, `started_at` |
@@ -101,7 +126,9 @@ When Phase 0 detects `inside-implementer-worktree`:
    that is itself a git worktree top; `base_branch` is a non-empty
    string. On any failure → refuse with a clear "state file is
    corrupt or hostile" message. Do NOT attempt to repair.
-4. Check `source_hash` against the current planner artifacts.
+4. Check `source_hash` against the current planner artifacts (read
+   them from the persisted `planner_artifact_dir` — do NOT re-resolve
+   the newest marker).
    - If mismatch: blocker — planner artifacts changed since extraction.
      Surface diff, ask user whether to re-extract (discards in-progress
      impl) or abort.

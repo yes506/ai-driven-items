@@ -98,8 +98,9 @@ creation; this is intent-aligner's first on-disk mutation). Until then,
   step at step 3 is the safety net.
 - `intent.<slug>.md` field names, commit messages, gate tokens, and the
   `(intent, human-confirmed)` marker intentionally stay in English
-  regardless of `LANGUAGE` — downstream skills read `intent.<slug>.md`
-  as a machine spec, and `git log` greps need ASCII for portability.
+  regardless of `LANGUAGE` — downstream skills read
+  `ai-artifacts/intents/intent.<slug>.md` as a machine spec, and `git log`
+  greps need ASCII for portability.
 - Mid-flow language switches do NOT re-translate intent values already
   captured. The user's own words stay verbatim — only future dialog
   prose switches language.

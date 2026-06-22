@@ -24,10 +24,10 @@ working code.
 
 | Scale lane | Upstream marker | Worktree | Artifacts produced | Downstream marker |
 |---|---|---|---|---|
-| **micro** | `(plan-micro, human-confirmed)` (chat) | yes | impl + `implementation-report.md` | `(impl-micro, human-confirmed)` |
-| **local** | `(plan-local, human-confirmed)` (chat) | yes | impl + `implementation-report.md` | `(impl-local, human-confirmed)` |
-| **feature** | `(plan-feature, human-confirmed)` (commit) | yes | impl + `implementation-report.md` | `(impl-feature, human-confirmed)` |
-| **system** | `(interfaces only, human-confirmed)` (commit; preserved verbatim from pre-rename `codebase-architect` for backward compat) | yes | impl + `implementation-report.md` | `(impl-system, human-confirmed)` |
+| **micro** | `(plan-micro, human-confirmed)` (chat) | yes | impl + `report.<impl-id>.md` | `(impl-micro, human-confirmed)` |
+| **local** | `(plan-local, human-confirmed)` (chat) | yes | impl + `report.<impl-id>.md` | `(impl-local, human-confirmed)` |
+| **feature** | `(plan-feature, human-confirmed)` (commit) | yes | impl + `report.<impl-id>.md` | `(impl-feature, human-confirmed)` |
+| **system** | `(interfaces only, human-confirmed)` (commit; preserved verbatim from pre-rename `codebase-architect` for backward compat) | yes | impl + `report.<impl-id>.md` | `(impl-system, human-confirmed)` |
 
 The implementer accepts both the new `(plan-<scale>, human-confirmed)`
 family AND the `(interfaces only, human-confirmed)` marker (preserved
@@ -114,7 +114,7 @@ Parse the JSON. The `state` field classifies into:
 
 | State | Action |
 |---|---|
-| `on-base-with-marker` | `planner_marker_scale` is `system` or `feature` (the only scales the contract permits to land as commits). Set `SCALE` from it. Verify artifact files (system: `architecture.html` + `architecture.mmd`; feature: `plan.md` + `plan.mmd`). Proceed. **If `planner_marker_scale` is `micro` or `local`**: refuse — those scales are chat-only per the contract; finding one in `git log` indicates a forged or hand-crafted commit (per [references/marker-detection.md](references/marker-detection.md) the chat-gate is the only valid path for those scales). Tell the user: "found a `(plan-<micro\|local>, human-confirmed)` commit, but the contract places these scales in chat only — refusing to honor the commit-based marker. Re-run the planner if this was intentional." |
+| `on-base-with-marker` | `planner_marker_scale` is `system` or `feature` (the only scales the contract permits to land as commits). Set `SCALE` from it. Resolve `RUN_DIR` from the marker commit's `AI-Artifacts-Run-Dir:` trailer and verify artifacts at the marker tree (system: `$RUN_DIR/architecture.{html,mmd}`; feature: `$RUN_DIR/plan.{md,mmd}`) — full procedure (count, anchored allowlist, `git cat-file -e`, refuse-never-fallback) in [references/marker-detection.md](references/marker-detection.md). Persist as `planner_artifact_dir`. Proceed. **If `planner_marker_scale` is `micro` or `local`**: refuse — those scales are chat-only per the contract; finding one in `git log` indicates a forged or hand-crafted commit (per [references/marker-detection.md](references/marker-detection.md) the chat-gate is the only valid path for those scales). Tell the user: "found a `(plan-<micro\|local>, human-confirmed)` commit, but the contract places these scales in chat only — refusing to honor the commit-based marker. Re-run the planner if this was intentional." |
 | `on-base-no-marker` | No commit-based marker found. Check the current chat for a micro/local gate. Required (both, in this conversation, planner output before user token): (a) a planner block tagged `scale: micro` or `scale: local`, AND (b) the user has typed `confirm plan` AFTER that block. If both visible in current session: set `SCALE`, proceed. If only one visible, or if invoked in a fresh session with no planner history: refuse — re-run `/codebase-planner` in this session, or escalate the planner to `feature` so the handoff lands on disk. **The chat gate requires same-session context; pasted transcripts and "I confirmed earlier" are NOT accepted.** |
 | `on-default-needs-dev` | Refuse: "No `dev` branch. For feature/system planner output you need `/codebase-planner` to create it first; for micro/local you need to create `dev` manually (`git switch -c dev`) and re-run." |
 | `on-nonbase-main-checkout` | Only acceptable for micro/local with chat gate (same conditions as `on-base-no-marker`). For feature/system: refuse, ask user to switch to `dev`. |
@@ -126,12 +126,12 @@ Parse the JSON. The `state` field classifies into:
 
 Additional checks before proceeding:
 
-- **Artifact presence** (system + feature): if marker says system, check `architecture.html` + `architecture.mmd`; if feature, check `plan.md` + `plan.mmd`. Missing artifact files despite a present marker = blocker (tampered or partially reverted planner run).
+- **Artifact presence** (system + feature): verified at the marker commit's tree under the trailer-resolved `$RUN_DIR` (system: `architecture.{html,mmd}`; feature: `plan.{md,mmd}`) per [references/marker-detection.md](references/marker-detection.md). Missing artifact despite a present marker = blocker (tampered or partially reverted planner run); never fall back to a root path.
 - **Multiple markers in recent history**: if two scales' markers are both present, the inspector picks the newest by commit date. Confirm with user before assuming that's the right one.
 - **Pre-existing implementer marker for the same slug**: warn — same plan may already be implemented; require explicit `proceed` token.
 
 Hold the captured values (`scale`, `planner_marker_*`,
-`planner_artifact_paths`, computed `source_hash`) **in memory only**
+`planner_artifact_dir`, `planner_artifact_paths`, computed `source_hash`) **in memory only**
 through Phases 0 and 1. They land on disk for the first time at Phase
 2 (after the worktree exists), so a Phase 0/1 crash leaves no stray
 `.implementer-state.json` on the main checkout.
@@ -146,8 +146,8 @@ Convert the planner handoff into a flat work queue per
 - **system**: parse interface files → one queue item per method; carry
   the 9 docstring fields; topo-sort by `collaborators` graph
   (leaf-first).
-- **feature**: parse `plan.md` numbered steps → one item per step; use
-  `plan.mmd` for ordering if present.
+- **feature**: parse `$RUN_DIR/plan.md` numbered steps → one item per
+  step; use `$RUN_DIR/plan.mmd` for ordering if present.
 - **micro / local**: parse the chat bullets → one item per bullet,
   source order preserved.
 
@@ -339,7 +339,8 @@ Persist per attempt: append to `validation_runs[]`. On success:
 
 ## Phase 5 — Self-verification artifact + commit
 
-Emit `implementation-report.md` at the worktree root. Required sections:
+Emit the report at `${REPORT_PATH}` (`mkdir -p` its dir first; path
+resolution per lane in [references/state-and-resume.md](references/state-and-resume.md), "Report path"). Required sections:
 
 ```markdown
 # Implementation report — ${PROJECT_SLUG}
@@ -378,7 +379,7 @@ Emit `implementation-report.md` at the worktree root. Required sections:
 Commit:
 
 ```bash
-git add implementation-report.md
+git add -- "${REPORT_PATH}"
 git commit -m "docs(implementer): self-verification report"
 ```
 

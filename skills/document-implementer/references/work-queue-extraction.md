@@ -5,9 +5,11 @@ linear list of items the autonomous loop in Phase 3 iterates. Extraction
 rule differs per scale; order is **source order** (Q1 default — the TOC
 order the planner emitted; documents are read top-to-bottom).
 
-## Feature + system lane — from `document-plan.md` stubs
+## Feature + system lane — from `${RUN_DIR}/document-plan.md` stubs
 
-The planner emitted `document-plan.md` with YAML frontmatter at the top
+The planner emitted `document-plan.md` (under `${RUN_DIR}` —
+`ai-artifacts/runs/doc/<slug>-<docplanner-id>/`, resolved from the
+marker commit's trailer at Phase 0) with YAML frontmatter at the top
 and `## stub: <id>` headings + fenced YAML bodies for each stub.
 
 Extraction:
@@ -40,8 +42,8 @@ Extraction:
 }
 ```
 
-3. Cross-check against `document-structure.mmd`: every node in the
-   `.mmd` should correspond to a declared stub. Mismatch is a planner-
+3. Cross-check against `${RUN_DIR}/document-structure.mmd`: every node
+   in the `.mmd` should correspond to a declared stub. Mismatch is a planner-
    side regression — surface as a discovery blocker.
 
 4. **Empty queue (no stubs declared) = refusal.** The planner

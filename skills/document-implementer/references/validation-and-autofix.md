@@ -15,18 +15,20 @@ Phase 4 branches accordingly.
 
 ```bash
 # Frontmatter integrity (no tampering with planner artifact)
-python3 "${CLAUDE_SKILL_DIR}/scripts/parse_frontmatter.py" document-plan.md
+# RUN_DIR resolved at Phase 0 from the marker commit's AI-Artifacts-Run-Dir
+# trailer (see marker-detection.md); reused from state on resume.
+python3 "${CLAUDE_SKILL_DIR}/scripts/parse_frontmatter.py" "${RUN_DIR}/document-plan.md"
 
 case "${OUTPUT_STACK}" in
   text)
     python3 "${CLAUDE_SKILL_DIR}/scripts/validate_doc_completeness.py" \
-      document-plan.md "${TARGET_PATH}"
+      "${RUN_DIR}/document-plan.md" "${TARGET_PATH}"
     python3 "${CLAUDE_SKILL_DIR}/scripts/validate_anchors.py" --text \
-      --plan document-plan.md "${TARGET_PATH}"
+      --plan "${RUN_DIR}/document-plan.md" "${TARGET_PATH}"
     ;;
   structured)
     python3 "${CLAUDE_SKILL_DIR}/scripts/validate_anchors.py" --pptx \
-      --plan document-plan.md "${TARGET_PATH}"
+      --plan "${RUN_DIR}/document-plan.md" "${TARGET_PATH}"
     ;;
 esac
 ```

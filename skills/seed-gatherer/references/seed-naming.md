@@ -1,8 +1,8 @@
 # Seed naming
 
 Each resource yields one seed pair:
-`seeds/seed.<intent-slug>.<resource-slug>.md` and
-`seeds/seed.<intent-slug>.<resource-slug>.html`.
+`ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.md` and
+`ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.html`.
 
 The `<intent-slug>` part is fixed for the run (chosen at Phase 1, see
 [intent-loading.md](intent-loading.md)). The `<resource-slug>` part is
@@ -119,7 +119,7 @@ falls back don't all collide.
 
 ## Collision policy (3-case disambiguation)
 
-A target file `seeds/seed.<intent-slug>.<resource-slug>.md` already
+A target file `ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.md` already
 existing on disk can mean three different things — and they require
 different handling. The discriminators are git-trackedness (was the
 file inherited from `${BASE_BRANCH}` via worktree branching, or did
@@ -127,7 +127,7 @@ it appear in this worktree?) AND the `## Source` field inside it:
 
 | Case | git-tracked? | Source-field match? | Meaning | Action |
 |---|---|---|---|---|
-| **(a) Inherited merged seed** | yes (tracked in HEAD) | n/a | A prior merged seed run already emitted this slug. The current run is the documented iteratively-re-runnable happy path. | Auto-suffix `-N`, notify, update state slug. Preserves both seeds (prior + new). **Escape hatch**: to *replace* rather than preserve a prior merged seed, on `${BASE_BRANCH}` `rm` **both** `seeds/seed.<intent-slug>.<resource-slug>.md` **and** `seeds/seed.<intent-slug>.<resource-slug>.html` (the pair invariant — removing only the `.md` leaves an orphan `.html` until the next emit overwrites it), **commit the removal**, then re-run the skill — that converts case (a) into a fresh emit. (Skipping the commit step trips Phase 4's dirty-`BASE_BRANCH` guard, which refuses to create the new worktree until the working tree is clean.) |
+| **(a) Inherited merged seed** | yes (tracked in HEAD) | n/a | A prior merged seed run already emitted this slug. The current run is the documented iteratively-re-runnable happy path. | Auto-suffix `-N`, notify, update state slug. Preserves both seeds (prior + new). **Escape hatch**: to *replace* rather than preserve a prior merged seed, on `${BASE_BRANCH}` `rm` **both** `ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.md` **and** `ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.html` (the pair invariant — removing only the `.md` leaves an orphan `.html` until the next emit overwrites it), **commit the removal**, then re-run the skill — that converts case (a) into a fresh emit. (Skipping the commit step trips Phase 4's dirty-`BASE_BRANCH` guard, which refuses to create the new worktree until the working tree is clean.) |
 | **(b) Crash-attempt mine** | no (untracked) | yes | Same run, prior Phase 5 attempt wrote the file but crashed before the state-update landed. | **Overwrite silently** — it's recovery, not a collision. |
 | **(c) True intra-run collision** | no (untracked) | no | Two distinct resources in this run derived the same slug (e.g., two `whitepaper.pdf` files in different directories), OR a manually-placed unrelated file is in the way. | Auto-suffix `-N`, notify, update state slug. |
 
@@ -153,13 +153,13 @@ When emitting at Phase 5, for each resource:
 
 3. **Auto-suffix algorithm** (cases a + c): find the smallest
    integer `N ≥ 2` such that
-   `seeds/seed.<intent-slug>.<resource-slug>-N.md` does NOT exist;
+   `ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>-N.md` does NOT exist;
    append `-N` to the resource_slug for both `.md` and `.html`;
    update `resources[i].resource_slug` in the state file to the
    suffixed name (so resume re-checks against the resolved slug);
    persist state; notify the user in chat (mandatory — never
    silent for cases a + c). Notification strings:
-   - Case (a) — English: *"Re-seeding `<location>` — a prior merged seed already uses `seed.<slug>.<resource-slug>.md`. Adding the new capture as `seed.<slug>.<resource-slug>-N.md` to preserve the prior one. If `-N` is climbing fast across runs, consider whether older captures should be retired (`rm` them on `${BASE_BRANCH}` before re-running) to avoid an over-accumulated `seeds/`."*
+   - Case (a) — English: *"Re-seeding `<location>` — a prior merged seed already uses `seed.<slug>.<resource-slug>.md`. Adding the new capture as `seed.<slug>.<resource-slug>-N.md` to preserve the prior one. If `-N` is climbing fast across runs, consider whether older captures should be retired (`rm` them on `${BASE_BRANCH}` before re-running) to avoid an over-accumulated `ai-artifacts/seeds/`."*
    - Case (a) — Korean: *"`<location>` 재시드 — 이전 병합된 시드가 이미 `seed.<slug>.<resource-slug>.md`를 사용 중입니다. 이전 것을 보존하기 위해 새 캡처를 `seed.<slug>.<resource-slug>-N.md`로 추가합니다. 여러 번 실행으로 `-N`이 빠르게 증가한다면, 오래된 캡처를 정리하는 것(`${BASE_BRANCH}`에서 재실행 전 `rm`)을 고려하세요."*
    - Case (c) — English: *"Slug collision — `seed.<slug>.<resource-slug>.md` already exists with a different source. Using `seed.<slug>.<resource-slug>-N.md` instead."*
    - Case (c) — Korean: *"슬러그 충돌 — `seed.<slug>.<resource-slug>.md`가 다른 출처로 이미 존재합니다. 대신 `seed.<slug>.<resource-slug>-N.md`를 사용합니다."*
@@ -213,7 +213,7 @@ fi
   `seed.dashboard.cloudfront-edge-tos.md`,
   `seed.dashboard.youtube-abc123def.md` is scannable.
 - **Stable handoff**: plan-establisher can glob
-  `seeds/seed.<intent-slug>.*.md` to find everything for one intent.
+  `ai-artifacts/seeds/seed.<intent-slug>.*.md` to find everything for one intent.
 - **Cross-intent coexistence**: `seed.dashboard.nextjs-caching.md`
   and `seed.payments.nextjs-caching.md` don't collide — same web
   resource, different intent perspective.

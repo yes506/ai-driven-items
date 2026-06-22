@@ -74,9 +74,12 @@ Below-bar comments (REQUIRED if any box unchecked):
 
 Generated from `.planner-state.json`:
 
+`$RUN_DIR` is `ai-artifacts/runs/code/${PROJECT_SLUG}-${PLANNER_ID}`
+(`mkdir -p` it before the first redirect).
+
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/scripts/render_mermaid_dag.py" \
-  .planner-state.json > architecture.mmd
+  .planner-state.json > "$RUN_DIR/architecture.mmd"
 ```
 
 Edges come from each method's `Collaborators` field. Edge labels are
@@ -105,7 +108,7 @@ Generated from `.planner-state.json`:
 
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/scripts/render_html_report.py" \
-  .planner-state.json > architecture.html
+  .planner-state.json > "$RUN_DIR/architecture.html"
 ```
 
 The HTML renders:
@@ -127,7 +130,7 @@ The HTML renders:
 ## Commit Phase 7 outputs
 
 ```bash
-git add architecture.mmd architecture.html
+git add "$RUN_DIR/architecture.mmd" "$RUN_DIR/architecture.html"
 git commit -m "docs(planner): self-verification artifacts"
 ```
 

@@ -1,6 +1,6 @@
 # Output schema — seed.<intent-slug>.<resource-slug>.md + .html
 
-Phase 5 emits two artifacts per resource at `seeds/` (creating the
+Phase 5 emits two artifacts per resource at `ai-artifacts/seeds/` (creating the
 directory if it doesn't exist), both derived from the corresponding
 entry in `.seed-state.json`'s `resources` list. The markdown is
 written directly via `Write` (the field values from the state entry,
@@ -10,8 +10,8 @@ the bundled template. The two formats serve different audiences:
 
 | Artifact | Audience | How it's used |
 |---|---|---|
-| `seeds/seed.<intent-slug>.<resource-slug>.md` | AI (downstream `plan-establisher` ingests it via glob) | Structured seed listing the source, type, extracted content, and relevance rationale |
-| `seeds/seed.<intent-slug>.<resource-slug>.html` | Human (user opens in browser to verify) | Static, self-contained, print-friendly visualization |
+| `ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.md` | AI (downstream `plan-establisher` ingests it via glob) | Structured seed listing the source, type, extracted content, and relevance rationale |
+| `ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.html` | Human (user opens in browser to verify) | Static, self-contained, print-friendly visualization |
 
 Slug derivation rules + collision policy: see
 [seed-naming.md](seed-naming.md). Both files always share the same

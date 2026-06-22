@@ -5,7 +5,8 @@ Reads the state file (path arg) and emits a Mermaid `graph LR` block to stdout.
 Edges come from each interface's methods' `collaborators` field if present in
 the state; otherwise just nodes are emitted.
 
-Read-only: writes only to stdout. Caller redirects with `> architecture.mmd`.
+Read-only: writes only to stdout. Caller redirects with
+`> "$RUN_DIR/architecture.mmd"` (or `$RUN_DIR/plan.mmd` for the feature lane).
 
 Safety:
 - Node IDs come from `_iface_graph.build_id_map()` — same source of truth

@@ -29,7 +29,7 @@ the next phase after `phase_completed`.
   },
   "seeds": [
     {
-      "resource_slug":       "<from seeds/seed.<intent-slug>.<resource-slug>.md>",
+      "resource_slug":       "<from ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.md>",
       "source":              "<URL or absolute path>",
       "type":                "web | youtube | pdf | image | local-doc | local-code",
       "extracted_content":   "<from seed's ## Extracted content (intent-filtered)>",
@@ -69,18 +69,18 @@ the next phase after `phase_completed`.
   creation). Before that, `LANGUAGE` lives only in memory. See
   [language-selection.md](language-selection.md).
 - **`intent_slug`** — chosen at Phase 1 (auto-detect if single
-  `intent.*.md`, prompt if multiple). Persisted at Phase 4.
+  `ai-artifacts/intents/intent.*.md`, prompt if multiple). Persisted at Phase 4.
 - **`plan_version`** — the tentative `N` from Phase 1's scan,
   possibly bumped at Phase 5's race-guard re-scan. See
   [plan-naming-and-versioning.md](plan-naming-and-versioning.md).
 - **`intent`** — the parsed 6 rubric fields loaded from
-  `intent.<intent-slug>.md`. Values may be refined via Dim 1
+  `ai-artifacts/intents/intent.<intent-slug>.md`. Values may be refined via Dim 1
   resolutions (Phase 3) before persisting. See
   [intent-loading.md](intent-loading.md).
-- **`seeds`** — loaded from `seeds/seed.<intent-slug>.*.md` at Phase
+- **`seeds`** — loaded from `ai-artifacts/seeds/seed.<intent-slug>.*.md` at Phase
   1. If `len(seeds) > 32` OR total content > 200KB, replace each
   entry's `extracted_content` and `relevance_rationale` with the
-  string `"(see seeds/seed.<intent-slug>.<resource-slug>.md)"` to
+  string `"(see ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.md)"` to
   keep the state file lean — the renderer doesn't need them, only
   Phase 2 verification does, and Phase 2 has already run by the time
   the state file is written. See [seed-loading.md](seed-loading.md).
@@ -169,14 +169,14 @@ successful checkpoint, which is the right thing to resume from.
 - It is NOT a transcript. The Phase 2 verification dialog and Phase
   3 resolution Q&A are in chat history; only the *confirmed* final
   records live here.
-- It is NOT the artifact. `plan.<intent-slug>.v<N>.md` is the
+- It is NOT the artifact. `ai-artifacts/plans/plan.<intent-slug>.v<N>.md` is the
   human-and-AI-readable artifact; this state file is a JSON sidecar
   for resumability and for the HTML renderer.
 - It is NOT version-controlled. It's gitignored deliberately — the
   worktree commits + the merged plan files are the canonical record,
   the state file is local working state.
 - It is NOT shared with downstream skills. `codebase-planner` reads
-  `plan.<intent-slug>.v<N>.md`, not `.plan-state.json`. The handoff
+  `ai-artifacts/plans/plan.<intent-slug>.v<N>.md`, not `.plan-state.json`. The handoff
   contract is the markdown file.
 
 ## Honest limitations

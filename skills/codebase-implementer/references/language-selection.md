@@ -2,7 +2,7 @@
 
 Determines the language for **all user-facing dialog** in this skill —
 gate prompts, progress lines, blocker diagnostics, the
-`implementation-report.md` prose sections, the Phase 6 merge prompt.
+report (`report.<implementer-id>.md`) prose sections, the Phase 6 merge prompt.
 Held in memory through Phases 0–1; persisted to
 `.implementer-state.json` at Phase 2 (when the worktree is created).
 
@@ -13,8 +13,8 @@ Held in memory through Phases 0–1; persisted to
 | User-facing chat dialog prose (gate prompts, progress, blockers) | follows `LANGUAGE` |
 | Gate tokens (`confirm merge`, `confirm plan`, `proceed`, `keep`, `revise`, `resume`, `abort`) | **always English, verbatim — never translated.** The skill expects to receive these tokens as input from the user; translating them would break gate matching and silently let the user bypass the gate by typing the Korean word instead |
 | Planner artifacts the implementer parses (`plan.md` structural headings like `## Implementation steps`, step-prefixing imperative verbs, `plan.mmd` Mermaid label text, 9-field docstring tags inside interface skeletons) | natural form (English) — Phase 1's work-queue extraction is a machine grammar; translating these breaks the handoff. The planner's own `language-selection.md` mirrors this rule |
-| `implementation-report.md` prose sections (Source / Work queue summary / Validation prose / Scope-discipline self-check) | follows `LANGUAGE` |
-| `implementation-report.md` file paths, command output, validation tails | natural form (these are code/CLI artifacts) |
+| Report (`report.<implementer-id>.md`) prose sections (Source / Work queue summary / Validation prose / Scope-discipline self-check) | follows `LANGUAGE` |
+| Report file paths, command output, validation tails | natural form (these are code/CLI artifacts) |
 | Generated implementation code (method bodies, helpers, inline comments inside generated code) | natural form (English) |
 | Commit messages | natural form (Conventional Commits stay in English for tooling compatibility) |
 | Merge-commit marker `(impl-<scale>, human-confirmed)` | natural form (verbatim — the marker family is grep-target for downstream tools) |

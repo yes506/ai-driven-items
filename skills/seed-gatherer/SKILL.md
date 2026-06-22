@@ -6,9 +6,10 @@ description: |
   codebase-implementer). Default path reads an existing
   `intent.<slug>.md` and extracts intent-filtered content from user-
   supplied web/youtube URLs and local file paths (PDF, image, doc,
-  code), emitting one md+html seed pair per resource under `seeds/`.
+  code), emitting one md+html seed pair per resource under
+  `ai-artifacts/seeds/`.
   When no intent exists, the **bootstrap path** captures intent ad-hoc
-  (prompt / URL / file) and emits `intent.<slug>.{md,html}` alongside
+  (prompt / URL / file) and emits `ai-artifacts/intents/intent.<slug>.{md,html}` alongside
   seeds in the same commit. When the user has no external resources,
   **ideation mode** crystallizes ideas through AI/user dialogue plus
   feasibility checks — each idea becomes its own seed. Iteratively
@@ -31,19 +32,19 @@ questions) and emits two artifacts per resource:
 
 | Output | Audience | Purpose |
 |---|---|---|
-| `seeds/seed.<intent-slug>.<resource-slug>.md` | AI (next-hop is `plan-establisher`) | Structured seed — source provenance, intent-filtered extract, relevance rationale |
-| `seeds/seed.<intent-slug>.<resource-slug>.html` | Human (browser-openable) | Self-contained verification doc, no CDN, HTML-escaped |
+| `ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.md` | AI (next-hop is `plan-establisher`) | Structured seed — source provenance, intent-filtered extract, relevance rationale |
+| `ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.html` | Human (browser-openable) | Self-contained verification doc, no CDN, HTML-escaped |
 
 The skill is **iteratively re-runnable**: each invocation runs in its
-own worktree+merge cycle and seeds accumulate in `seeds/`.
-`plan-establisher` globs `seeds/seed.<intent-slug>.*.md` for one intent.
+own worktree+merge cycle and seeds accumulate in `ai-artifacts/seeds/`.
+`plan-establisher` globs `ai-artifacts/seeds/seed.<intent-slug>.*.md` for one intent.
 
 Three Phase 1 / 2 branches encode bidirectionality with intent-aligner:
 
-- **`standard`** — existing `intent.<slug>.md`; user provides
+- **`standard`** — existing `ai-artifacts/intents/intent.<slug>.md`; user provides
   URLs/files; seeds only.
 - **`bootstrap`** — no intent file; user supplies prompt/URL/file ad-hoc;
-  emits `intent.<slug>.{md,html}` (rev 1) **plus** seeds in one merge.
+  emits `ai-artifacts/intents/intent.<slug>.{md,html}` (rev 1) **plus** seeds in one merge.
   Spec: [references/intent-bootstrap.md](references/intent-bootstrap.md).
 - **`ideation`** — Phase 2 ends with 0 resources (or user types `ideate`);
   AI/user dialogue + feasibility checks crystallize one seed per idea.
@@ -61,7 +62,7 @@ Phase L: Dialog language — references/language-selection.md
 Phase 0: Detect repo state (on-dev | on-default-needs-dev |
          on-nonbase-main-checkout | inside-seed-worktree [resume] |
          inside-other-worktree | unrelated)
-Phase 1: Intent selection ──┬─ ≥1 intent.<slug>.md exists ─── auto-pick / menu → RUN_MODE=standard
+Phase 1: Intent selection ──┬─ ≥1 ai-artifacts/intents/intent.<slug>.md exists ─── auto-pick / menu → RUN_MODE=standard
                             ├─ 0 found, user opts bootstrap ── Phase 1b (intent-bootstrap.md) → RUN_MODE=bootstrap
                             └─ 0 found, user opts abort ────── exit cleanly
 Phase 2: Resource intake loop ──┬─ user pastes URL/path ─── classify + append
@@ -141,7 +142,7 @@ objects).
 
 ## Phase 1 — Intent selection (or bootstrap)
 
-Discover intents: `ls -1 "${MAIN_CHECKOUT}"/intent.*.md 2>/dev/null`.
+Discover intents: `ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/intents/intent.*.md 2>/dev/null`.
 
 | Match count | Action |
 |---|---|
@@ -321,17 +322,18 @@ Stop and ask the user — never auto-resolve.
 ## Phase 5 — Emit seeds (+ intent in bootstrap) + commit
 
 **Bootstrap prelude** (only when `RUN_MODE` is `bootstrap` or
-`bootstrap, ideation`): write `intent.${INTENT_SLUG}.md` at the
-worktree root per [references/intent-bootstrap.md](references/intent-bootstrap.md)
+`bootstrap, ideation`): `mkdir -p ai-artifacts/intents`, then write
+`ai-artifacts/intents/intent.${INTENT_SLUG}.md` at the worktree root per
+[references/intent-bootstrap.md](references/intent-bootstrap.md)
 (Provenance must include `Revision: 1` and `Bootstrapped by: seed-gatherer`).
 Then render the HTML via the bundled renderer:
 
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/scripts/render_intent_html.py" \
-  .seed-state.json > "intent.${INTENT_SLUG}.html"
+  .seed-state.json > "ai-artifacts/intents/intent.${INTENT_SLUG}.html"
 ```
 
-Then `mkdir -p seeds`. For each `RESOURCES[i]`, in order:
+Then `mkdir -p ai-artifacts/seeds`. For each `RESOURCES[i]`, in order:
 
 0. **Skip non-emit cases** — `skipped-*` or already `emitted` (resume).
    Process only `confirmed` and `extracted` (ideation arrives at Phase 3
@@ -349,8 +351,8 @@ After the loop, batch-commit with a `RUN_MODE`-conditional subject:
 
 ```bash
 [ "${RUN_MODE%,*}" = "bootstrap" ] \
-  && git add "intent.${INTENT_SLUG}.md" "intent.${INTENT_SLUG}.html"
-git add seeds/
+  && git add "ai-artifacts/intents/intent.${INTENT_SLUG}.md" "ai-artifacts/intents/intent.${INTENT_SLUG}.html"
+git add ai-artifacts/seeds/
 if ! git diff --cached --quiet; then
   case "${RUN_MODE}" in
     bootstrap)            SUBJECT="feat(seeds+intent): bootstrap ${INTENT_SLUG} (rev 1 + ${SEED_COUNT} seeds)" ;;
@@ -374,15 +376,15 @@ The agent's cwd may be inside the worktree. Use `git -C
 Print:
 
 1. The list of emitted artifacts — absolute paths to each
-   `seeds/seed.${INTENT_SLUG}.${RESOURCE_SLUG}.{md,html}` so the user
+   `ai-artifacts/seeds/seed.${INTENT_SLUG}.${RESOURCE_SLUG}.{md,html}` so the user
    can open the HTMLs in a browser. Also list any `skipped-*`
    resources with the reason — these contributed nothing to the
    emit but the user should know they were attempted.
 
 2. Next-step pointer (transition-safe):
    ```
-   Next: `/plan-establisher` (reads seeds/seed.${INTENT_SLUG}.*.md +
-   intent.${INTENT_SLUG}.md) — or run `/seed-gatherer` again to grow
+   Next: `/plan-establisher` (reads ai-artifacts/seeds/seed.${INTENT_SLUG}.*.md +
+   ai-artifacts/intents/intent.${INTENT_SLUG}.md) — or run `/seed-gatherer` again to grow
    the corpus, or `/intent-aligner update ${INTENT_SLUG}` to refine
    intent from the seeds just landed.
    ```
@@ -426,12 +428,12 @@ misuse and make deliberate bypass visible in history.
 The skill does NOT auto-launch any downstream skill. The user runs
 `/plan-establisher` (or repeats `/seed-gatherer` to grow the
 corpus) explicitly when ready. This skill's job ends at the merged
-`seeds/seed.<intent-slug>.*.md` files — shaping for the planner's
+`ai-artifacts/seeds/seed.<intent-slug>.*.md` files — shaping for the planner's
 rubric is `plan-establisher`'s concern.
 
 The cross-intent coexistence property is the same as intent-aligner's:
 running this skill for `dashboard` and `payments` produces
-`seeds/seed.dashboard.*.md` and `seeds/seed.payments.*.md` without
+`ai-artifacts/seeds/seed.dashboard.*.md` and `ai-artifacts/seeds/seed.payments.*.md` without
 overwriting each other. The downstream planner globs by intent slug.
 
 ---
@@ -457,7 +459,7 @@ Refuse even on mid-flow request (surface + ask for explicit override; default re
   (quasi-quoting / copyright + context-pollution concern)
 - Auto-launching `/plan-establisher`, `/codebase-planner`, or
   `/intent-aligner` from Phase 6
-- Loading or modifying `intent.<slug>.md` in `standard` mode — repair
+- Loading or modifying `ai-artifacts/intents/intent.<slug>.md` in `standard` mode — repair
   is `/intent-aligner`'s job. **Exception**: bootstrap mode authors a
   fresh intent (Phase 1b); that's the only seed-gatherer path that
   writes intent.md.

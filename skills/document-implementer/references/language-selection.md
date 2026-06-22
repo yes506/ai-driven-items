@@ -18,8 +18,8 @@ independent.
 | Gate tokens (`confirm merge`, `revise`, `keep`, `proceed`) | **always English, verbatim — never translated** |
 | Generated document body (prose / slide content) | follows `OUTPUT_LANGUAGE` (from planner) |
 | Stub-id slugs, `[[stub-id]]` wikilinks, anchors | natural form (English / ASCII) |
-| `implementation-report.md` prose sections | follows `LANGUAGE` |
-| `implementation-report.md` tables (file paths, exit codes, item ids) | natural form |
+| Self-verification report (`report.<id>.md`) prose sections | follows `LANGUAGE` |
+| Self-verification report tables (file paths, exit codes, item ids) | natural form |
 | Merge-commit marker `(document-impl-<scale>, human-confirmed)` | natural form (verbatim — grep contract) |
 | This skill's own SKILL.md / references/ / scripts/ | never translated (agent-facing) |
 | Commit messages on the implementer branch | English (project convention) |

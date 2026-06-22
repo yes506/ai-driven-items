@@ -1,10 +1,12 @@
 # Output schema — plan.<intent-slug>.v<N>.{md,html}
 
-Phase 5 emits two artifacts per plan run at the **plan worktree
-root** (`.worktrees/plan-<intent-slug>-<id>/`); Phase 6's
-`git merge --no-ff` brings them to `${MAIN_CHECKOUT}` on
-`${BASE_BRANCH}` (the repo root, where `codebase-planner` reads them
-from). Both are derived from the in-memory plan representation that
+Phase 5 emits two artifacts per plan run under
+`ai-artifacts/plans/` at the **plan worktree root**
+(`.worktrees/plan-<intent-slug>-<id>/ai-artifacts/plans/`); Phase 6's
+`git merge --no-ff` brings them to
+`${MAIN_CHECKOUT}/ai-artifacts/plans/` on `${BASE_BRANCH}` (where
+`codebase-planner` reads them from). Both are derived from the
+in-memory plan representation that
 was confirmed at Phase 3. The markdown is written directly via
 `Write` (the field values from the in-memory plan, formatted per the
 schema below); the HTML is rendered by `scripts/render_plan_html.py`
@@ -12,8 +14,8 @@ which reads the state file plus the bundled template. Audiences:
 
 | Artifact | Audience | How it's used |
 |---|---|---|
-| `plan.<intent-slug>.v<N>.md` | AI (`codebase-planner` reads ONLY this) | Folded planner-ready doc; planner picks a scale lane and proceeds. intent.md + seeds/ become raw source material, not active inputs |
-| `plan.<intent-slug>.v<N>.html` | Human (browser-openable) | Self-contained verification doc, no CDN, HTML-escaped |
+| `ai-artifacts/plans/plan.<intent-slug>.v<N>.md` | AI (`codebase-planner` reads ONLY this) | Folded planner-ready doc; planner picks a scale lane and proceeds. intent.md + seeds/ become raw source material, not active inputs |
+| `ai-artifacts/plans/plan.<intent-slug>.v<N>.html` | Human (browser-openable) | Self-contained verification doc, no CDN, HTML-escaped |
 
 `<N>` is the version number (see [plan-naming-and-versioning.md](plan-naming-and-versioning.md)).
 
