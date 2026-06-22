@@ -1,7 +1,8 @@
 # Output schema — intent.<slug>.md + intent.<slug>.html
 
-Phase 5 emits two artifacts at the worktree root, **slug-scoped** so
-multiple intents can coexist at the repo root after merge. Both are
+Phase 5 emits two artifacts under `ai-artifacts/intents/` at the
+worktree root, **slug-scoped** so multiple intents can coexist in
+`ai-artifacts/intents/` after merge. Both are
 rendered from the same in-memory `INTENT` representation that was
 confirmed in Phase 3. The two formats serve different audiences:
 

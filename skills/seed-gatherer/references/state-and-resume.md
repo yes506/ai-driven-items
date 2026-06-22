@@ -44,8 +44,8 @@ next phase after `phase_completed`.
       "resource_slug": "<sanitized slug used in seed.<intent-slug>.<resource-slug>.{md,html}>",
       "status":        "pending | extracted | confirmed | emitted | skipped-no-ytdlp | skipped-fetch-failed",
       "extracted_at":  "<ISO-8601 — written when status transitions to extracted>",
-      "output_md":     "<relative path under seeds/, populated at emit time>",
-      "output_html":   "<relative path under seeds/, populated at emit time>",
+      "output_md":     "<relative path under ai-artifacts/seeds/, populated at emit time>",
+      "output_html":   "<relative path under ai-artifacts/seeds/, populated at emit time>",
       "extracted_content":   "<intent-filtered excerpts / summary — populated at Phase 3>",
       "relevance_rationale": "<one paragraph linking to specific INTENT fields — populated at Phase 3>",
       "feasibility_check":   "<ideation-only — summary of web/code/file checks the agent ran>"
@@ -64,7 +64,7 @@ next phase after `phase_completed`.
   - `standard` — existing `intent.<slug>.md` loaded; resources produce
     seeds (no intent emit).
   - `bootstrap` — no existing intent; Phase 1b captures ad-hoc intent
-    AND emits `intent.<slug>.{md,html}` alongside seeds. See
+    AND emits `ai-artifacts/intents/intent.<slug>.{md,html}` alongside seeds. See
     [intent-bootstrap.md](intent-bootstrap.md).
   - `ideation` — Phase 2 chose ideation (zero resources or user typed
     `ideate`); seeds come from AI/user dialogue + feasibility checks.
@@ -165,7 +165,7 @@ Write the state file:
      `resources[i].status="emitted"`, `output_md`, `output_html`, and
      persist again. This is the per-resource "done" marker.
    - **After the per-resource loop** and the single batch
-     `git add seeds/ && git commit` (guarded with `diff --cached
+     `git add ai-artifacts/seeds/ && git commit` (guarded with `diff --cached
      --quiet`): set `phase_completed: artifacts_emitted` and persist.
 3. **At Phase 6** after the merge: update `phase_completed:
    human_confirmed`, write `merged_at`.
@@ -178,15 +178,15 @@ successful checkpoint, which is the right thing to resume from.
 - It is NOT a transcript. The Phase 2 intake dialog and Phase 3
   synthesis preview are in chat history; only the *confirmed* final
   per-resource records live here.
-- It is NOT the artifact. Each `seeds/seed.<intent-slug>.<resource-slug>.md`
+- It is NOT the artifact. Each `ai-artifacts/seeds/seed.<intent-slug>.<resource-slug>.md`
   is the human-and-AI-readable artifact; this state file is a JSON
   sidecar for resumability.
 - It is NOT version-controlled. It's gitignored deliberately — the
   worktree commits + the merged seeds directory are the canonical
   record, the state file is local working state.
 - It is NOT shared with downstream skills. They read each
-  `seeds/seed.*.md`, not `.seed-state.json`. The handoff contract is
-  the markdown files under `seeds/`.
+  `ai-artifacts/seeds/seed.*.md`, not `.seed-state.json`. The handoff contract is
+  the markdown files under `ai-artifacts/seeds/`.
 
 ## Honest limitations
 
@@ -202,5 +202,5 @@ successful checkpoint, which is the right thing to resume from.
 - Multiple seed runs in flight for the same intent slug (different
   `SEED_RUN_ID`s) are fully independent — different worktrees,
   different branches, different state files. Phase 0 distinguishes by
-  which worktree the user is currently inside. The downstream `seeds/`
+  which worktree the user is currently inside. The downstream `ai-artifacts/seeds/`
   directory accumulates contributions from all merged runs.

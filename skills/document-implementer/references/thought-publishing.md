@@ -22,7 +22,7 @@ existed.
 | `3` | `progress` | Republished after each commit batch — items completed since last publish, dep_context_degraded summary |
 | `3` | `blocker` | On any blocker mid-queue — blocker_reason + implicated item id |
 | `4` | `validate` | Per-validator exit code; auto-fix attempts used + outcome |
-| `5` | `report` | The implementation-report.md path (committed) + summary line count |
+| `5` | `report` | The report path `${REPORT_PATH}` (committed) + summary line count |
 | `6` | `outcome` | Gate decision (`confirm merge` / `revise` / `keep` / aborted); marker landed (if confirm merge) |
 
 The Phase L language preamble does NOT publish — it's metadata, not

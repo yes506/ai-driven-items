@@ -4,9 +4,11 @@ The state file lives at the worktree root and is **gitignored** on the
 planner branch (per Phase 4 step 3). It is local-only working state,
 updated **incrementally** after each Phase sub-step so any mid-run
 failure stays resumable. It is NEVER committed; the human-confirmation
-marker lives in the tracked artifacts (system: `architecture.html` +
-`architecture.mmd`; feature: `plan.md` + `plan.mmd`) and the merge
-commit message, not in this file. See
+marker lives in the tracked artifacts under
+`ai-artifacts/runs/code/<slug>-<planner-id>/` (system: `architecture.html`
++ `architecture.mmd`; feature: `plan.md` + `plan.mmd`) and the merge
+commit message (whose `AI-Artifacts-Run-Dir:` trailer points at that
+dir), not in this file. See
 [implementer-contract.md](implementer-contract.md) for the full
 per-lane gate check and SKILL.md "Implementation gate (downstream
 contract)" for the summary table.
@@ -153,9 +155,10 @@ Downstream automation does NOT read `.planner-state.json` (it's
 gitignored — wouldn't survive merge to dev). The canonical
 implementation-gate check is a **scale-tagged marker family** — system
 lane keeps the original `(interfaces only, human-confirmed)` marker
-plus `architecture.html`/`.mmd` files; feature lane uses
-`(plan-feature, human-confirmed)` plus `plan.md`/`plan.mmd`; micro and
-local use chat-history gates only. See
+plus `$RUN_DIR/architecture.html`/`.mmd` files; feature lane uses
+`(plan-feature, human-confirmed)` plus `$RUN_DIR/plan.md`/`plan.mmd`
+(`$RUN_DIR` resolved from the merge commit's `AI-Artifacts-Run-Dir:`
+trailer); micro and local use chat-history gates only. See
 [implementer-contract.md](implementer-contract.md) for the full
 per-lane check and SKILL.md "Implementation gate (downstream contract)"
 for the canonical summary table.

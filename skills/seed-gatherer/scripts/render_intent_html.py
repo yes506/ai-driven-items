@@ -34,7 +34,7 @@ renderers all emit the same five-stage breadcrumb so a reviewer who
 opens any HTML output immediately knows where the artifact sits.
 
 Read-only: writes only to stdout. Caller redirects with
-`> intent.<slug>.html` per SKILL.md Phase 5.
+`> ai-artifacts/intents/intent.<slug>.html` per SKILL.md Phase 5.
 """
 
 import html

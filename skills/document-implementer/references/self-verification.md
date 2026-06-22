@@ -1,8 +1,23 @@
 # Phase 5 — Self-verification report
 
-Emits `implementation-report.md` at the worktree root after Phase 4
-validators succeed. The report is the artifact the human reviewer
-inspects at Phase 6 before typing `confirm merge`.
+Emits the self-verification report after Phase 4 validators succeed.
+The report is the artifact the human reviewer inspects at Phase 6
+before typing `confirm merge`.
+
+**Report path** (`REPORT_PATH`):
+- **feature / system**: `"${RUN_DIR}/report.${DOCIMPL_ID}.md"` — the
+  planner's run-dir, resolved from the marker commit's trailer at
+  Phase 0 and reused from state (`planner_artifact_dir`).
+- **micro / local** (no planner run-dir, hence no trailer):
+  `"ai-artifacts/runs/doc/${REPORT_SLUG}-docimpl-${DOCIMPL_ID}/report.${DOCIMPL_ID}.md"`,
+  where `REPORT_SLUG` is the sanitized `TARGET_PATH`/project basename
+  persisted in state (`report_slug`).
+
+`mkdir -p "$(dirname "${REPORT_PATH}")"` before writing. The report is
+committed inside the worktree and merged via the normal Phase 5/6 flow
+for ALL lanes (no carve-out). `TARGET_PATH` is unaffected — the
+user-facing document stays at its user-chosen path, NOT under
+`ai-artifacts/`.
 
 ## Report schema
 
@@ -11,7 +26,8 @@ inspects at Phase 6 before typing `confirm merge`.
 
 ## Source
 - Planner marker: `<scale>` from commit `<sha-short>` (or "chat" for micro/local)
-- Planner artifacts: `<list of paths>` (e.g. `document-plan.md`, `document-structure.mmd`)
+- Planner run-dir: `<RUN_DIR>` (feature/system; resolved from marker trailer) — `<empty>` for micro/local
+- Planner artifacts: `<list of paths under RUN_DIR>` (e.g. `${RUN_DIR}/document-plan.md`, `${RUN_DIR}/document-structure.mmd`)
 - Source hash: `<sha256-short>` (computed at Phase 1 extraction over the union of planner artifacts; surfaces if planner is re-run mid-implementer)
 - Frontmatter values (feature/system): DOCTYPE, OUTPUT_STACK, AUDIENCE, OUTPUT_LANGUAGE, TARGET_PATH
 
@@ -21,7 +37,7 @@ inspects at Phase 6 before typing `confirm merge`.
 - Blocked: <K> (with reasons)
 
 ## Files changed
-<bullet list of relative paths with line-count deltas; for structured, just `<TARGET_PATH>` and `implementation-report.md`>
+<bullet list of relative paths with line-count deltas; for structured, just `<TARGET_PATH>` and the report at `<REPORT_PATH>`>
 
 ## Validation
 - Validators run: parse_frontmatter, validate_doc_completeness (text), validate_anchors (text or pptx)
@@ -38,8 +54,8 @@ inspects at Phase 6 before typing `confirm merge`.
 
 ## Acceptance-criteria checklist (Q8 — explicit per stub)
 
-For each stub from `document-plan.md`, list every entry in the
-stub's `acceptance_criteria` field as a checkbox. Reviewer ticks
+For each stub from `${RUN_DIR}/document-plan.md`, list every entry in
+the stub's `acceptance_criteria` field as a checkbox. Reviewer ticks
 each at Phase 6 before `confirm merge`.
 
 ### stub: context
@@ -109,7 +125,9 @@ explicit human ratification.
 ## Commit
 
 ```bash
-git add implementation-report.md
+mkdir -p "$(dirname "${REPORT_PATH}")"
+# write the report to "${REPORT_PATH}" via the Write tool, then stage it:
+git add -- "${REPORT_PATH}"
 git commit -m "docs(implementer): self-verification report"
 ```
 

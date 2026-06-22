@@ -20,9 +20,10 @@ Extraction:
    (Java `interface`, Go `type ... interface`, Rust `trait`). Do NOT
    parse paths out of `architecture.html` — the HTML is a human-facing
    report, not a stable machine-parseable index. Cross-check the
-   discovered set against `architecture.mmd` (the Mermaid DAG of
-   nodes) for sanity: if a node in the DAG has no matching skeleton
-   file, surface as a discovery blocker.
+   discovered set against `"$RUN_DIR/architecture.mmd"` (the Mermaid
+   DAG of nodes; `RUN_DIR` = the trailer-resolved `planner_artifact_dir`)
+   for sanity: if a node in the DAG has no matching skeleton file,
+   surface as a discovery blocker.
 2. Parse each interface file. For every method on every interface,
    produce a queue item:
 
@@ -60,14 +61,16 @@ Extraction:
    blocked items as a batched question at end-of-discovery — do NOT
    skip them silently.
 
-## Feature lane — from `plan.md` (+ optional skeletons)
+## Feature lane — from `"$RUN_DIR/plan.md"` (+ optional skeletons)
 
-The planner emitted `plan.md` (prose plan, 5-15 implementation steps)
-and `plan.mmd` (Mermaid DAG). Skeletons are optional at this lane.
+The planner emitted `"$RUN_DIR/plan.md"` (prose plan, 5-15
+implementation steps) and `"$RUN_DIR/plan.mmd"` (Mermaid DAG), where
+`RUN_DIR` = the trailer-resolved `planner_artifact_dir`. Skeletons are
+optional at this lane.
 
 Extraction:
 
-1. Parse `plan.md`. Each numbered step under a heading like
+1. Parse `"$RUN_DIR/plan.md"`. Each numbered step under a heading like
    "Implementation steps" or equivalent becomes one queue item. If the
    plan structure is ambiguous, fall back to: each `##`-level heading
    that contains imperative-mood prose ("Add", "Implement", "Refactor",
@@ -87,8 +90,9 @@ Extraction:
 }
 ```
 
-3. **If `plan.mmd` is present**, use it for ordering: topo-sort on the
-   DAG, root-first. If absent, preserve `plan.md` source order.
+3. **If `"$RUN_DIR/plan.mmd"` is present**, use it for ordering:
+   topo-sort on the DAG, root-first. If absent, preserve
+   `"$RUN_DIR/plan.md"` source order.
 
 4. **If skeletons were also emitted** (feature lane with explicit
    `emit skeletons`): merge — each skeleton-method item is added in

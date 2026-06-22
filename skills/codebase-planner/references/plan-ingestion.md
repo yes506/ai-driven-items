@@ -9,11 +9,11 @@ supply zero, one, or many of each Phase-1 method.
 
 ## Phase 0.5 — Plan-establisher auto-discovery (all lanes, preferred when available)
 
-Before any other discovery or scoring, scan the repo root for
+Before any other discovery or scoring, scan the plans directory for
 plan-establisher output:
 
 ```bash
-ls -1 "${MAIN_CHECKOUT}"/plan.*.v*.md 2>/dev/null \
+ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/plans/plan.*.v*.md 2>/dev/null \
   | sed -nE 's|.*/plan\.([a-z0-9-]+)\.v([0-9]+)\.md$|\1 \2 &|p' \
   | sort -k1,1 -k2,2n | awk '{print $3}'
 ```

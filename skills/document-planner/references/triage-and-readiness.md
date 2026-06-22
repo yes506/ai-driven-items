@@ -10,10 +10,10 @@ ambiguity)` tuple does NOT transfer verbatim.
 
 Before scoring, scan and surface what's already known:
 
-1. `plan.<intent-slug>.v<N>.md` at repo root (highest `N`) — per
+1. `ai-artifacts/plans/plan.<intent-slug>.v<N>.md` (highest `N`) — per
    [plan-ingestion.md](plan-ingestion.md). If present, its
    `Proposed scale lane` is the default.
-2. The intent doc (`intent.<intent-slug>.md`) if present.
+2. The intent doc (`ai-artifacts/intents/intent.<intent-slug>.md`) if present.
 3. `CLAUDE.md`, `AGENTS.md`, `README.md` at repo root + nearest
    ancestor.
 4. `git log -n 20 --oneline -- <related-path>` if the user named a
@@ -108,8 +108,8 @@ choice.
 **B. New tech-spec for a feature shipping next quarter**
 - discovery: plan-establisher plan present; ~8 sections projected
 - scope=2, risk=1 (internal canonical), ambiguity=0
-- `final_scale=2` → `feature`. Worktree + `document-plan.md` +
-  `document-structure.mmd`.
+- `final_scale=2` → `feature`. Worktree + `${RUN_DIR}/document-plan.md` +
+  `${RUN_DIR}/document-structure.mmd`.
 
 **C. Customer-facing API reference v2**
 - discovery: ~30 endpoints, customer-facing, contract-affecting

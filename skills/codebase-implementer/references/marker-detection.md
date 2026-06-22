@@ -36,26 +36,69 @@ commit indicates a forged or hand-crafted marker; re-run the planner
 if this was intentional." If `planner_marker_scale` is empty AND the
 chat-history check (below) also fails, refuse to proceed.
 
-Additional artifact check (defense-in-depth — the marker alone is a
-documented social contract, not cryptographic):
+### Run-dir resolution via git trailer (feature + system)
+
+The inspector's marker scan emits hash+ts+subject only
+(`--format='%H%x09%ct%x09%s'`) and never reads the commit body, so the
+run-dir is resolved with a SECOND lookup once `PLANNER_MARKER_COMMIT`
+is chosen. The planner's landing merge carries the run-dir as a git
+trailer `AI-Artifacts-Run-Dir:`; parse it, count matches, and refuse
+unless exactly one is present (do NOT `tail -1`):
+
+```bash
+RUN_DIR_LINES="$(git -C "${MAIN_CHECKOUT}" show -s --format=%B "${PLANNER_MARKER_COMMIT}" \
+  | git interpret-trailers --parse \
+  | grep '^AI-Artifacts-Run-Dir:' || true)"
+# Inline `grep -c` so the substitution's exit status is discarded — the
+# two-step `N=$(grep -c .)` form aborts under `set -e` on a zero count.
+[ "$(printf '%s' "${RUN_DIR_LINES}" | grep -c .)" -eq 1 ] \
+  || { echo "expected exactly 1 AI-Artifacts-Run-Dir trailer — refusing"; exit 1; }
+# Strip the key (and surrounding whitespace) → bare run-dir value.
+RUN_DIR="$(printf '%s' "${RUN_DIR_LINES}" | sed -e 's/^AI-Artifacts-Run-Dir:[[:space:]]*//' -e 's/[[:space:]]*$//')"
+# ANCHORED, single-line, code-chain allowlist. Rejects absolute paths,
+# '..', and any embedded newline/CR/whitespace (the [a-z0-9-]+ slug and
+# [A-Za-z0-9._-]+ planner-id segments contain none of those).
+printf '%s' "${RUN_DIR}" | grep -Eqx '^ai-artifacts/runs/code/[a-z0-9-]+-[A-Za-z0-9._-]+$' \
+  || { echo "run-dir trailer failed code-chain allowlist: ${RUN_DIR}"; exit 1; }
+```
+
+`grep -Eqx` anchors the whole string (`-x`) so a value carrying an
+embedded newline cannot pass by matching only its first line.
+
+Then verify the per-scale artifacts exist **at the marker commit's
+tree** (`git cat-file -e "<commit>:<path>"`) — NOT at the worktree
+`HEAD`, which may have drifted since the planner landed:
 
 ```bash
 case "${PLANNER_MARKER_SCALE}" in
   system)
-    test -f architecture.html && test -f architecture.mmd \
-      || { echo "system marker present but architecture.{html,mmd} missing"; exit 1; }
+    git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/architecture.html" 2>/dev/null \
+      && git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/architecture.mmd" 2>/dev/null \
+      || { echo "system marker present but architecture.{html,mmd} missing at ${RUN_DIR}"; exit 1; }
     ;;
   feature)
-    test -f plan.md && test -f plan.mmd \
-      || { echo "feature marker present but plan.{md,mmd} missing"; exit 1; }
+    git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/plan.md" 2>/dev/null \
+      && git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/plan.mmd" 2>/dev/null \
+      || { echo "feature marker present but plan.{md,mmd} missing at ${RUN_DIR}"; exit 1; }
+    ;;
+  *)
+    # Fail closed: an unset/unexpected scale must never skip artifact checks.
+    echo "BLOCKER: unexpected planner marker scale: ${PLANNER_MARKER_SCALE:-<unset>}"; exit 1
     ;;
 esac
 ```
 
-If the artifact files are missing despite the marker, treat as a
-**tampered or partially reverted** planner run — refuse and ask the user
-to either re-run the planner or restore the artifact files. Do NOT
+Persist the resolved dir as state field `planner_artifact_dir`. On any
+failure above (zero/multiple trailers, allowlist rejection, missing
+artifact at the marker tree) on a feature/system marker → **REFUSE.
+Never fall back to a project-root path.** Treat a missing artifact as a
+**tampered or partially reverted** planner run — refuse and ask the
+user to either re-run the planner or restore the artifact files. Do NOT
 silently downgrade to a lower scale.
+
+micro/local lanes have no planner commit and therefore no trailer — the
+run-dir is not resolved here; the implementer uses its own id-keyed
+sibling dir (see SKILL.md Phase 5).
 
 ## Gate check — micro + local (chat-based)
 

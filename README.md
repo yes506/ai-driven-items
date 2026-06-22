@@ -14,12 +14,20 @@ This README is the **item index** for the repo. Items are grouped by type below;
 
 #### Skills
 
+> **Artifact paths in the descriptions below name the file, not its root
+> location.** Every skill deliverable now lives under `ai-artifacts/` (see
+> [Repository layout](#repository-layout) → "Where skills write their
+> deliverables"): `intent.<slug>.*` → `ai-artifacts/intents/`, `seeds/seed.*` →
+> `ai-artifacts/seeds/`, `plan.<slug>.v<N>.*` → `ai-artifacts/plans/`, and the
+> planner→implementer handoffs + `report.<impl-id>.md` under
+> `ai-artifacts/runs/<code|doc>/<slug>-<run-id>/`.
+
 | Skill | What it does |
 |---|---|
 | [`project-scaffolder`](skills/project-scaffolder/) | Language-agnostic project bootstrapping. Walks intent → 2-4 tech-stack options → scaffolded baseline (lint, test, logging, config, CI stub, health endpoint). Runs entirely inside an isolated git worktree and merges back to `dev` only after explicit user confirmation. Tier-1 stacks: Next.js, Spring Boot, FastAPI, Go, Node/Express. |
 | [`intent-aligner`](skills/intent-aligner/) | Head of the planning chain — and now **bidirectional** with `seed-gatherer`. Extracts what's actually in the user's head before any planning starts: an interactive elicitation dialog (Socratic loops + 5 Whys + example/counter-example disambiguation) auto-detects whether the user brings a **feature/product idea** or a **problem/pain**, then iterates until intent converges. Emits a dual-format artifact — `intent.<slug>.md` (structured AI-parseable seed) and `intent.<slug>.html` (static, self-contained, human-verifiable). Stack-, planner-, and lane-agnostic: the file's 6 rubric-aligned fields (Goal, In-scope features, Out-of-scope, Constraints, Success criteria, Open questions) are directly readable by `codebase-planner`. **Two invocations**: `/intent-aligner` for first capture (create mode, revision 1), and `/intent-aligner update <slug>` for refinement from accumulated seeds — the seed→intent feedback loop that lets intent grow more solid before planning. Update mode loads existing intent + globs `seeds/seed.<slug>.*.md`, proposes per-field refinements with seed-backed citations, bumps the revision (`Revision: N`), and merges with marker `(intent, updated-from-seeds, human-confirmed)`. Downstream `seed-gatherer` collects evidence, `plan-establisher` folds intent + seeds into `plan.<intent-slug>.v<N>.md`. Create-mode marker: `(intent, human-confirmed)`. Manual invocation only — `/intent-aligner` or `/intent-aligner update <slug>`. |
 | [`seed-gatherer`](skills/seed-gatherer/) | Bidirectional with `intent-aligner` in the planning chain. **Standard path**: reads existing `intent.<slug>.md` and grows an evidence corpus from user-supplied URLs / YouTube / PDFs / images / local docs/code; each resource is intent-filtered into an md+html seed pair under `seeds/seed.<intent-slug>.<resource-slug>.{md,html}` with source provenance + relevance rationale. **Bootstrap path**: when no intent.md exists, the user supplies a starting prompt / URL / file and the skill captures intent ad-hoc (revision 1, marked `Bootstrapped by: seed-gatherer`), emitting intent.md + intent.html alongside seeds in a single merge — marker `(intent+seeds, bootstrap, human-confirmed)`. **Ideation path**: when the user has no external material, AI/user back-and-forth dialogue plus feasibility checks (WebSearch, local code grep, reference doc lookup) crystallize one seed per accepted idea — marker `(seeds, ideation, human-confirmed)`. Bootstrap and ideation compose. Pre-fetch `proceed` gates protect against accidentally-pasted URLs in both bootstrap and standard intake. Iteratively re-runnable across worktree+merge cycles with 3-case collision disambiguation. Feeds `plan-establisher`; refinement of the bootstrapped intent flows back to `/intent-aligner update <slug>`. Manual invocation only — `/seed-gatherer`. |
-| [`plan-establisher`](skills/plan-establisher/) | Sits between `seed-gatherer` and the downstream planners — **`codebase-planner`** (for code) and **`document-planner`** (for documents). Reads `intent.<slug>.md` (required) and `seeds/seed.<intent-slug>.*.md` (optional), runs **4 verification dimensions** (intent self-consistency, seeds-vs-intent, seeds-vs-seeds, planner-rubric completeness), resolves ambiguities via interactive Socratic dialog (per-finding `(d) Defer` or batch `accept remaining`), then emits a folded planner-ready `plan.<intent-slug>.v<N>.md` + `.html` at the repo root. The downstream planner reads ONLY the plan; `intent.md` + `seeds/` become raw source material the planner doesn't re-read. Includes a proposed scale lane (`micro` / `local` / `feature` / `system`) with reasoning + an Evidence inventory mapping rubric fields → contributing seeds. Iteratively re-runnable — each invocation emits the next monotonic version (`v1`, `v2`, ...) with prior versions preserved as audit trail; Phase 5 race-guard re-scans for parallel runs. Runs inside a git worktree and merges to `dev` only after `confirm merge`; marker `(plan, human-confirmed)` keeps the chain visible in `git log`. Manual invocation only — `/plan-establisher`. |
+| [`plan-establisher`](skills/plan-establisher/) | Sits between `seed-gatherer` and the downstream planners — **`codebase-planner`** (for code) and **`document-planner`** (for documents). Reads `intent.<slug>.md` (required) and `seeds/seed.<intent-slug>.*.md` (optional), runs **4 verification dimensions** (intent self-consistency, seeds-vs-intent, seeds-vs-seeds, planner-rubric completeness), resolves ambiguities via interactive Socratic dialog (per-finding `(d) Defer` or batch `accept remaining`), then emits a folded planner-ready `plan.<intent-slug>.v<N>.md` + `.html` under `ai-artifacts/plans/`. The downstream planner reads ONLY the plan; `intent.md` + `seeds/` become raw source material the planner doesn't re-read. Includes a proposed scale lane (`micro` / `local` / `feature` / `system`) with reasoning + an Evidence inventory mapping rubric fields → contributing seeds. Iteratively re-runnable — each invocation emits the next monotonic version (`v1`, `v2`, ...) with prior versions preserved as audit trail; Phase 5 race-guard re-scans for parallel runs. Runs inside a git worktree and merges to `dev` only after `confirm merge`; marker `(plan, human-confirmed)` keeps the chain visible in `git log`. Manual invocation only — `/plan-establisher`. |
 | [`codebase-planner`](skills/codebase-planner/) | Decides how much planning a code change needs, then runs only the phases that lane requires. Four scale lanes: **micro** (one-function, 3–7 bullet chat plan, no worktree), **local** (≤3 files / 1 module, chat plan), **feature** (worktree + `plan.md` + Mermaid DAG, optional skeletons), **system** (full interface-skeleton workflow inherited verbatim from the prior codebase-architect skill — worktree + 9-field docstrings + Mermaid DAG + HTML report + human-confirmation merge gate). Lane is picked by a scored tuple (scope, risk, ambiguity) before any mutation; ambiguous requests block-and-ask rather than silently over-engineer. Downstream implementer agents read a scale-tagged marker family (see `codebase-implementer` below). Manual invocation only — `/codebase-planner`. |
 | [`codebase-implementer`](skills/codebase-implementer/) | Downstream half of the planner→implementer chain. Reads the planner's scale-tagged, human-confirmed marker from chat (micro/local) or merge commit (feature/system), creates its own git worktree, then runs an **autonomous** implementation loop across all phases (no per-step prompts; only pause is a genuine blocker like a missing collaborator). Generates method bodies from 9-field docstrings (system) or plan steps (feature) or bullets (micro/local), runs the project's compile+test command with bounded auto-fix (default 3 attempts, oscillation-detected), emits an `implementation-report.md` for review, and merges to the base branch (default `dev`) only after the user types `confirm merge`. Language-agnostic. Body-generation only — refuses to re-architect, refactor, or rename committed signatures. Manual invocation only — `/codebase-implementer`. |
 | [`document-planner`](skills/document-planner/) | The document-shaped sibling of `codebase-planner`. Decides how much planning a document needs, then runs only the phases that lane requires — same four scale lanes (**micro** / **local** / **feature** / **system**) and same `(scope, risk, ambiguity)` triage, but axes are re-grounded in document semantics (scope = content volume, risk = accuracy / compliance, ambiguity = unresolved claims/evidence/audience). First-class **DOCTYPE** classification picks one of `api-spec` / `tech-spec` / `runbook` / `ppt` and drives the stub primitive (per-endpoint / per-section / per-step / per-slide) and the eventual output stack (`text` for markdown doctypes; `structured` for pptx). Heavy lanes emit a **9-field stub schema** (`## stub: <id>` + YAML body — id, purpose, audience, key claims, evidence sources, dependencies, acceptance criteria, length budget, open questions) plus a Mermaid dependency DAG and self-contained HTML preview. Bundled validators check structure (DFS cycle detection), internal-ref resolution (`[[stub-id]]`), and undeclared-dependency catches at the render step. Marker family `(document-plan-<scale>, human-confirmed)` is a fresh choice — does NOT inherit codebase-planner's legacy `(interfaces only, …)` system marker. Manual invocation only — `/document-planner`. |
@@ -59,6 +67,30 @@ ai-driven-items/
 ├── playbooks/          (planned) Reusable, AI-consumable implementation guides
 └── README.md
 ```
+
+**Where skills write their deliverables.** Side-effect skills never scatter
+artifacts across your project root — they all write under a single committed
+`ai-artifacts/` directory (created on first use), so multiple skill runs in one
+project never collide:
+
+```
+ai-artifacts/
+├── intents/   intent.<slug>.{md,html}             # intent-aligner / seed-gatherer
+├── seeds/     seed.<slug>.<resource>.{md,html}    # seed-gatherer
+├── plans/     plan.<slug>.v<N>.{md,html}          # plan-establisher (versioned)
+└── runs/
+    ├── code/<slug>-<planner-id>/                  # codebase-planner → codebase-implementer
+    │     plan.md  plan.mmd | architecture.{html,mmd}   report.<impl-id>.md
+    └── doc/<slug>-<docplanner-id>/                # document-planner → document-implementer
+          document-plan.md  document-structure.{mmd,html}   report.<impl-id>.md
+```
+
+Durable artifacts (intents/seeds/plans) are slug- and version-named; per-run
+planner→implementer handoffs keep stable filenames inside a run-id-keyed
+directory whose path is passed downstream via an `AI-Artifacts-Run-Dir:` git
+trailer on the merge commit. Exempt from `ai-artifacts/`: `document-implementer`
+writes the finished document to your chosen `TARGET_PATH`; `collect-searches`
+and `live-notes` write to their own note targets.
 
 ### Installing
 
@@ -202,12 +234,19 @@ Released into the public domain via [CC0 1.0 Universal](https://creativecommons.
 
 #### 스킬
 
+> **아래 설명의 산출물 경로는 파일 이름을 가리키며, 루트 위치가 아닙니다.**
+> 모든 스킬 산출물은 이제 `ai-artifacts/` 아래에 저장됩니다(상단
+> [저장소 구조](#저장소-구조) → "스킬 산출물이 저장되는 위치" 참고):
+> `intent.<slug>.*` → `ai-artifacts/intents/`, `seeds/seed.*` → `ai-artifacts/seeds/`,
+> `plan.<slug>.v<N>.*` → `ai-artifacts/plans/`, planner→implementer 핸드오프와
+> `report.<impl-id>.md` 는 `ai-artifacts/runs/<code|doc>/<slug>-<run-id>/` 아래.
+
 | 스킬 | 설명 |
 |---|---|
 | [`project-scaffolder`](skills/project-scaffolder/) | 언어 무관 프로젝트 부트스트래퍼. 의도 파악 → 2-4개 스택 옵션 추천 → 베이스라인 스캐폴딩 (린트, 테스트, 로깅, 설정, CI 스텁, 헬스 엔드포인트) 흐름으로 진행합니다. 모든 작업은 격리된 git worktree 안에서만 일어나며, 사용자가 명시적으로 확인해야만 `dev` 브랜치로 머지됩니다. Tier-1 스택: Next.js, Spring Boot, FastAPI, Go, Node/Express. |
 | [`intent-aligner`](skills/intent-aligner/) | 계획 체인의 **상류** 단계 — 이제 `seed-gatherer`와 **양방향**으로 연결됩니다. 계획에 들어가기 전에 사용자의 머릿속에 있는 의도를 끄집어내 명확히 합니다. 대화형 elicitation(소크라테스식 질문 루프 + 5 Whys + 예시/반례 분별)을 통해 **만들고 싶은 기능/제품**인지 **겪고 있는 문제/불편함**인지 자동 판별하고, 의도가 수렴할 때까지 반복합니다. 결과물은 두 형식 — `intent.<slug>.md`(구조화된 AI 파싱용 시드) 및 `intent.<slug>.html`(외부 의존성 없는 사람 검증용 문서). 스택·플래너·레인 무관: 6개 루브릭 필드(Goal, In-scope features, Out-of-scope, Constraints, Success criteria, Open questions)는 `codebase-planner`가 그대로 읽을 수 있습니다. **두 가지 호출**: `/intent-aligner`로 최초 캡처(create mode, revision 1) 또는 `/intent-aligner update <slug>`로 누적된 시드로부터 의도를 정제(update mode). update mode는 기존 intent + `seeds/seed.<slug>.*.md` 글롭을 로드해 시드 근거가 붙은 필드별 정제안을 제안하고, revision을 1씩 증가(`Revision: N`)시키며 `(intent, updated-from-seeds, human-confirmed)` 마커로 머지합니다 — 시드→의도 피드백 루프를 통해 계획을 시작하기 전에 의도를 더욱 단단하게 만듭니다. 다운스트림 `seed-gatherer`가 evidence를 모으고, `plan-establisher`가 intent + 시드를 `plan.<intent-slug>.v<N>.md`로 folding합니다. Create-mode 마커: `(intent, human-confirmed)`. 수동 호출 전용 — `/intent-aligner` 또는 `/intent-aligner update <slug>`. |
 | [`seed-gatherer`](skills/seed-gatherer/) | 계획 체인에서 `intent-aligner`와 **양방향**으로 연결. **Standard path**: 기존 `intent.<slug>.md`를 읽어 사용자가 제공한 외부 자료(웹 URL, YouTube, PDF, 이미지, 로컬 문서/코드)에서 evidence corpus를 키워, 출처 provenance·의도-필터링된 추출·intent 필드별 관련성 설명을 담은 md+html 시드 쌍(`seeds/seed.<intent-slug>.<resource-slug>.{md,html}`)을 리소스당 하나씩 산출합니다. **Bootstrap path**: intent.md가 없을 때 사용자가 prompt/URL/파일을 제공하면 스킬이 즉석에서 intent를 캡처(revision 1, `Bootstrapped by: seed-gatherer` 표식)해 intent.md + intent.html을 시드와 함께 한 번의 머지에 산출 — 마커 `(intent+seeds, bootstrap, human-confirmed)`. **Ideation path**: 외부 자료가 전혀 없을 때 AI/사용자 간 tiki-taka 대화 + feasibility 검증(WebSearch, 로컬 코드 grep, 레퍼런스 문서 조회)을 통해 채택된 아이디어 하나당 하나의 시드로 결정화 — 마커 `(seeds, ideation, human-confirmed)`. Bootstrap과 ideation은 결합 가능합니다. 외부 fetch 직전의 `proceed` 게이트로 잘못 붙여넣은 URL을 차단(bootstrap과 standard 인테이크 양쪽 적용). 반복 실행 가능, 3-case 충돌 해소 보존. `plan-establisher`에 입력되고, 부트스트랩된 intent의 정제는 `/intent-aligner update <slug>`로 흘러갑니다. 수동 호출 전용 — `/seed-gatherer`. |
-| [`plan-establisher`](skills/plan-establisher/) | `seed-gatherer`와 다운스트림 플래너들 — **`codebase-planner`**(코드용)와 **`document-planner`**(문서용) — 사이에 위치합니다. `intent.<slug>.md`(필수)와 `seeds/seed.<intent-slug>.*.md`(선택) 를 읽어 **4가지 검증 차원**(intent 자체 일관성, seeds-vs-intent, seeds-vs-seeds, planner-루브릭 완전성)을 실행하고, 대화형 소크라테스 다이얼로그(개별 `(d) Defer` 또는 일괄 `accept remaining`)로 모호성을 해결한 뒤, 플래너 친화적으로 folding된 `plan.<intent-slug>.v<N>.md` + `.html`을 저장소 루트에 산출합니다. 다운스트림 플래너는 이 plan **만** 활성 입력으로 읽고, `intent.md`와 `seeds/`는 원본 소스 자료가 됩니다. 제안 scale lane(`micro`/`local`/`feature`/`system`) + 근거와, 루브릭 필드 → 기여 시드 매핑인 Evidence inventory를 포함합니다. 반복 실행 가능 — 각 호출은 다음 단조 증가 버전(`v1`, `v2`, ...)을 산출하며 이전 버전을 audit trail로 보존하고, Phase 5에서 병렬 실행을 위한 race-guard 재스캔을 수행합니다. 모든 mutation은 git worktree 안에서만 일어나며 `confirm merge` 후에만 `dev`로 머지됩니다. 머지 마커 `(plan, human-confirmed)`로 `git log`에서 체인이 가시화됩니다. 수동 호출 전용 — `/plan-establisher`. |
+| [`plan-establisher`](skills/plan-establisher/) | `seed-gatherer`와 다운스트림 플래너들 — **`codebase-planner`**(코드용)와 **`document-planner`**(문서용) — 사이에 위치합니다. `intent.<slug>.md`(필수)와 `seeds/seed.<intent-slug>.*.md`(선택) 를 읽어 **4가지 검증 차원**(intent 자체 일관성, seeds-vs-intent, seeds-vs-seeds, planner-루브릭 완전성)을 실행하고, 대화형 소크라테스 다이얼로그(개별 `(d) Defer` 또는 일괄 `accept remaining`)로 모호성을 해결한 뒤, 플래너 친화적으로 folding된 `plan.<intent-slug>.v<N>.md` + `.html`을 `ai-artifacts/plans/`에 산출합니다. 다운스트림 플래너는 이 plan **만** 활성 입력으로 읽고, `intent.md`와 `seeds/`는 원본 소스 자료가 됩니다. 제안 scale lane(`micro`/`local`/`feature`/`system`) + 근거와, 루브릭 필드 → 기여 시드 매핑인 Evidence inventory를 포함합니다. 반복 실행 가능 — 각 호출은 다음 단조 증가 버전(`v1`, `v2`, ...)을 산출하며 이전 버전을 audit trail로 보존하고, Phase 5에서 병렬 실행을 위한 race-guard 재스캔을 수행합니다. 모든 mutation은 git worktree 안에서만 일어나며 `confirm merge` 후에만 `dev`로 머지됩니다. 머지 마커 `(plan, human-confirmed)`로 `git log`에서 체인이 가시화됩니다. 수동 호출 전용 — `/plan-establisher`. |
 | [`codebase-planner`](skills/codebase-planner/) | 코드 변경에 필요한 **계획 규모**를 먼저 판정한 뒤, 해당 레인에 필요한 단계만 실행합니다. 네 단계 스케일: **micro**(단일 함수 수준, 3–7 항목 채팅 플랜, worktree 없음), **local**(≤3 파일·단일 모듈, 채팅 플랜), **feature**(worktree + `plan.md` + Mermaid DAG, 스켈레톤 선택적), **system**(이전 codebase-architect 스킬의 전체 인터페이스-스켈레톤 워크플로 — worktree + 9-필드 docstring + Mermaid DAG + HTML 리포트 + 사람 확인 머지 게이트). 레인은 mutation 직전에 (scope, risk, ambiguity) 점수 튜플로 결정되며, 요청이 모호하면 silently 과설계하지 않고 명확화 질문으로 차단합니다. 다운스트림 구현 에이전트는 scale-tagged marker family를 읽습니다(아래 `codebase-implementer` 참조). 수동 호출 전용 — `/codebase-planner`. |
 | [`codebase-implementer`](skills/codebase-implementer/) | planner→implementer 체인의 다운스트림 절반. 사용자가 확인한 planner의 scale-tagged marker를 chat(micro/local) 또는 머지 커밋(feature/system)에서 읽어, 자체 git worktree를 만든 뒤 모든 phase를 **자율적으로** 실행합니다(per-step 확인 없음, 진짜 blocker(예: 미정의 collaborator)만 정지 신호). 구현 본문을 9-필드 docstring(system) 또는 plan 단계(feature) 또는 bullet(micro/local)에서 생성하고, 프로젝트의 compile+test 명령을 bounded auto-fix(기본 3회, oscillation 감지)로 돌린 뒤, 리뷰용 `implementation-report.md`를 생성하고, 사용자가 `confirm merge`라고 입력해야만 base branch(기본 `dev`)로 머지합니다. 언어 무관. 본문 생성 전용 — re-architecting, refactoring, 커밋된 시그니처 변경은 거부합니다. 수동 호출 전용 — `/codebase-implementer`. |
 | [`document-planner`](skills/document-planner/) | `codebase-planner`의 문서 버전 자매 스킬. 문서에 필요한 **계획 규모**를 먼저 판정한 뒤, 해당 레인에 필요한 단계만 실행 — 네 단계 스케일(**micro** / **local** / **feature** / **system**)과 `(scope, risk, ambiguity)` triage는 동일하나, 축은 문서 의미로 재정의됩니다(scope = 콘텐츠 분량, risk = 정확성/컴플라이언스, ambiguity = 미해결 주장/근거/대상). 1급 시민인 **DOCTYPE** 분류가 `api-spec` / `tech-spec` / `runbook` / `ppt` 중 하나를 선택해 stub primitive(엔드포인트별 / 섹션별 / 단계별 / 슬라이드별)와 다운스트림 출력 스택(`text`는 markdown 계열, `structured`는 pptx)을 결정합니다. 무거운 레인은 **9-필드 stub 스키마**(`## stub: <id>` + YAML 본문 — id, purpose, audience, key claims, evidence sources, dependencies, acceptance criteria, length budget, open questions) + Mermaid 의존성 DAG + 자체 완결형 HTML 미리보기를 산출합니다. 번들 검증기는 구조(DFS 사이클 감지), 내부 참조 해결(`[[stub-id]]`), 그리고 렌더 단계에서의 미선언 의존성을 모두 잡습니다. 마커 패밀리 `(document-plan-<scale>, human-confirmed)`는 새로 정의된 것으로, codebase-planner의 레거시 `(interfaces only, …)` system 마커를 상속하지 **않습니다**. 수동 호출 전용 — `/document-planner`. |
@@ -247,6 +286,30 @@ ai-driven-items/
 ├── playbooks/          (예정) 재사용 가능한 AI 친화적 구현 가이드
 └── README.md
 ```
+
+**스킬 산출물이 저장되는 위치.** 부작용(side-effect)이 있는 스킬은 산출물을
+프로젝트 루트에 흩뿌리지 않습니다 — 모두 커밋되는 단일 `ai-artifacts/`
+디렉터리 아래에 기록하므로(최초 실행 시 생성), 한 프로젝트에서 여러 스킬을
+여러 번 실행해도 서로 충돌하지 않습니다:
+
+```
+ai-artifacts/
+├── intents/   intent.<slug>.{md,html}             # intent-aligner / seed-gatherer
+├── seeds/     seed.<slug>.<resource>.{md,html}    # seed-gatherer
+├── plans/     plan.<slug>.v<N>.{md,html}          # plan-establisher (버전 관리)
+└── runs/
+    ├── code/<slug>-<planner-id>/                  # codebase-planner → codebase-implementer
+    │     plan.md  plan.mmd | architecture.{html,mmd}   report.<impl-id>.md
+    └── doc/<slug>-<docplanner-id>/                # document-planner → document-implementer
+          document-plan.md  document-structure.{mmd,html}   report.<impl-id>.md
+```
+
+지속(durable) 산출물(intents/seeds/plans)은 slug·버전으로 이름이 붙고, 실행별
+planner→implementer 핸드오프는 run-id 기반 디렉터리 안에서 고정 파일명을
+유지하며, 그 경로는 머지 커밋의 `AI-Artifacts-Run-Dir:` git trailer 로
+다운스트림에 전달됩니다. `ai-artifacts/` 예외: `document-implementer` 는 완성
+문서를 사용자가 지정한 `TARGET_PATH` 에 기록하고, `collect-searches` 와
+`live-notes` 는 각자의 노트 대상에 기록합니다.
 
 ### 설치
 

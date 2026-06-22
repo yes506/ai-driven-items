@@ -202,8 +202,8 @@ the entire artifact. The 9-field stub schema does NOT apply.
 Accept the project plan via multiple inputs, presented separately so
 each can be normalized in isolation before synthesis:
 
-- **plan-establisher output** — `plan.<intent-slug>.v<N>.md` at repo
-  root (preferred; auto-discovered in Phase 0.5)
+- **plan-establisher output** — `ai-artifacts/plans/plan.<intent-slug>.v<N>.md`
+  (preferred; auto-discovered in Phase 0.5)
 - **File paths** — markdown / text / PDF references on disk
 - **URLs** — wiki / GitHub issue / spec page
 - **Inline pasted text** — content pasted directly in chat
@@ -269,7 +269,9 @@ Order matters — only after Phase 3 confirmation:
      ".worktrees/docplanner-${INTENT_SLUG}-${DOCPLANNER_ID}" \
      -b "docplanner/${INTENT_SLUG}-${DOCPLANNER_ID}" "${BASE_BRANCH}"
    ```
-2. `cd` into the new worktree for subsequent file operations.
+2. `cd` into the worktree; define+create the run-dir for all artifact
+   writes (`document-plan.md`, `document-structure.{mmd,html}`):
+   `RUN_DIR="ai-artifacts/runs/doc/${INTENT_SLUG}-${DOCPLANNER_ID}"; mkdir -p "${RUN_DIR}"`
 3. Append `.worktrees/` and `.document-planner-state.json` to the
    **worktree's** `.gitignore` if either is missing. Lands on
    `${BASE_BRANCH}` via Phase 8's merge so future contributors never
@@ -290,11 +292,11 @@ never auto-resolve.
 
 ## Phase 5 — Stub emission (feature+system)
 
-**First, write the frontmatter** at the top of `document-plan.md`
+**First, write the frontmatter** at the top of `${RUN_DIR}/document-plan.md`
 per the 8-key spec in [state-and-resume.md](references/state-and-resume.md),
 using captured state values. Then run
-`parse_frontmatter.py document-plan.md` to verify the 4 boundary
-checks pass before appending stubs.
+`parse_frontmatter.py "${RUN_DIR}/document-plan.md"` to verify the 4
+boundary checks pass before appending stubs.
 
 For each stub from Phase 3, emit the 9-field stub per
 [stub-schema.md](references/stub-schema.md), using the machine-readable
@@ -307,7 +309,7 @@ field has per-doctype semantics (word count, endpoint complexity, step
 count, bullet-slot + speaker-time) — see stub-schema.md.
 
 **In lockstep with each `## stub: <id>` heading emitted in
-`document-plan.md`**, append a matching entry to the state file's
+`${RUN_DIR}/document-plan.md`**, append a matching entry to the state file's
 `stubs[]` array: `{"id", "title", "dependencies"}` (snake_case,
 matching the YAML body's `dependencies:` list). The renderer
 (`render_doc_structure.py`) reads this array to emit the Mermaid DAG.
@@ -319,7 +321,7 @@ After all stubs are emitted, render the Mermaid DAG:
 
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/scripts/render_doc_structure.py" \
-  .document-planner-state.json --format mmd > document-structure.mmd
+  .document-planner-state.json --format mmd > "${RUN_DIR}/document-structure.mmd"
 ```
 
 The renderer fails non-zero on undeclared dependencies — fix the
@@ -342,11 +344,11 @@ Run bundled structural validators on the emitted artifacts:
 
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/scripts/parse_frontmatter.py" \
-  document-plan.md
+  "${RUN_DIR}/document-plan.md"
 python3 "${CLAUDE_SKILL_DIR}/scripts/validate_doc_structure.py" \
-  document-structure.mmd
+  "${RUN_DIR}/document-structure.mmd"
 python3 "${CLAUDE_SKILL_DIR}/scripts/validate_internal_refs.py" \
-  document-plan.md
+  "${RUN_DIR}/document-plan.md"
 ```
 
 Run all 3 sequentially (no `&&` — diagnostic mode surfaces every error
@@ -374,11 +376,11 @@ injection.
 
 ```bash
 case "${SCALE}" in
-  system)  ARTIFACTS="document-plan.md document-structure.mmd document-structure.html"
+  system)  ARTIFACTS="${RUN_DIR}/document-plan.md ${RUN_DIR}/document-structure.mmd ${RUN_DIR}/document-structure.html"
            MARKER="(document-plan-system, human-confirmed)"
            python3 "${CLAUDE_SKILL_DIR}/scripts/render_doc_structure.py" \
-             .document-planner-state.json --format html > document-structure.html ;;
-  feature) ARTIFACTS="document-plan.md document-structure.mmd"
+             .document-planner-state.json --format html > "${RUN_DIR}/document-structure.html" ;;
+  feature) ARTIFACTS="${RUN_DIR}/document-plan.md ${RUN_DIR}/document-structure.mmd"
            MARKER="(document-plan-feature, human-confirmed)" ;;
 esac
 ```
@@ -422,9 +424,11 @@ Type `confirm plan` to mark this document-planner output human-confirmed
     ```bash
     git -C "${MAIN_CHECKOUT}" checkout "${BASE_BRANCH}"
     git -C "${MAIN_CHECKOUT}" merge --no-ff "docplanner/${INTENT_SLUG}-${DOCPLANNER_ID}" \
-      -m "feat(document-planner): merge ${INTENT_SLUG} ${MARKER}"
+      -m "feat(document-planner): merge ${INTENT_SLUG} ${MARKER}" \
+      -m "AI-Artifacts-Run-Dir: ai-artifacts/runs/doc/${INTENT_SLUG}-${DOCPLANNER_ID}"
     ```
-    Explicit `-m` mandatory. **Do not** `git push` — user's call.
+    Both `-m` mandatory — 2nd is the run-dir trailer for document-implementer
+    ([implementer-contract.md](references/implementer-contract.md)). **No** `git push`.
 - `revise` → leave worktree intact, return to relevant phase.
 - Anything else → re-ask.
 

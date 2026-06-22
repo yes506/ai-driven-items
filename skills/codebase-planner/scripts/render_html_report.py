@@ -8,7 +8,8 @@ The Mermaid diagram is included as plain `<pre>` text so a reviewer can copy
 it into a Mermaid renderer; this avoids running third-party JS in the
 reviewer's browser, which would also be an XSS surface.
 
-Read-only: writes only to stdout. Caller redirects with `> architecture.html`.
+Read-only: writes only to stdout. Caller redirects with
+`> "$RUN_DIR/architecture.html"` (RUN_DIR = ai-artifacts/runs/code/<slug>-<planner-id>).
 """
 
 import html

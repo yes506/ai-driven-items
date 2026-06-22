@@ -22,12 +22,12 @@ chat-handoff block (micro/local).
 |---|---|---|---|
 | micro | `(document-plan-micro, human-confirmed)` | chat history only — no commit | chat-handoff block + in-chat confirmation token |
 | local | `(document-plan-local, human-confirmed)` | chat history only — no commit | chat-handoff block + in-chat confirmation token |
-| feature | `(document-plan-feature, human-confirmed)` | merge commit on `${BASE_BRANCH}` | `document-plan.md` + `document-structure.mmd` committed on the merged branch |
-| system | `(document-plan-system, human-confirmed)` | merge commit on `${BASE_BRANCH}` | `document-plan.md` + `document-structure.mmd` + `document-structure.html` committed on the merged branch |
+| feature | `(document-plan-feature, human-confirmed)` | merge commit on `${BASE_BRANCH}` | `$RUN_DIR/document-plan.md` + `$RUN_DIR/document-structure.mmd` committed on the merged branch |
+| system | `(document-plan-system, human-confirmed)` | merge commit on `${BASE_BRANCH}` | `$RUN_DIR/document-plan.md` + `$RUN_DIR/document-structure.mmd` + `$RUN_DIR/document-structure.html` committed on the merged branch |
 
 ## Canonical metadata source (feature + system)
 
-`document-plan.md` carries a YAML frontmatter block at the top with
+`$RUN_DIR/document-plan.md` carries a YAML frontmatter block at the top with
 `doctype`, `output_stack`, `audience`, `output_language`,
 `target_path`, `scale`, `intent_slug`, `docplanner_id`. Spec +
 boundary checks: [state-and-resume.md](state-and-resume.md). The
@@ -35,17 +35,73 @@ implementer parses the frontmatter via `parse_frontmatter.py` (bundled
 stdlib-only scalar parser; no PyYAML). Absence or malformed
 frontmatter is an implementer-side refusal.
 
+Validate the frontmatter against the **marker-tree blob**
+(`${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-plan.md`), **never the
+live worktree path** — the worktree may have advanced past the marker
+commit, so a HEAD-bound read can false-refuse a valid marker or
+false-pass a corrected-since-marker file. `parse_frontmatter.py` takes a
+file path, so extract the blob with `git cat-file -p` first (see the gate
+snippet below; the implementer mirror in
+`document-implementer/references/marker-detection.md` ships the same
+binding).
+
 ## Canonical gate check (feature + system)
 
-```bash
-# feature
-test -f document-plan.md && test -f document-structure.mmd \
-  && git log --grep='(document-plan-feature, human-confirmed)' --format=%H | grep -q .
+The run-dir is NOT a fixed path — it is carried by the
+`AI-Artifacts-Run-Dir:` git trailer on the marker merge commit. The
+document-implementer first scans `git log` for the marker, then reads
+the trailer off the marker commit to resolve `$RUN_DIR`:
 
-# system
-test -f document-plan.md && test -f document-structure.mmd && test -f document-structure.html \
-  && git log --grep='(document-plan-system, human-confirmed)' --format=%H | grep -q .
+```bash
+# 1. find the marker commit (subject grep). Feature lane shown; for the
+#    system lane use the -system grep AND set SCALE=system. (A real
+#    implementer derives SCALE from the inspector's marker scan.)
+PLANNER_MARKER_COMMIT="$(git -C "${MAIN_CHECKOUT}" log \
+  --grep='(document-plan-feature, human-confirmed)' --format=%H | head -1)"
+SCALE=feature
+
+# 2. resolve the run-dir from the SECOND -m (git trailer) on that commit
+TRAILER="$(git -C "${MAIN_CHECKOUT}" show -s --format=%B "${PLANNER_MARKER_COMMIT}" \
+  | git interpret-trailers --parse | grep '^AI-Artifacts-Run-Dir:' || true)"
+[ "$(printf '%s' "${TRAILER}" | grep -c .)" -eq 1 ] \
+  || { echo "BLOCKER: expected exactly 1 AI-Artifacts-Run-Dir trailer"; exit 1; }   # never tail -1
+RUN_DIR="$(printf '%s' "${TRAILER}" | sed 's/^AI-Artifacts-Run-Dir: *//')"
+printf '%s' "${RUN_DIR}" | grep -Eqx '^ai-artifacts/runs/doc/[a-z0-9-]+-[A-Za-z0-9._-]+$' \
+  || { echo "BLOCKER: run-dir failed allowlist"; exit 1; }   # rejects absolute, '..', whitespace
+
+# 3. verify per-lane artifacts exist at the MARKER COMMIT's tree (not HEAD).
+#    Branch by ${SCALE} so a verbatim copy checks only the lane's artifacts —
+#    a single sequential block would false-fail a valid feature run on the
+#    system-only document-structure.html.
+case "${SCALE}" in
+  feature)
+    git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-plan.md" 2>/dev/null \
+      && git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-structure.mmd" 2>/dev/null \
+      || { echo "BLOCKER: document-plan.md/document-structure.mmd missing at ${PLANNER_MARKER_COMMIT}:${RUN_DIR}"; exit 1; }
+    ;;
+  system)
+    git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-plan.md" 2>/dev/null \
+      && git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-structure.mmd" 2>/dev/null \
+      && git cat-file -e "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-structure.html" 2>/dev/null \
+      || { echo "BLOCKER: document-plan.md/document-structure.{mmd,html} missing at ${PLANNER_MARKER_COMMIT}:${RUN_DIR}"; exit 1; }
+    ;;
+  *)
+    # Fail closed: an unset/unexpected scale must never skip artifact checks.
+    echo "BLOCKER: unexpected planner marker scale: ${SCALE:-<unset>}"; exit 1
+    ;;
+esac
+
+# 4. validate frontmatter against the SAME marker-tree blob (not the worktree)
+TMP_PLAN="$(mktemp)"
+git cat-file -p "${PLANNER_MARKER_COMMIT}:${RUN_DIR}/document-plan.md" > "${TMP_PLAN}" \
+  || { rm -f "${TMP_PLAN}"; echo "BLOCKER: cannot read document-plan.md at the marker tree"; exit 1; }
+python3 "${CLAUDE_SKILL_DIR}/scripts/parse_frontmatter.py" "${TMP_PLAN}" \
+  || { rm -f "${TMP_PLAN}"; echo "BLOCKER: document-plan.md frontmatter invalid"; exit 1; }
+rm -f "${TMP_PLAN}"
 ```
+
+Any failure on a feature/system marker → REFUSE; never fall back to a
+root path. Persist the resolved dir as state field `planner_artifact_dir`.
 
 ## Canonical gate check (micro + local)
 
@@ -131,7 +187,7 @@ the marker contract above.
 
 ## `[[stub-id]]` transformation contract (feature + system)
 
-`document-plan.md` uses `[[stub-id]]` wikilink syntax for cross-stub
+`$RUN_DIR/document-plan.md` uses `[[stub-id]]` wikilink syntax for cross-stub
 references. This syntax is **intermediate** — standard markdown
 renderers display `[[foo]]` verbatim.
 
@@ -159,8 +215,9 @@ unresolved references would already have failed planner gate.
   marker — this includes a planner that crashed before Phase 8
   (feature/system) or one that printed a plan but never received
   `confirm plan` (micro/local).
-- Treat presence of `document-plan.md` alone as sufficient — the
-  marker commit must also be reachable in `git log` history.
+- Treat presence of `$RUN_DIR/document-plan.md` alone as sufficient —
+  the marker commit (carrying the `AI-Artifacts-Run-Dir:` trailer) must
+  also be reachable in `git log` history.
 - Reuse codebase-planner's marker family. `(interfaces only,
   human-confirmed)` and `(plan-<scale>, human-confirmed)` are code
   markers; a document-implementer that greps for them is a bug.
