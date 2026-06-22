@@ -10,7 +10,7 @@ canonical synthesis.
 At Phase 0.5 step 1:
 
 ```bash
-ls -1 ai-artifacts/plans/plan.*.v*.md 2>/dev/null
+ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/plans/plan.*.v*.md 2>/dev/null
 ```
 
 If multiple plans exist for distinct intent slugs, ask the user which

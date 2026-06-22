@@ -54,7 +54,7 @@ Phase 1: Intent selection + seed loading + version pick (N = max(existing) + 1)
 Phase 2: Verification — 4 dimensions → in-memory FINDINGS list
 Phase 3: Iterative ambiguity resolution + synthesis + `confirm plan` gate
 Phase 4: Worktree creation (FIRST mutation) — .worktrees/plan-<intent-slug>-<id>/
-Phase 5: Emit plan.<intent-slug>.v<N>.{md,html} at repo root (race-guard re-scan) + commit
+Phase 5: Emit plan.<intent-slug>.v<N>.{md,html} under ai-artifacts/plans/ (race-guard re-scan) + commit
 Phase 6: Human gate + merge (`confirm merge` → marker `(plan, human-confirmed)`)
 ```
 
@@ -123,7 +123,7 @@ Capture from JSON: `MAIN_CHECKOUT`, `default_branch`. Set
 
 ## Phase 1 — Intent selection + seed loading + version pick
 
-**1a — Intent selection.** Discover `intent.*.md` files at repo root:
+**1a — Intent selection.** Discover `intent.*.md` files under `ai-artifacts/intents/`:
 
 ```bash
 ls -1 "${MAIN_CHECKOUT}"/ai-artifacts/intents/intent.*.md 2>/dev/null
@@ -312,7 +312,7 @@ actually-used N. Full algorithm + notification strings:
 
 Then (all **plan-file** writes happen at the **worktree root**, not
 at `MAIN_CHECKOUT` — Phase 6's `git merge --no-ff` is what brings
-the files to the repo root on `${BASE_BRANCH}` where
+the files under `ai-artifacts/plans/` on `${BASE_BRANCH}` where
 the downstream planner reads them; the `.plan-state.json` written by
 Phase 4 / updated by Phase 5 also lives at the worktree root but
 stays gitignored throughout):
