@@ -13,7 +13,7 @@ GEMINI.md
 # scaffolded projects; including them here is belt-and-suspenders so they
 # never accidentally land in this repo)
 .worktrees/
-.scaffold-state.json
+.*-state.json
 
 # Skill packaging output from skill-creator's package_skill.py
 *.skill
