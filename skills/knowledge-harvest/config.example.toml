@@ -1,0 +1,28 @@
+# knowledge-harvest config. Copy to config.toml (gitignored) and edit.
+# No value is guessed from the filesystem — the vault path must be explicit.
+
+[vault]
+# Absolute path to your Obsidian vault root. The skill only ever writes under
+# <path>/Knowledge/ (six category folders + _needs-review + operational .state/
+# and .ledger/). ~ is expanded.
+#
+# Use ONE global home-level vault shared by every project — NOT a per-project
+# path. Knowledge is asset-ized globally: sources are per-project (the harvested
+# git diff / transcript), but the notes, the dedup index, and the ledger are
+# global, so the same concept learned in project A and re-hit in project B maps
+# to a single note (each note's `sources[]` records which project/commit
+# contributed). Point this at e.g. ~/Obsidian/DevKnowledge and leave it fixed.
+path = "~/Obsidian/DevKnowledge"
+
+[limits]
+max_units_per_run = 12                  # cap knowledge units distilled per cycle
+max_index_entries_per_category = 2000   # bound the fuzzy-match index
+consolidation_delta_threshold = 8       # propose consolidation past N update deltas
+
+[hook]
+# Optional auto-harvest adapter. OFF by default. See references/hook-automation.md
+# before enabling — it is experimental and draft-only until you have run the
+# per-CLI "<=1 recursion" test. When true, hook mode still writes to _needs-review
+# only (no active-note updates) unless hook_allow_active_updates is set.
+enabled = false
+hook_allow_active_updates = false

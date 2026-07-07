@@ -1,0 +1,4 @@
+# knowledge-harvest runtime deps. Install with: pip install -r requirements.txt
+# (No pinned major versions — see repo CLAUDE.md.)
+PyYAML                      # frontmatter parsing (build_index, validate_note, apply_plan)
+tomli; python_version < "3.11"   # config.toml parsing on Python < 3.11 (3.11+ has tomllib)
