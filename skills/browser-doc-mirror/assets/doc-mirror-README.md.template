@@ -1,0 +1,71 @@
+<!-- browser-doc-mirror -->
+<!-- ↑ sentinel line — do not remove. It marks this directory as a
+     browser-doc-mirror root so the skill adopts (not re-bootstraps) it. -->
+
+# <mirror-root>/ — 원천 지식 미러 (browser-doc-mirror)
+
+이 디렉토리는 **사내 원천 문서(Confluence/위키 등)의 읽기 전용 로컬 미러**다.
+`browser-doc-mirror` 스킬이 브라우저 로그인 세션으로 원문을 받아와 생성한다.
+
+This directory is a **read-only local mirror of internal source documents**
+(Confluence / wiki / etc.), produced by the `browser-doc-mirror` skill via the
+user's browser login session.
+
+## 원칙 (Principles)
+
+- **원천이 단일 진실 (source of truth).** 로컬은 캐시일 뿐. 미러 파일을 편집해도
+  원문에 반영되지 않으며, 편집/역동기화는 하지 않는다.
+- **버전관리 제외.** 이 미러 루트는 gitignore 대상(사내 지식). 외부로 전송 금지.
+- **읽기 전용.** 자격증명 입력·게시·삭제 등 side-effect 없음.
+
+## 레이아웃 (Layout)
+
+```
+<mirror-root>/
+  README.md              # 이 파일 (sentinel 포함)
+  <mirror-subtree>/      # 원문 서브트리 미러 — 소스 트리명으로 치환(예: planning/, arch/)
+    _manifest.md         # 페이지 인덱스 + 현행화 상태
+    <번호>-<슬러그>.md    # 원문 계층/번호 보존한 개별 미러 파일
+  analysis/              # 원문에서 파생한 분석/설계 노트 (미러와 분리)
+```
+<!-- bootstrap 시 <mirror-root> 와 <mirror-subtree> 를 실제 이름으로 치환한다.
+     Substitute <mirror-root> and <mirror-subtree> with the real names at bootstrap. -->
+
+## Frontmatter 규격 (per mirror file)
+
+Confluence는 `confluence_*` 키를 **필수**로 쓴다(그 외 소스는 `source_*`):
+
+```yaml
+---
+title: "<원문 제목>"
+confluence_id: <page id>            # 비-Confluence: source_id
+confluence_url: <canonical permalink — 인증/추적 파라미터 제거>
+confluence_version: <리비전 id, 없으면 ->   # 비-Confluence: source_revision
+author: <작성자, 없으면 ->
+confluence_updated: <YYYY-MM-DD>    # 원문 Updated 날짜, 없으면 -
+synced_at: <YYYY-MM-DD>             # 본문 받아온 날짜 (현행성 확인일은 _manifest.md)
+status: <WIP|정본|->
+parent: <상위 미러 슬러그>
+---
+```
+
+**현행화 판정:** 리비전 id(있으면) 비교로 stale 판정. 비교 가능한 리비전이 없고
+날짜만 있으면(같은 날 수정 놓침) `unknown` → 기본 전량 재미러. 현행성 확인일
+(`checked_at`)은 `_manifest.md` 에만 둔다(변경 없는 파일은 재작성하지 않으므로).
+Staleness by revision id; a bare date can't prove unchanged → `unknown` → full
+re-mirror. `checked_at` lives in `_manifest.md` only.
+
+## 동기화 절차 (Sync procedure)
+
+작업(operation)은 니즈에 따라 선택 / operation is chosen by need:
+**최초신규(initial)** · **현행화(refresh)** · **신규추가(add)** · **단건·부분(targeted)**.
+
+1. `_manifest.md`에서 대상/우선순위/작업 범위 확인.
+2. `/browser-doc-mirror` 실행 → 작업 확인 후 브라우저로 원문 페이지 받아와 미러
+   파일 갱신 (신규는 생성, 기존은 도메인 메모 보존 후 원자적 교체; 현행화는 원문이
+   실제로 바뀐 페이지만 refresh).
+3. 각 파일 하단 `> 도메인 메모(@handle)`에 담당 관점 요약 추가(원문과 구분).
+4. `_manifest.md` 상태·날짜 갱신.
+
+전체 워크플로와 브라우저 조작 함정은 스킬의 `SKILL.md` /
+`references/browser-pitfalls.md` 참고.

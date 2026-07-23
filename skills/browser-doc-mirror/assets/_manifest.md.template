@@ -1,0 +1,36 @@
+# _manifest — <소스 트리/스페이스 이름 / source tree/space name>
+
+- **소스 (Source):** <space/root 이름 및 URL / space or root name + URL>
+- **동기화 방식 (Sync method):** 브라우저 (claude-in-chrome) — 커넥터 우회
+- **로컬파일 경로 (Local-file paths):** 미러 루트 기준 상대경로 / relative to the
+  mirror root (e.g. `<mirror-subtree>/03-01-con-설계개요.md`)
+- **현행화 (Staleness):** 원격 재확인으로 판정 — 저장된 날짜만으로는 이후 변경을
+  탐지 못함. Detected by re-reading the source on a refresh pass; stored dates
+  alone cannot discover a later upstream edit.
+
+## 페이지 인덱스 (Page index)
+
+> 최초 미러: 트리 전체를 먼저 `pending`으로 등록하고 받아온 페이지만 `synced`.
+> Initial mirror: register whole tree `pending`, flip to `synced` as fetched.
+> 재동기화(현행화): 기존 `synced` 행을 리셋하지 말고 reconcile — 원문 갱신 확인 시
+> `stale`, 신규 상위 페이지는 `pending`, 현행성 판정 불가(리비전/날짜 비교 불가)는
+> `unknown`, 원문에서 사라진 페이지는 `removed?`(로컬 파일 유지, 사용자 판단 대기).
+> Re-sync: reconcile, don't reset — `stale` (source changed), `pending` (new
+> upstream), `unknown` (can't prove fresh), `removed?` (gone upstream; local kept).
+
+| # | 페이지 (Page) | 소스 ID (Source ID) | 리비전 (Revision) | 상태 (Status) | 원문갱신 (Src updated) | 확인 (Checked) | 동기화 (Synced) | 로컬파일 (Local file) |
+|---|---------------|---------------------|-------------------|---------------|------------------------|----------------|-----------------|-----------------------|
+|   |               |                     |                   |               |                        |                |                 |                       |
+
+<!-- 리비전 = confluence_version(Confluence) 또는 source_revision(그 외), 없으면 -.
+     확인(Checked) = 마지막 원격 현행성 확인일(checked_at). 없는 값은 -.
+     Revision = confluence_version (Confluence) / source_revision (other), - if none.
+     Checked = date of the last remote freshness probe (checked_at). -->
+
+
+## 우선순위 (Priority)
+
+담당 도메인 관점에서 먼저 미러할 대상. / Own-domain pages to mirror first.
+
+<!-- 실제 대상으로 채운다 — 예시 행/항목을 남기지 말 것.
+     Fill with real targets — do not leave example rows/items behind. -->
