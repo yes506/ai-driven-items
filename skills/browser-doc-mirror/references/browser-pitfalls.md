@@ -35,6 +35,31 @@ and "the table is half empty" failures.
   existence and a filename in a `note` inside the mirror file; never fabricate
   their content.
 
+## Large-page extraction
+
+- **`javascript_tool` return is capped (~1.5KB) — route bulk text through
+  `get_page_text`.** Returning a big string from `javascript_tool` truncates at
+  ~1.5KB. To pull a full page — or a locally-converted markdown string held in a
+  page variable — assign it into a `<pre>`:
+  `document.body.innerHTML='<pre id=x></pre>'; document.getElementById('x').textContent = BIG;`
+  (`<pre>` preserves the newlines that `innerText` would otherwise collapse — set
+  `textContent` on a non-`pre` and your markdown tables lose every row break),
+  then call `get_page_text`. Wrap the payload in unique
+  `<<<MD-START>>>` / `<<<MD-END>>>` markers so you can slice it out cleanly.
+- **`get_page_text` truncates at 50,000 chars by default — pass `max_chars`.**
+  Beyond ~50KB the output is silently cut ("output truncated at 50000 of N
+  characters"). Pass `max_chars` above the page size (e.g. `max_chars: 90000`).
+  When the result exceeds the inline limit it is persisted to a
+  `tool-results/*.json` file instead of returned inline — read that file with a
+  script (`json → results[0].text → slice between the markers`) and assemble the
+  mirror file on disk. That keeps the whole large body out of the model context.
+- **REST `body.export_view` beats scroll-scraping for field tables.** For
+  Confluence, `fetch('/wiki/rest/api/content/{id}?expand=body.export_view')`
+  (same-origin, in the authenticated tab) returns fully server-rendered HTML with
+  every expand/collapse macro already expanded — no lazy-load scrolling. Convert
+  that HTML to markdown in-page, then extract via the `<pre>`+`get_page_text`
+  path above.
+
 ## Session stability
 
 - **Confirm the session each run.** Call `tabs_context_mcp` at least once per
